@@ -107,6 +107,8 @@ $('#start').onclick = () => {
   ctx = new (window.AudioContext || window.webkitAudioContext)(); ctx.resume();
   ring(); keepAwake(); $('#gate').remove();
 };
+// Inside the Sunmi staff app the alarm may play without a tap, so start straight away.
+if (/AcaiDoseApp/.test(navigator.userAgent)) $('#start').click();
 setInterval(() => {
   const hasNew = [...orders.values()].some(o => o.status === 'new');
   const arrivedWaiting = [...orders.values()].some(o => o.arrived_at && !seenArrived.has(o.id));

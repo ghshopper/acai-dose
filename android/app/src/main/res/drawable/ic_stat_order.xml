@@ -1,0 +1,5 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <!-- simple cup: white silhouette as Android requires for status-bar icons -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M5,6h14l-1.6,14.2c-0.1,1 -1,1.8 -2,1.8H8.6c-1,0 -1.9,-0.8 -2,-1.8L5,6zM4,3h16v2H4zM13,0h2l-1,3h-2z"/>
+</vector>

@@ -97,6 +97,28 @@ public class MainActivity extends Activity {
 
         if (savedInstanceState != null) web.restoreState(savedInstanceState);
         else web.loadUrl(START_URL);
+
+        // Background order alarm: ask to show notifications (Android 13+), then start listening.
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != android.content.pm.PackageManager.PERMISSION_GRANTED)
+            requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 1);
+        OrderWatchService.start(this);
+    }
+
+    /** Tapping an order alert opens the orders screen. */
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        if (intent != null && "screen".equals(intent.getStringExtra("open"))) {
+            String u = web.getUrl();
+            if (u == null || !u.contains("/screen")) web.loadUrl(START_URL);
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        OrderWatchService.appVisible = true;
+        OrderWatchService.start(this);   // restarts it if the worker pressed Stop earlier
     }
 
     /** Stay inside order.acaiee.com; open maps, phone and other links in their own apps. */
@@ -149,6 +171,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
+        OrderWatchService.appVisible = false;
         CookieManager.getInstance().flush();
     }
 }

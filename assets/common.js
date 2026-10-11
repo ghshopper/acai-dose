@@ -68,3 +68,43 @@ export async function requireLogin(root, title, en = false) {
 }
 
 export async function logout() { try { await api('logout', {}); } catch { /* ignore */ } location.reload(); }
+
+/**
+ * Order alarm for staff pages other than the orders screen (e.g. POS):
+ * checks every 5 s and, while a website order is still "New", beeps and shows a bar linking to the screen.
+ * Browsers only allow sound after a first tap; the staff app allows it straight away.
+ */
+export function watchNewOrders() {
+  let ctx = null;
+  const unlock = () => { if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return; } } ctx.resume(); };
+  if (/AcaiDoseApp/.test(navigator.userAgent)) unlock();
+  document.addEventListener('pointerdown', unlock, { passive: true });
+  const bar = document.createElement('a');
+  bar.href = 'screen.html'; bar.setAttribute('role', 'alert');
+  bar.style.cssText = 'position:fixed;inset:auto 0 0 0;z-index:50;display:none;background:#E39A2E;color:#470D43;text-align:center;font:800 22px/1.3 Montserrat,Tajawal,system-ui,sans-serif;padding:16px;text-decoration:none';
+  document.body.appendChild(bar);
+  const ring = () => {
+    if (!ctx || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    [0, 0.2, 0.4, 0.75, 0.95, 1.15].forEach((d, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'square'; o.frequency.value = i % 3 === 2 ? 1320 : 990;
+      g.gain.setValueAtTime(0.0001, t + d); g.gain.exponentialRampToValueAtTime(0.35, t + d + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.16);
+      o.connect(g).connect(ctx.destination); o.start(t + d); o.stop(t + d + 0.18);
+    });
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+  };
+  let waiting = 0;
+  const check = async () => {
+    try {
+      const list = await api('active_orders');
+      const fresh = list.filter(o => o.status === 'new');
+      waiting = fresh.length;
+      bar.textContent = waiting ? `New website order${waiting > 1 ? 's' : ''} (${waiting}) — tap to open the Orders screen and Accept` : '';
+      bar.style.display = waiting ? 'block' : 'none';
+    } catch { /* offline or logged out: try again next time */ }
+  };
+  check(); setInterval(check, 5000);
+  setInterval(() => { if (waiting) ring(); }, 3000);
+}

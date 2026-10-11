@@ -2,8 +2,9 @@
 declare(strict_types=1);
 date_default_timezone_set('Asia/Muscat');
 // Database settings live outside the website folder (survives updates), with api/config.php as a fallback.
-$__cfg = dirname(__DIR__, 3) . '/acai-config.php';
-require is_file($__cfg) ? $__cfg : __DIR__ . '/config.php';
+$__base = dirname(__DIR__, 3);
+$__cfg = is_file("$__base/acai-config.php") ? "$__base/acai-config.php" : (is_file("$__base/config.php") ? "$__base/config.php" : __DIR__ . '/config.php');
+require $__cfg;
 
 function db(): PDO {
     static $pdo = null;

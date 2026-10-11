@@ -9,7 +9,7 @@ PHP + MySQL, runs on Hostinger shared hosting.
 | `pos.html` | Staff: in-shop sales (English) | `/pos` |
 | `dashboard.html` | Owner: sales, app commissions, expenses, profit | `/dashboard` |
 
-Database settings are read from `acai-config.php` one level above `public_html`
+Database settings are read from `acai-config.php` (or `config.php`) one level above `public_html`
 (falls back to `api/config.php`). Copy `api/config.example.php` there and fill it in.
 First run: open `/api/setup.php` to create tables and the owner account.
 New columns are added automatically on the first request after an update.

@@ -339,6 +339,18 @@ case 'wallet_setup':  // owner uploads the Apple Pass Type ID certificate once
     if (!$p12 || !$wwdr) fail('missing_files');
     out(wallet_install($p12, (string)($in['password'] ?? ''), $wwdr));
 
+case 'wallet_csr':    // owner: request file to upload to Apple (no Mac needed)
+    $post(); need('owner');
+    require_once __DIR__ . '/wallet_lib.php';
+    out(['csr' => wallet_csr()]);
+
+case 'wallet_cer':    // owner: the certificate Apple issued for that request
+    $post(); need('owner');
+    require_once __DIR__ . '/wallet_lib.php';
+    $cer = base64_decode((string)($in['cer'] ?? ''), true); $wwdr = base64_decode((string)($in['wwdr'] ?? ''), true);
+    if (!$cer || !$wwdr) fail('missing_files');
+    out(wallet_install_cer($cer, $wwdr));
+
 case 'save_loyalty':
     $post(); need('owner');
     $need = (int)($in['need'] ?? 5); if ($need < 2 || $need > 30) fail('bad_need');

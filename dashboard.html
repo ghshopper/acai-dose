@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Açaí Dose">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="stylesheet" href="assets/app.css?v=1791722563">
+<link rel="stylesheet" href="assets/app.css?v=1791723325">
 <style>
 body{background:var(--c2)}
 .wrap{max-width:1100px;margin:0 auto;padding:16px}
@@ -58,7 +58,7 @@ setTimeout(function(){if(!window.__appStarted)show('The page script did not run.
 <body>
 <div id="app"></div>
 <script type="module">
-import { api, msg, $, $$, esc, money, ymd, requireLogin, logout } from './assets/common.js?v=1791722563';
+import { api, msg, $, $$, esc, money, ymd, requireLogin, logout } from './assets/common.js?v=1791723325';
 window.__appStarted = true;
 (async () => {
 const app = $('#app');
@@ -331,13 +331,27 @@ async function drawSettings() {
         ? `<span class="ok">شغالة ✓</span> · <span dir="ltr">${esc(st.wallet.pass_type)}</span>${st.wallet.expires ? ` · الشهادة تنتهي ${esc(st.wallet.expires)}` : ''}`
         : '<span class="pill">مب مفعّلة للحين</span> العملاء يشوفون البطاقة في الموقع، وزر المحفظة يظهر بعد ما ترفع الشهادة.'}</div>
       ${!st.wallet.has_zip || !st.wallet.has_openssl ? '<div class="err">السيرفر ناقصه إضافة zip أو openssl. فعّلها من إعدادات PHP في Hostinger.</div>' : ''}
-      <form id="wf" class="formrow" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div style="display:grid;gap:10px;line-height:1.7;font-weight:700">
+        <div><b>١.</b> اضغط الزر ونزّل ملف الطلب:
+          <button class="btn small" id="wcsr" type="button">نزّل ملف طلب الشهادة</button></div>
+        <div><b>٢.</b> في موقع أبل للمطورين، افتح المعرّف <span dir="ltr" style="unicode-bidi:isolate">pass.com.acaidose.loyalty</span> واضغط <span dir="ltr" style="unicode-bidi:isolate">Create Certificate</span>، ارفع الملف، ونزّل <span dir="ltr" style="unicode-bidi:isolate">pass.cer</span></div>
+        <div><b>٣.</b> نزّل شهادة <span dir="ltr" style="unicode-bidi:isolate">Worldwide Developer Relations - G4</span> من <span dir="ltr" style="unicode-bidi:isolate">apple.com/certificateauthority</span></div>
+        <div><b>٤.</b> ارفع الملفين هني:</div>
+      </div>
+      <form id="wcf" class="formrow" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+        <div class="field"><label for="wcer">ملف pass.cer من أبل</label><input type="file" id="wcer" accept=".cer,.crt,.pem"></div>
+        <div class="field"><label for="wwdr2">ملف G4 من أبل</label><input type="file" id="wwdr2" accept=".cer,.pem,.crt"></div>
+        <button class="btn" type="submit">ارفع وفعّل</button>
+        <div class="err" id="wcerr" role="status" style="flex-basis:100%"></div>
+      </form>
+      <details><summary style="cursor:pointer;font-weight:700;opacity:.75">عندك ملف .p12 من الماك؟</summary>
+      <form id="wf" class="formrow" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:10px">
         <div class="field"><label for="wp12">شهادة Pass Type ID (.p12)</label><input type="file" id="wp12" accept=".p12,.pfx"></div>
         <div class="field"><label for="wpw">كلمة سر الشهادة</label><input type="password" id="wpw" autocomplete="off"></div>
         <div class="field"><label for="wwdr">شهادة Apple WWDR G4 (.cer)</label><input type="file" id="wwdr" accept=".cer,.pem,.crt"></div>
-        <button class="btn" type="submit">${st.wallet.ready ? 'غيّر الشهادة' : 'ارفع وفعّل'}</button>
+        <button class="btn" type="submit">ارفع وفعّل</button>
         <div class="err" id="werr" role="status" style="flex-basis:100%"></div>
-      </form>
+      </form></details>
     </div>
 
     <h3 class="lal">المنيو والأسعار</h3>
@@ -376,6 +390,26 @@ async function drawSettings() {
     e.preventDefault();
     try { await api('save_loyalty', { on: $('#lon').checked, need: +$('#lneed').value, unit: $('#lunit').value }); $('#lerr2').style.color = 'var(--ok)'; $('#lerr2').textContent = 'انحفظ ✓'; }
     catch (ex) { $('#lerr2').style.color = ''; $('#lerr2').textContent = ex.message === 'bad_need' ? 'العدد من ٢ إلى ٣٠' : msg(ex); }
+  };
+  const WERR = { p12_unreadable: 'ما قدرت أفتح ملف .p12، تأكد من كلمة السر', not_pass_cert: 'هذي مب شهادة Pass Type ID', bad_wwdr: 'ملف G4 غلط',
+    missing_files: 'اختر الملفين', no_pending_key: 'نزّل ملف طلب الشهادة أول (الخطوة ١)', bad_cer: 'ملف pass.cer غلط',
+    cer_mismatch: 'هذي الشهادة مب لآخر ملف طلب نزّلته. ارفع لأبل آخر ملف طلب ونزّل شهادة جديدة' };
+  $('#wcsr').onclick = async () => {
+    if (st.wallet.ready && !confirm('البطاقة شغالة. تبي تبدأ شهادة جديدة؟ القديمة تظل شغالة لين ترفع الجديدة.')) return;
+    try {
+      const r = await api('wallet_csr', {});
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([r.csr], { type: 'application/octet-stream' }));
+      a.download = 'AcaiDose.certSigningRequest'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    } catch (ex) { $('#wcerr').textContent = msg(ex); }
+  };
+  const b64f = async f => { const u = new Uint8Array(await f.arrayBuffer()); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
+  $('#wcf').onsubmit = async e => {
+    e.preventDefault();
+    const err = $('#wcerr'); err.style.color = ''; err.textContent = '';
+    const a = $('#wcer').files[0], b = $('#wwdr2').files[0];
+    if (!a || !b) { err.textContent = 'اختر الملفين: pass.cer وملف G4'; return; }
+    try { await api('wallet_cer', { cer: await b64f(a), wwdr: await b64f(b) }); drawSettings(); }
+    catch (ex) { err.textContent = WERR[ex.message] || msg(ex); }
   };
   $('#wf').onsubmit = async e => {
     e.preventDefault();

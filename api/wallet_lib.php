@@ -29,13 +29,45 @@ function wallet_status(): array {
 function wallet_install(string $p12, string $pass, string $wwdr): array {
     $certs = [];
     if (!openssl_pkcs12_read($p12, $certs, $pass)) fail('p12_unreadable');
-    $x = openssl_x509_parse($certs['cert']);
+    $key = ''; openssl_pkey_export($certs['pkey'], $key);
+    return wallet_save($certs['cert'], $key, $wwdr);
+}
+
+function to_pem(string $der): string {
+    return str_contains($der, '-----BEGIN CERTIFICATE-----') ? $der
+        : "-----BEGIN CERTIFICATE-----\n" . chunk_split(base64_encode($der), 64, "\n") . "-----END CERTIFICATE-----\n";
+}
+
+/** Step 1 without a Mac: the server makes the private key and the request file to upload to Apple. */
+function wallet_csr(): string {
+    $key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
+    $csr = openssl_csr_new(['commonName' => 'Acai Dose', 'countryName' => 'OM', 'stateOrProvinceName' => 'Muscat', 'organizationName' => 'Acai Dose'], $key, ['digest_alg' => 'sha256']);
+    if (!$key || !$csr) fail('csr_failed', 500);
+    $pem = ''; openssl_pkey_export($key, $pem);
+    $f = wallet_dir() . '/key-pending.pem'; file_put_contents($f, $pem); @chmod($f, 0600);
+    $out = ''; openssl_csr_export($csr, $out);
+    return $out;
+}
+
+/** Step 2: the pass.cer Apple gave back for that request, plus Apple's WWDR G4 certificate. */
+function wallet_install_cer(string $cer, string $wwdr): array {
+    $f = wallet_dir() . '/key-pending.pem';
+    if (!is_file($f)) fail('no_pending_key');
+    $cert = to_pem($cer); $key = (string)file_get_contents($f);
+    if (!openssl_x509_parse($cert)) fail('bad_cer');
+    if (!openssl_x509_check_private_key($cert, $key)) fail('cer_mismatch');
+    $st = wallet_save($cert, $key, $wwdr);
+    @unlink($f);
+    return $st;
+}
+
+function wallet_save(string $cert, string $key, string $wwdr): array {
+    $x = openssl_x509_parse($cert);
     $uid = $x['subject']['UID'] ?? ''; $team = $x['subject']['OU'] ?? '';
     if (!str_starts_with($uid, 'pass.') || $team === '') fail('not_pass_cert');
-    if (!str_contains($wwdr, '-----BEGIN CERTIFICATE-----'))
-        $wwdr = "-----BEGIN CERTIFICATE-----\n" . chunk_split(base64_encode($wwdr), 64, "\n") . "-----END CERTIFICATE-----\n";
+    $wwdr = to_pem($wwdr);
     if (!openssl_x509_parse($wwdr)) fail('bad_wwdr');
-    $key = ''; openssl_pkey_export($certs['pkey'], $key);
+    $certs = ['cert' => $cert];
     $d = wallet_dir();
     foreach (['cert.pem' => $certs['cert'], 'key.pem' => $key, 'wwdr.pem' => $wwdr, 'apns.pem' => $certs['cert'] . "\n" . $key] as $f => $v) {
         file_put_contents("$d/$f", $v); @chmod("$d/$f", 0600);

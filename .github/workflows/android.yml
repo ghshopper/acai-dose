@@ -3,7 +3,7 @@ name: Build staff app (Sunmi)
 on:
   push:
     branches: [main]
-    paths: ['android/**', '.github/workflows/android.yml']
+    paths: ['staff_app/**', '.github/workflows/android.yml']
   workflow_dispatch:
 
 permissions:
@@ -20,23 +20,52 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: subosito/flutter-action@v2
         with:
-          gradle-version: '8.9'
+          channel: stable
+          cache: true
 
-      - name: Accept SDK licences
-        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+      - name: Build APK (Flutter)
+        working-directory: staff_app
+        run: |
+          set -o pipefail
+          flutter --version 2>&1 | tee ../build.log
+          # Generate the standard Android project files; our own files are kept as they are
+          flutter create --org com.acaidose --project-name staff --platforms android . 2>&1 | tee -a ../build.log
+          rm -f test/widget_test.dart
+          flutter pub get 2>&1 | tee -a ../build.log
+          flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee -a ../build.log || true
+          flutter build apk --release 2>&1 | tee -a ../build.log
 
-      - name: Build APK
-        run: gradle -p android assembleRelease --no-daemon --stacktrace
+      - name: Sign with the shop key (installs over earlier versions)
+        run: |
+          set -o pipefail
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/apksigner" sign --ks staff_app/keystore/acai-staff.jks --ks-pass pass:acaidose-staff \
+            --ks-key-alias acai --key-pass pass:acaidose-staff \
+            --out acai-dose-staff.apk staff_app/build/app/outputs/flutter-apk/app-release.apk 2>&1 | tee -a build.log
+          "$BT/apksigner" verify acai-dose-staff.apk 2>&1 | tee -a build.log
 
       - name: Publish to the "app-latest" release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp android/app/build/outputs/apk/release/app-release.apk acai-dose-staff.apk
           gh release delete app-latest --yes --cleanup-tag || true
           gh release create app-latest acai-dose-staff.apk \
             --title "Açaí Dose staff app" \
             --notes "Install on the Sunmi device. Built from ${GITHUB_SHA::7}." \
             --latest
+
+      - name: Keep the build log on the ci-logs branch
+        if: always()
+        run: |
+          cp build.log /tmp/build.log 2>/dev/null || echo "no log" > /tmp/build.log
+          git config user.name "ci"
+          git config user.email "ci@users.noreply.github.com"
+          git checkout -q --orphan ci-logs
+          git rm -rfq --cached . || true
+          git clean -fdxq
+          cp /tmp/build.log build.log
+          git add build.log
+          git commit -qm "Build log for ${GITHUB_SHA::7} (${{ job.status }})"
+          git push -fq origin ci-logs

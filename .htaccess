@@ -17,7 +17,7 @@ RewriteRule ^(.+?)/?$ $1.html [L]
 <FilesMatch "^(README\.md|\.gitignore)$">
   Require all denied
 </FilesMatch>
-RedirectMatch 404 ^/(android|\.github|\.git)(/|$)
+RedirectMatch 404 ^/(android|staff_app|tools|\.github|\.git)(/|$)
 # Always check for a fresh copy so updates reach the shop devices straight away.
 <IfModule mod_headers.c>
 <FilesMatch "\.(html|js|css)$">

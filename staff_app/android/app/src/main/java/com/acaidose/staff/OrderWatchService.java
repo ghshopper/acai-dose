@@ -18,7 +18,8 @@ import android.os.IBinder;
 import android.os.PowerManager;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
-import android.webkit.CookieManager;
+import android.content.SharedPreferences;
+import android.media.Ringtone;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -35,12 +36,14 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Keeps listening for website orders while the app is in the background or closed.
- * A "New" order sounds the alarm on a loop until a worker accepts it; a customer tapping
- * "I'm here" gives one alert. While the app is open the web pages ring by themselves.
+ * A "New" order sounds the alarm on a loop until a worker accepts it (also while the app is open);
+ * a customer tapping "I'm here" gives one alert. Notifications only show when the app is not on screen.
  */
 public class OrderWatchService extends Service {
 
-    static final String API = "https://" + MainActivity.HOST + "/api/api.php?a=active_orders";
+    static final String HOST = "order.acaiee.com";
+    static final String API = "https://" + HOST + "/api/api.php?a=active_orders";
+    static final String PREFS = "watch";
     static final String CH_RUN = "watch";
     static final String CH_ALERT = "orders_v1";
     static final int ID_RUN = 1, ID_ALERT = 2, ID_ARRIVED = 3;
@@ -55,7 +58,16 @@ public class OrderWatchService extends Service {
     private final Set<Integer> arrivedSeen = new HashSet<>();
     private boolean firstPoll = true;
 
+    /** Saves the login cookie the Flutter side got; empty = logged out. */
+    static void saveCookie(Context c, String cookie) {
+        c.getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("cookie", cookie == null ? "" : cookie).apply();
+    }
+    static String cookie(Context c) {
+        return c.getSharedPreferences(PREFS, MODE_PRIVATE).getString("cookie", "");
+    }
+
     static void start(Context c) {
+        if (cookie(c).isEmpty()) return;
         Intent i = new Intent(c, OrderWatchService.class);
         try {
             if (Build.VERSION.SDK_INT >= 26) c.startForegroundService(i); else c.startService(i);
@@ -72,7 +84,7 @@ public class OrderWatchService extends Service {
                 .setOngoing(true)
                 .addAction(new Notification.Action.Builder(null, "Stop", stopIntent()).build())
                 .build();
-        if (Build.VERSION.SDK_INT >= 29) startForeground(ID_RUN, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
+        if (Build.VERSION.SDK_INT >= 34) startForeground(ID_RUN, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
         else startForeground(ID_RUN, n);
 
         PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
@@ -104,8 +116,8 @@ public class OrderWatchService extends Service {
 
     private void poll() {
         try {
-            String cookie = CookieManager.getInstance().getCookie("https://" + MainActivity.HOST);
-            if (cookie == null || cookie.isEmpty()) { stopAlarm(); return; }
+            String cookie = cookie(this);
+            if (cookie.isEmpty()) { stopAlarm(); stopSelf(); return; }
             HttpURLConnection c = (HttpURLConnection) new URL(API).openConnection();
             c.setConnectTimeout(8000); c.setReadTimeout(8000);
             c.setRequestProperty("Cookie", cookie);
@@ -132,21 +144,25 @@ public class OrderWatchService extends Service {
             firstPoll = false;
 
             NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            if (newCount > 0) {
+                startAlarm();
+            } else {
+                stopAlarm();
+            }
             if (newCount > 0 && !appVisible) {
                 String title = newCount == 1 ? "New order #" + firstRef : newCount + " new orders";
                 String text = (firstCar != null && !firstCar.isEmpty() ? "Car " + firstCar + " · " : "") + "Open the app and press Accept";
                 nm.notify(ID_ALERT, base(CH_ALERT).setContentTitle(title).setContentText(text)
                         .setCategory(Notification.CATEGORY_ALARM).setOngoing(true).setOnlyAlertOnce(true)
                         .setFullScreenIntent(openIntent(), true).build());
-                startAlarm();
             } else {
                 nm.cancel(ID_ALERT);
-                stopAlarm();
             }
-            if (arrivedCar != null && !appVisible) {
-                nm.notify(ID_ARRIVED, base(CH_ALERT).setContentTitle("Customer is here")
+            if (arrivedCar != null) {
+                if (!appVisible) nm.notify(ID_ARRIVED, base(CH_ALERT).setContentTitle("Customer is here")
                         .setContentText(arrivedCar.isEmpty() ? "A customer has arrived" : "Car " + arrivedCar + " has arrived")
                         .setAutoCancel(true).build());
+                beep();
                 buzz();
             }
         } catch (Exception e) {
@@ -190,6 +206,14 @@ public class OrderWatchService extends Service {
         player = null;
     }
 
+    private void beep() {
+        try {
+            Uri u = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+            Ringtone r = RingtoneManager.getRingtone(this, u);
+            if (r != null) r.play();
+        } catch (Exception ignored) { }
+    }
+
     private void buzz() {
         Vibrator v = (Vibrator) getSystemService(VIBRATOR_SERVICE);
         if (v == null || !v.hasVibrator()) return;
@@ -221,7 +245,7 @@ public class OrderWatchService extends Service {
     }
 
     private PendingIntent openIntent() {
-        Intent i = new Intent(this, MainActivity.class).putExtra("open", "screen")
+        Intent i = new Intent(this, MainActivity.class)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         return PendingIntent.getActivity(this, 0, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }

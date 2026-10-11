@@ -25,3 +25,10 @@ New columns are added automatically on the first request after an update.
 - Google Wallet: upload a Google Cloud service-account key (.json) and the Issuer ID in Dashboard → Settings.
   Android customers then see "Add to Google Wallet" (`api/gwallet.php`); stamps update through the Wallet REST API.
 - Card artwork for both wallets is drawn by `tools/wallet_images.py`.
+
+## Staff app (Sunmi)
+
+`staff_app/` is a Flutter app with the orders screen and the POS, using the same API.
+GitHub Actions builds it on every push to `staff_app/**`, signs it with `staff_app/keystore/acai-staff.jks`
+and publishes `acai-dose-staff.apk` to the `app-latest` release. A background service rings for new
+website orders until they are accepted, even when the app is closed. Build logs go to the `ci-logs` branch.

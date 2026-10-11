@@ -13,7 +13,7 @@ body{background:var(--c)}
 .hero img{width:180px;max-width:56%}
 .hero h1{margin:12px 0 4px;font-size:34px;line-height:1.2}
 .hero p{margin:0;font-weight:700;opacity:.85}
-main{max-width:520px;margin:-40px auto 0;padding:0 16px 150px;display:flex;flex-direction:column;gap:16px}
+main{position:relative;z-index:1;max-width:520px;margin:-40px auto 0;padding:0 16px 150px;display:flex;flex-direction:column;gap:16px}
 .steps{display:flex;gap:8px;justify-content:center;margin-bottom:2px}
 .steps span{display:flex;align-items:center;gap:6px;font-weight:800;font-size:14px;background:#fff;border-radius:999px;padding:6px 14px;opacity:.55}
 .steps span.on{opacity:1;background:var(--o)}
@@ -54,51 +54,54 @@ main{max-width:520px;margin:-40px auto 0;padding:0 16px 150px;display:flex;flex-
 .prog div.done i{background:var(--ok)}
 .st{font-size:22px}
 .here{width:100%;min-height:64px;font-size:20px}
+.lang{position:absolute;top:14px;inset-inline-end:14px;min-height:40px;padding:6px 16px;border-radius:999px;border:2px solid var(--c);background:transparent;color:var(--c);font-weight:800;cursor:pointer;font-family:"Tajawal","Montserrat",sans-serif}
+.lang:focus-visible{outline:3px solid var(--o);outline-offset:2px}
 </style>
 </head>
 <body>
-<header class="hero">
+<header class="hero" style="position:relative">
+  <button class="lang" id="lang" type="button">English</button>
   <img src="assets/logo-cream.png" alt="Açaí Dose">
-  <h1 class="lal" id="htitle">اختار دوزك</h1>
-  <p>استلام من سيارتك في القرم ٢٩ &middot; الدفع عند الاستلام</p>
+  <h1 class="lal" id="htitle" data-t="pick"></h1>
+  <p data-t="sub"></p>
 </header>
 
 <main id="main">
-  <div class="steps" id="steps"><span class="on" id="s1">١ المنيو</span><span id="s2">٢ بياناتك</span></div>
-  <div id="closed" class="closed hidden">المحل مسكر الحين. نفتح من ٧ الصبح لين ١٢ الليل.</div>
+  <div class="steps" id="steps"><span class="on" id="s1" data-t="s1"></span><span id="s2" data-t="s2"></span></div>
+  <div id="closed" class="closed hidden" data-t="closed"></div>
 
-  <section id="step1" aria-label="المنيو">
+  <section id="step1">
     <div id="menu" style="display:flex;flex-direction:column;gap:12px">
-      <div class="card item" style="justify-content:center;min-height:120px">يحمّل المنيو…</div>
+      <div class="card item" style="justify-content:center;min-height:120px" data-t="loading"></div>
     </div>
   </section>
 
-  <section id="step2" class="hidden" aria-label="بياناتك">
+  <section id="step2" class="hidden">
     <div class="card summary" id="summary"></div>
     <form id="form" class="card form" novalidate style="margin-top:14px">
       <div class="row2">
-        <div class="field"><label for="car">رقم السيارة</label><input id="car" class="plate" maxlength="20" autocomplete="off" placeholder="12345 A" required></div>
-        <div class="field"><label for="cardesc">نوع ولون السيارة</label><input id="cardesc" maxlength="40" placeholder="مثلاً: لاندكروزر أبيض"></div>
+        <div class="field"><label for="car" data-t="car"></label><input id="car" class="plate" maxlength="20" autocomplete="off" placeholder="12345 A" required></div>
+        <div class="field"><label for="cardesc" data-t="cardesc"></label><input id="cardesc" maxlength="40" data-ph="cardescPh"></div>
       </div>
-      <div class="field"><label for="name">الاسم</label><input id="name" autocomplete="name" maxlength="60" required></div>
-      <div class="field"><label for="phone">رقم الجوال</label>
+      <div class="field"><label for="name" data-t="name"></label><input id="name" autocomplete="name" maxlength="60" required></div>
+      <div class="field"><label for="phone" data-t="phone"></label>
         <div class="phone-row"><span>+968</span><input id="phone" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="8" placeholder="9XXXXXXX" required></div>
       </div>
-      <div class="field"><label for="time">وقت الاستلام</label><select id="time"></select></div>
-      <div class="field"><label for="notes">ملاحظات (اختياري)</label><textarea id="notes" maxlength="300" placeholder="مثلاً: بدون ثلج"></textarea></div>
+      <div class="field"><label for="time" data-t="time"></label><select id="time"></select></div>
+      <div class="field"><label for="notes" data-t="notes"></label><textarea id="notes" maxlength="300" data-ph="notesPh"></textarea></div>
     </form>
     <div class="info-box" style="margin-top:14px">
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none;margin-top:2px"><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.6"/></svg>
-      <div>توقف قدام المحل في القرم ٢٩ واضغط "وصلت"، ونجيب لك الطلب لين سيارتك. <a href="https://maps.app.goo.gl/gid6wTDGEtdCS21a7" target="_blank" rel="noopener" style="color:var(--p)">الموقع في الخريطة</a></div>
+      <div><span data-t="howto"></span> <a href="https://maps.app.goo.gl/gid6wTDGEtdCS21a7" target="_blank" rel="noopener" style="color:var(--p)" data-t="map"></a></div>
     </div>
   </section>
 </main>
 
 <div class="bar" id="bar">
   <div class="in">
-    <button class="btn ghost hidden" id="back" type="button" style="min-width:auto">رجوع</button>
-    <div class="tot"><small id="count">ما اخترت شي</small><b id="total" class="mon">0.000</b> <span style="font-weight:800">ر.ع</span></div>
-    <button class="btn" id="next" type="button" disabled>التالي</button>
+    <button class="btn ghost hidden" id="back" type="button" style="min-width:auto" data-t="back"></button>
+    <div class="tot"><small id="count"></small><b id="total" class="mon">0.000</b> <span style="font-weight:800" data-t="omr"></span></div>
+    <button class="btn" id="next" type="button" disabled></button>
   </div>
   <div class="err" id="err" role="alert" style="max-width:520px;margin:6px auto 0;text-align:center"></div>
 </div>
@@ -106,73 +109,123 @@ main{max-width:520px;margin:-40px auto 0;padding:0 16px 150px;display:flex;flex-
 <script type="module">
 import { api, $, esc, money, arNum } from './assets/common.js';
 
-const cart = new Map();
-let products = [], step = 1;
+const T = {
+  ar: {
+    pick: 'اختار دوزك', details: 'بيانات الاستلام', yours: 'طلبك', sub: 'استلام من سيارتك في القرم ٢٩ · الدفع عند الاستلام',
+    s1: '١ المنيو', s2: '٢ بياناتك', closed: 'المحل مسكر الحين. نفتح من ٧ الصبح لين ١٢ الليل.', loading: 'يحمّل المنيو…',
+    car: 'رقم السيارة', cardesc: 'نوع ولون السيارة', cardescPh: 'مثلاً: لاندكروزر أبيض', name: 'الاسم', phone: 'رقم الجوال',
+    time: 'وقت الاستلام', notes: 'ملاحظات (اختياري)', notesPh: 'مثلاً: بدون ثلج',
+    howto: 'توقف قدام المحل في القرم ٢٩ واضغط "وصلت"، ونجيب لك الطلب لين سيارتك.', map: 'الموقع في الخريطة',
+    back: 'رجوع', next: 'التالي', send: 'أرسل الطلب', sending: 'يرسل…', omr: 'ر.ع', edit: 'عدّل الطلب',
+    none: 'ما اخترت شي', cups: n => `${arNum(n)} ${n === 1 ? 'كوب' : n === 2 ? 'كوبين' : 'أكواب'}`,
+    asap: 'بأسرع وقت (١٥ – ٢٠ دقيقة)', am: 'ص', pm: 'م', add: 'أضف', less: 'نقّص',
+    eCar: 'اكتب رقم السيارة', eName: 'اكتب اسمك', ePhone: 'اكتب رقم جوال عماني من ٨ أرقام', eClosed: 'المحل مسكر الحين',
+    eMany: 'طلبات كثيرة من نفس الجهاز، انتظر شوي', eFail: 'ما قدرنا نرسل الطلب، جرب مرة ثانية', eMenu: 'ما قدرنا نحمّل المنيو، حدّث الصفحة',
+    yourNo: 'رقم طلبك', carL: 'السيارة', amount: 'المبلغ', payOn: 'تدفعه عند الاستلام',
+    st: { new: 'وصلنا طلبك، بنبدأ فيه الحين', preparing: 'طلبك يتحضر', ready: 'طلبك جاهز!', done: 'استلمت طلبك، بالعافية', cancelled: 'انلغى الطلب. تواصل معنا لو في شي' },
+    steps: ['استلمنا', 'يتحضر', 'جاهز', 'استلمته'], here: 'وصلت عند المحل', told: 'بلّغناهم إنك وصلت، جايين لك',
+    shop: 'موقع المحل', again: 'طلب جديد', switchTo: 'English', num: arNum,
+  },
+  en: {
+    pick: 'Pick your dose', details: 'Pickup details', yours: 'Your order', sub: 'Curbside pickup at Al Qurum 29 · Pay on pickup',
+    s1: '1 Menu', s2: '2 Your details', closed: 'We are closed now. Open daily 7 AM – 12 AM.', loading: 'Loading menu…',
+    car: 'Car plate number', cardesc: 'Car model & color', cardescPh: 'e.g. White Land Cruiser', name: 'Name', phone: 'Mobile number',
+    time: 'Pickup time', notes: 'Notes (optional)', notesPh: 'e.g. No ice',
+    howto: 'Park in front of our shop in Al Qurum 29 and tap "I\'m here". We\'ll bring your order to your car.', map: 'Open in Maps',
+    back: 'Back', next: 'Next', send: 'Place order', sending: 'Sending…', omr: 'OMR', edit: 'Edit order',
+    none: 'Nothing selected', cups: n => `${n} ${n === 1 ? 'cup' : 'cups'}`,
+    asap: 'As soon as possible (15 – 20 min)', am: 'AM', pm: 'PM', add: 'Add', less: 'Remove one',
+    eCar: 'Enter your car plate number', eName: 'Enter your name', ePhone: 'Enter an 8-digit Omani mobile number', eClosed: 'We are closed now',
+    eMany: 'Too many orders from this device, please wait a bit', eFail: 'Could not send your order, please try again', eMenu: 'Could not load the menu, refresh the page',
+    yourNo: 'Your order number', carL: 'Car', amount: 'Amount', payOn: 'pay on pickup',
+    st: { new: 'Order received, starting now', preparing: 'Your order is being prepared', ready: 'Your order is ready!', done: 'Order picked up. Enjoy!', cancelled: 'Order cancelled. Contact us if needed' },
+    steps: ['Received', 'Preparing', 'Ready', 'Picked up'], here: "I'm here", told: "We know you're here, coming out now",
+    shop: 'Shop location', again: 'New order', switchTo: 'عربي', num: n => String(n),
+  },
+};
+
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode */ } },
   del(k) { try { localStorage.removeItem(k); } catch { /* ignore */ } },
 };
+let lang = store.get('ad_lang') || ((navigator.language || '').toLowerCase().startsWith('ar') ? 'ar' : 'en');
+let L = T[lang];
+const cart = new Map();
+let products = [], step = 1, trackToken = null;
+
+function applyLang() {
+  L = T[lang];
+  document.documentElement.lang = lang;
+  document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+  document.querySelectorAll('[data-t]').forEach(el => { const v = L[el.dataset.t]; if (typeof v === 'string') el.textContent = v; });
+  document.querySelectorAll('[data-ph]').forEach(el => { el.placeholder = L[el.dataset.ph]; });
+  $('#lang').textContent = L.switchTo;
+  document.title = `${lang === 'ar' ? 'اطلب' : 'Order'} | Açaí Dose`;
+  if (trackToken) return;
+  const t = $('#time').value; buildTimes(); if (t) $('#time').value = t;
+  if (products.length) render();
+  goStep(step, true);
+}
+$('#lang').onclick = () => { lang = lang === 'ar' ? 'en' : 'ar'; store.set('ad_lang', lang); applyLang(); if (trackToken) tick(); };
 
 function buildTimes() {
   const sel = $('#time'), now = new Date(), opts = [];
-  if (now.getHours() >= 7) opts.push(['ASAP', 'بأسرع وقت (١٥ – ٢٠ دقيقة)']);
+  if (now.getHours() >= 7) opts.push(['ASAP', L.asap]);
   const t = new Date(now); t.setMinutes(Math.ceil((t.getMinutes() + 30) / 15) * 15, 0, 0);
   if (t.getHours() < 7) t.setHours(7, 0, 0, 0);
   while (t.getDate() === now.getDate() && opts.length < 40) {
     const hh = t.getHours(), mm = String(t.getMinutes()).padStart(2, '0');
-    opts.push([`${String(hh).padStart(2, '0')}:${mm}`, arNum(`${((hh + 11) % 12) + 1}:${mm} ${hh < 12 ? 'ص' : 'م'}`)]);
+    opts.push([`${String(hh).padStart(2, '0')}:${mm}`, L.num(`${((hh + 11) % 12) + 1}:${mm}`) + ' ' + (hh < 12 ? L.am : L.pm)]);
     t.setMinutes(t.getMinutes() + 15);
   }
   sel.innerHTML = opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+  $('#closed').classList.toggle('hidden', opts.length > 0);
   return opts.length > 0;
 }
 const isOpen = () => $('#time').options.length > 0;
-
-function totals() {
-  let n = 0, tot = 0;
-  for (const p of products) { const q = cart.get(p.id) || 0; n += q; tot += q * p.price; }
-  return { n, tot };
-}
-const cupsLabel = n => n ? `${arNum(n)} ${n === 1 ? 'كوب' : n === 2 ? 'كوبين' : 'أكواب'}` : 'ما اخترت شي';
+const pname = p => lang === 'ar' ? p.name_ar : p.name_en;
 
 function render() {
   $('#menu').innerHTML = products.map(p => {
     const q = cart.get(p.id) || 0;
+    const main = lang === 'ar' ? `<div class="ar lal">${esc(p.name_ar)}</div><div class="en mon">${esc(p.name_en)}</div>`
+                               : `<div class="ar mon" style="font-weight:800;font-size:19px">${esc(p.name_en)}</div><div class="en" dir="rtl">${esc(p.name_ar)}</div>`;
     return `<div class="card item">
       <img src="assets/${esc(p.img || 'cup-smoothie.png')}" alt="">
-      <div class="info"><div class="ar lal">${esc(p.name_ar)}</div><div class="en mon">${esc(p.name_en)}</div>
-        <div class="price"><span class="mon">${money(p.price)}</span> ر.ع</div></div>
+      <div class="info">${main}<div class="price"><span class="mon">${money(p.price)}</span> ${L.omr}</div></div>
       <div class="qty">
-        ${q ? `<button type="button" data-id="${p.id}" data-d="-1" aria-label="نقّص ${esc(p.name_ar)}">−</button><span aria-live="polite">${arNum(q)}</span>` : ''}
-        <button type="button" class="add" data-id="${p.id}" data-d="1" aria-label="أضف ${esc(p.name_ar)}">+</button>
+        ${q ? `<button type="button" data-id="${p.id}" data-d="-1" aria-label="${L.less} ${esc(pname(p))}">−</button><span aria-live="polite">${L.num(q)}</span>` : ''}
+        <button type="button" class="add" data-id="${p.id}" data-d="1" aria-label="${L.add} ${esc(pname(p))}">+</button>
       </div></div>`;
   }).join('');
-  const { n, tot } = totals();
+  let n = 0, tot = 0;
+  for (const p of products) { const q = cart.get(p.id) || 0; n += q; tot += q * p.price; }
   $('#total').textContent = money(tot);
-  $('#count').textContent = cupsLabel(n);
+  $('#count').textContent = n ? L.cups(n) : L.none;
   $('#next').disabled = n === 0 || !isOpen();
 }
 
-function goStep(s) {
+function goStep(s, quiet) {
   step = s;
   $('#step1').classList.toggle('hidden', s !== 1);
   $('#step2').classList.toggle('hidden', s !== 2);
   $('#s1').classList.toggle('on', s === 1); $('#s2').classList.toggle('on', s === 2);
   $('#back').classList.toggle('hidden', s !== 2);
-  $('#next').textContent = s === 1 ? 'التالي' : 'أرسل الطلب';
-  $('#htitle').textContent = s === 1 ? 'اختار دوزك' : 'بيانات الاستلام';
-  $('#err').textContent = '';
+  $('#next').textContent = s === 1 ? L.next : L.send;
+  $('#htitle').textContent = s === 1 ? L.pick : L.details;
+  if (!quiet) $('#err').textContent = '';
   if (s === 2) {
     $('#summary').innerHTML = products.filter(p => cart.get(p.id)).map(p =>
-      `<div class="l"><span>${arNum(cart.get(p.id))}× ${esc(p.name_ar)}</span><span class="mon">${money(cart.get(p.id) * p.price)}</span></div>`).join('')
-      + '<button type="button" id="edit">عدّل الطلب</button>';
+      `<div class="l"><span>${L.num(cart.get(p.id))}× ${esc(pname(p))}</span><span class="mon">${money(cart.get(p.id) * p.price)}</span></div>`).join('')
+      + `<button type="button" id="edit">${L.edit}</button>`;
     $('#edit').onclick = () => goStep(1);
-    // remember returning customers
-    for (const k of ['name', 'phone', 'car', 'cardesc']) { const v = store.get('ad_' + k); if (v && !$('#' + k).value) $('#' + k).value = v; }
-    setTimeout(() => ($('#car').value ? $('#name') : $('#car')).focus(), 50);
+    if (!quiet) {
+      for (const k of ['name', 'phone', 'car', 'cardesc']) { const v = store.get('ad_' + k); if (v && !$('#' + k).value) $('#' + k).value = v; }
+      setTimeout(() => ($('#car').value ? $('#name') : $('#car')).focus(), 50);
+    }
   }
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (!quiet) window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 $('#menu').addEventListener('click', e => {
@@ -188,11 +241,11 @@ $('#next').addEventListener('click', async () => {
   if (step === 1) return goStep(2);
   const err = $('#err'); err.textContent = '';
   const car = $('#car').value.trim(), name = $('#name').value.trim(), phone = $('#phone').value.trim();
-  if (!car) { err.textContent = 'اكتب رقم السيارة'; $('#car').focus(); return; }
-  if (name.length < 2) { err.textContent = 'اكتب اسمك'; $('#name').focus(); return; }
-  if (!/^[279]\d{7}$/.test(phone)) { err.textContent = 'اكتب رقم جوال عماني من ٨ أرقام'; $('#phone').focus(); return; }
-  if (!isOpen()) { err.textContent = 'المحل مسكر الحين'; return; }
-  const btn = $('#next'); btn.disabled = true; btn.textContent = 'يرسل…';
+  if (!car) { err.textContent = L.eCar; $('#car').focus(); return; }
+  if (name.length < 2) { err.textContent = L.eName; $('#name').focus(); return; }
+  if (!/^[279]\d{7}$/.test(phone)) { err.textContent = L.ePhone; $('#phone').focus(); return; }
+  if (!isOpen()) { err.textContent = L.eClosed; return; }
+  const btn = $('#next'); btn.disabled = true; btn.textContent = L.sending;
   try {
     const r = await api('place_order', {
       name, phone: '+968' + phone, car_plate: car.toUpperCase(), car_desc: $('#cardesc').value.trim(),
@@ -202,56 +255,60 @@ $('#next').addEventListener('click', async () => {
     store.set('ad_track', r.token);
     showTrack(r.token);
   } catch (ex) {
-    err.textContent = ex.message === 'too_many' ? 'طلبات كثيرة من نفس الجهاز، انتظر شوي'
-      : ex.message === 'closed' ? 'المحل مسكر الحين' : 'ما قدرنا نرسل الطلب، جرب مرة ثانية';
-    btn.disabled = false; btn.textContent = 'أرسل الطلب';
+    err.textContent = ex.message === 'too_many' ? L.eMany : ex.message === 'closed' ? L.eClosed : L.eFail;
+    btn.disabled = false; btn.textContent = L.send;
   }
 });
 
 // ---------- order tracking ----------
 const ST = ['new', 'preparing', 'ready', 'done'];
-const ST_TXT = { new: 'وصلنا طلبك، بنبدأ فيه الحين', preparing: 'طلبك يتحضر', ready: 'طلبك جاهز!', done: 'استلمت طلبك، بالعافية', cancelled: 'انلغى الطلب. تواصل معنا لو في شي' };
 let trackTimer = null;
 
+async function tick() {
+  let o;
+  try { o = await api('track', undefined, { t: trackToken }); }
+  catch (ex) { if (ex.message === 'not_found') { store.del('ad_track'); location.reload(); } return; }
+  if (!o.today) store.del('ad_track');
+  $('#htitle').textContent = L.yours;
+  const idx = ST.indexOf(o.status);
+  $('#track').innerHTML = `
+    <div style="font-weight:700">${L.yourNo}</div>
+    <div class="num" dir="ltr">#${esc(o.ref)}</div>
+    <div class="st lal">${L.st[o.status]}</div>
+    ${o.status !== 'cancelled' ? `<div class="prog">${L.steps.map((l, i) =>
+      `<div class="${i < idx ? 'done on' : i === idx ? 'on' : ''}"><i></i>${l}</div>`).join('')}</div>` : ''}
+    <div style="font-weight:700;line-height:1.7">${L.carL}: <b dir="ltr" style="unicode-bidi:isolate">${esc(o.car_plate || '')}</b><br>${L.amount}: <span class="mon">${money(o.total)}</span> ${L.omr}, ${L.payOn}</div>
+    ${['new', 'preparing', 'ready'].includes(o.status) ? (o.arrived
+      ? `<div class="btn here" style="background:var(--ok)" role="status">${L.told}</div>`
+      : `<button class="btn orange here" id="here" type="button">${L.here}</button>`) : ''}
+    <a class="btn ghost" href="https://maps.app.goo.gl/gid6wTDGEtdCS21a7" target="_blank" rel="noopener">${L.shop}</a>
+    ${['done', 'cancelled'].includes(o.status) ? `<button class="btn" id="again" type="button">${L.again}</button>` : ''}`;
+  const here = $('#here');
+  if (here) here.addEventListener('click', async e => {
+    e.target.disabled = true;
+    try { await api('arrived', { t: trackToken }); tick(); } catch { e.target.disabled = false; }
+  });
+  const again = $('#again');
+  if (again) again.addEventListener('click', () => { store.del('ad_track'); location.reload(); });
+  if (['done', 'cancelled'].includes(o.status)) { clearInterval(trackTimer); store.del('ad_track'); }
+}
+
 function showTrack(token) {
-  $('#bar')?.remove(); $('#steps')?.remove();
-  $('#htitle').textContent = 'طلبك';
-  $('#main').innerHTML = `<div class="card track" id="track" aria-live="polite">يحمّل…</div>`;
-  const tick = async () => {
-    let o;
-    try { o = await api('track', undefined, { t: token }); } catch (ex) { if (ex.message === 'not_found') { store.del('ad_track'); location.reload(); } return; }
-    if (!o.today) store.del('ad_track');
-    const idx = ST.indexOf(o.status);
-    $('#track').innerHTML = `
-      <div style="font-weight:700">رقم طلبك</div>
-      <div class="num">#${esc(o.ref)}</div>
-      <div class="st lal">${ST_TXT[o.status]}</div>
-      ${o.status !== 'cancelled' ? `<div class="prog">${['استلمنا', 'يتحضر', 'جاهز', 'استلمته'].map((l, i) =>
-        `<div class="${i < idx ? 'done on' : i === idx ? 'on' : ''}"><i></i>${l}</div>`).join('')}</div>` : ''}
-      <div style="font-weight:700;line-height:1.7">سيارة: <b dir="ltr" style="unicode-bidi:isolate">${esc(o.car_plate || '')}</b><br>المبلغ: <span class="mon">${money(o.total)}</span> ر.ع، تدفعه عند الاستلام</div>
-      ${['new', 'preparing', 'ready'].includes(o.status) ? (o.arrived
-        ? '<div class="btn here" style="background:var(--ok)" role="status">بلّغناهم إنك وصلت، جايين لك</div>'
-        : '<button class="btn orange here" id="here" type="button">وصلت عند المحل</button>') : ''}
-      <a class="btn ghost" href="https://maps.app.goo.gl/gid6wTDGEtdCS21a7" target="_blank" rel="noopener">موقع المحل</a>
-      ${['done', 'cancelled'].includes(o.status) ? '<button class="btn" id="again" type="button">طلب جديد</button>' : ''}`;
-    $('#here')?.addEventListener('click', async e => {
-      e.target.disabled = true;
-      try { await api('arrived', { t: token }); tick(); } catch { e.target.disabled = false; }
-    });
-    $('#again')?.addEventListener('click', () => { store.del('ad_track'); location.reload(); });
-    if (['done', 'cancelled'].includes(o.status)) { clearInterval(trackTimer); store.del('ad_track'); }
-  };
+  trackToken = token;
+  const bar = $('#bar'); if (bar) bar.remove();
+  const steps = $('#steps'); if (steps) steps.remove();
+  $('#htitle').textContent = L.yours;
+  $('#main').innerHTML = `<div class="card track" id="track" aria-live="polite">…</div>`;
   tick(); trackTimer = setInterval(tick, 6000);
   window.scrollTo({ top: 0 });
 }
 
 (async () => {
+  applyLang();
   const saved = store.get('ad_track');
   if (saved && /^[a-f0-9]{32}$/.test(saved)) return showTrack(saved);
-  const open = buildTimes();
-  if (!open) $('#closed').classList.remove('hidden');
   try { products = await api('menu'); }
-  catch { $('#menu').innerHTML = '<div class="card item">ما قدرنا نحمّل المنيو، حدّث الصفحة</div>'; return; }
+  catch { $('#menu').innerHTML = `<div class="card item">${L.eMenu}</div>`; return; }
   render();
 })();
 </script>

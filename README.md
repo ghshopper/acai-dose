@@ -13,3 +13,12 @@ Database settings are read from `acai-config.php` (or `config.php`) one level ab
 (falls back to `api/config.php`). Copy `api/config.example.php` there and fill it in.
 First run: open `/api/setup.php` to create tables and the owner account.
 New columns are added automatically on the first request after an update.
+
+## Loyalty card and Apple Wallet
+
+- Every cup (or order — set in Dashboard → Settings) from a website order earns a stamp once staff mark it paid.
+  Every 5 stamps (configurable) = one free cup, taken off the customer's next website order automatically.
+- Customers see their card at `/card.html?c=…` (linked from the order tracking view and the "My card" button).
+- Apple Wallet: upload the Pass Type ID certificate (.p12 + password) and Apple's WWDR G4 certificate
+  in Dashboard → Settings. They are stored outside the web root in `acai-wallet/`, beside the config file.
+  Apple updates passes through `/wallet/v1/...` (rewritten to `api/wallet.php`).

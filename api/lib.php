@@ -81,7 +81,7 @@ function clean(?string $s, int $max): string { return mb_substr(trim((string)$s)
 
 /** Adds new columns on first request after an update, so re-running setup is not needed. */
 function ensure_schema(): void {
-    try { q('SELECT source, car_plate, token, commission, n_orders FROM orders LIMIT 0'); q('SELECT id FROM customers LIMIT 0'); }
+    try { q('SELECT source, car_plate, token, commission, n_orders FROM orders LIMIT 0'); q('SELECT id, card_token, pass_updated FROM customers LIMIT 0'); q('SELECT free_cups FROM orders LIMIT 0'); q('SELECT k FROM settings LIMIT 0'); q('SELECT serial FROM wallet_regs LIMIT 0'); }
     catch (Throwable $e) { require_once __DIR__ . '/schema.php'; create_schema(); }
 }
 
@@ -99,8 +99,8 @@ function save_customer(string $phone, ?string $name, ?string $car = null, ?strin
     $at = $at ?: now();
     $c = q('SELECT id FROM customers WHERE phone = ?', [$phone])->fetch();
     if (!$c) {
-        q('INSERT INTO customers (phone, name, car_plate, car_desc, offers, created_at, updated_at) VALUES (?,?,?,?,?,?,?)',
-          [$phone, (string)($name ?? ''), $car ?: null, $carDesc ?: null, $offers ? 1 : 0, $at, $at]);
+        q('INSERT INTO customers (phone, name, car_plate, car_desc, offers, created_at, updated_at, card_token, wallet_auth) VALUES (?,?,?,?,?,?,?,?,?)',
+          [$phone, (string)($name ?? ''), $car ?: null, $carDesc ?: null, $offers ? 1 : 0, $at, $at, bin2hex(random_bytes(16)), bin2hex(random_bytes(16))]);
         return;
     }
     $set = ['updated_at = ?']; $v = [$at];

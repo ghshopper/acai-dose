@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Açaí Dose">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="stylesheet" href="assets/app.css?v=1791721445">
+<link rel="stylesheet" href="assets/app.css?v=1791722563">
 <style>
 body{background:var(--c2)}
 .wrap{max-width:1100px;margin:0 auto;padding:16px}
@@ -58,7 +58,7 @@ setTimeout(function(){if(!window.__appStarted)show('The page script did not run.
 <body>
 <div id="app"></div>
 <script type="module">
-import { api, msg, $, $$, esc, money, ymd, requireLogin, logout } from './assets/common.js?v=1791721445';
+import { api, msg, $, $$, esc, money, ymd, requireLogin, logout } from './assets/common.js?v=1791722563';
 window.__appStarted = true;
 (async () => {
 const app = $('#app');
@@ -315,6 +315,31 @@ async function drawSettings() {
       <div class="err" id="cerr" role="status"></div>
     </form>
 
+    <h3 class="lal">نظام الولاء</h3>
+    <form class="card formrow" id="lf" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;padding:16px">
+      <label style="display:flex;gap:8px;align-items:center;font-weight:800;min-height:50px"><input type="checkbox" id="lon" ${st.loyalty.on ? 'checked' : ''} style="width:22px;height:22px"> مفعّل</label>
+      <div class="field"><label for="lneed">كم ختم للكوب المجاني</label><input type="number" id="lneed" min="2" max="30" value="${st.loyalty.need}" style="width:120px"></div>
+      <div class="field"><label for="lunit">الختم على</label><select id="lunit"><option value="cup">كل كوب</option><option value="order">كل طلب</option></select></div>
+      <button class="btn" type="submit">احفظ</button>
+      <div class="err" id="lerr2" role="status" style="flex-basis:100%"></div>
+      <p style="margin:0;flex-basis:100%;font-weight:700;opacity:.75;line-height:1.6">ينختم العميل تلقائياً لما العامل يضغط Paid cash أو Paid card لطلب من الموقع. الكوب المجاني ينخصم تلقائياً في طلبه الجاي (أغلى كوب في الطلب).</p>
+    </form>
+
+    <h3 class="lal">بطاقة Apple Wallet</h3>
+    <div class="card" style="padding:16px;display:grid;gap:12px">
+      <div style="font-weight:800">${st.wallet.ready
+        ? `<span class="ok">شغالة ✓</span> · <span dir="ltr">${esc(st.wallet.pass_type)}</span>${st.wallet.expires ? ` · الشهادة تنتهي ${esc(st.wallet.expires)}` : ''}`
+        : '<span class="pill">مب مفعّلة للحين</span> العملاء يشوفون البطاقة في الموقع، وزر المحفظة يظهر بعد ما ترفع الشهادة.'}</div>
+      ${!st.wallet.has_zip || !st.wallet.has_openssl ? '<div class="err">السيرفر ناقصه إضافة zip أو openssl. فعّلها من إعدادات PHP في Hostinger.</div>' : ''}
+      <form id="wf" class="formrow" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+        <div class="field"><label for="wp12">شهادة Pass Type ID (.p12)</label><input type="file" id="wp12" accept=".p12,.pfx"></div>
+        <div class="field"><label for="wpw">كلمة سر الشهادة</label><input type="password" id="wpw" autocomplete="off"></div>
+        <div class="field"><label for="wwdr">شهادة Apple WWDR G4 (.cer)</label><input type="file" id="wwdr" accept=".cer,.pem,.crt"></div>
+        <button class="btn" type="submit">${st.wallet.ready ? 'غيّر الشهادة' : 'ارفع وفعّل'}</button>
+        <div class="err" id="werr" role="status" style="flex-basis:100%"></div>
+      </form>
+    </div>
+
     <h3 class="lal">المنيو والأسعار</h3>
     <div class="tbl-wrap"><table>
       <thead><tr><th>الصنف</th><th>السعر (ر.ع)</th><th>متوفر</th><th></th></tr></thead>
@@ -345,6 +370,25 @@ async function drawSettings() {
     const vals = Object.fromEntries(Object.keys(CH).map(k => [k, +$('#c_' + k).value || 0]));
     try { await api('save_commissions', vals); Object.assign(commissions, vals); $('#cerr').style.color = 'var(--ok)'; $('#cerr').textContent = 'انحفظ. تنطبق على المبيعات الجديدة.'; }
     catch (ex) { $('#cerr').style.color = ''; $('#cerr').textContent = msg(ex); }
+  };
+  $('#lunit').value = st.loyalty.unit;
+  $('#lf').onsubmit = async e => {
+    e.preventDefault();
+    try { await api('save_loyalty', { on: $('#lon').checked, need: +$('#lneed').value, unit: $('#lunit').value }); $('#lerr2').style.color = 'var(--ok)'; $('#lerr2').textContent = 'انحفظ ✓'; }
+    catch (ex) { $('#lerr2').style.color = ''; $('#lerr2').textContent = ex.message === 'bad_need' ? 'العدد من ٢ إلى ٣٠' : msg(ex); }
+  };
+  $('#wf').onsubmit = async e => {
+    e.preventDefault();
+    const err = $('#werr'); err.style.color = ''; err.textContent = '';
+    const a = $('#wp12').files[0], b = $('#wwdr').files[0];
+    if (!a || !b) { err.textContent = 'اختر الملفين: شهادة .p12 وشهادة WWDR'; return; }
+    const b64 = async f => { const u = new Uint8Array(await f.arrayBuffer()); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
+    try {
+      await api('wallet_setup', { p12: await b64(a), password: $('#wpw').value, wwdr: await b64(b) });
+      drawSettings();
+    } catch (ex) {
+      err.textContent = ({ p12_unreadable: 'ما قدرت أفتح ملف .p12، تأكد من كلمة السر', not_pass_cert: 'هذي مب شهادة Pass Type ID', bad_wwdr: 'ملف WWDR غلط', missing_files: 'اختر الملفين' })[ex.message] || msg(ex);
+    }
   };
   $('#uf').onsubmit = async e => {
     e.preventDefault();
@@ -426,11 +470,12 @@ function filteredCusts() {
 function drawCustList() {
   const list = filteredCusts();
   $('#clist').innerHTML = list.length ? `<div class="tbl-wrap"><table>
-    <thead><tr><th>العميل</th><th>الجوال</th><th>الطلبات</th><th>صرف</th><th>آخر زيارة</th><th>السيارة</th><th>العروض</th><th>ملاحظة</th></tr></thead>
+    <thead><tr><th>العميل</th><th>الجوال</th><th>الطلبات</th><th>صرف</th><th>الأختام</th><th>آخر زيارة</th><th>السيارة</th><th>العروض</th><th>ملاحظة</th></tr></thead>
     <tbody>${list.slice(0, 500).map(c => `<tr>
       <td>${esc(c.name || '-')}${c.orders >= 5 ? ' <span class="pill">دائم</span>' : ''}</td>
       <td dir="ltr" style="text-align:right"><a href="https://wa.me/${esc(c.phone.replace('+', ''))}" target="_blank" rel="noopener" style="color:var(--p);font-weight:800">${esc(c.phone)}</a></td>
-      <td class="num">${c.orders}</td><td class="num">${money(c.spent)}</td><td>${agoText(daysAgo(c.last_at))}</td>
+      <td class="num">${c.orders}</td><td class="num">${money(c.spent)}</td>
+      <td>${c.stamps}${c.free ? ` <span class="pill" style="background:var(--o);color:var(--p)">${c.free} مجاني</span>` : ''}${c.free_used ? ` <small style="opacity:.7">(أخذ ${c.free_used})</small>` : ''}</td><td>${agoText(daysAgo(c.last_at))}</td>
       <td>${esc([c.car_plate, c.car_desc].filter(Boolean).join(' · ') || '-')}</td>
       <td><input type="checkbox" data-coffer="${c.id}" ${c.offers ? 'checked' : ''} aria-label="يبي العروض" style="width:22px;height:22px"></td>
       <td><button class="btn small ghost" data-cnote="${c.id}" type="button">${c.note ? esc(c.note) : 'أضف'}</button></td></tr>`).join('')}</tbody>

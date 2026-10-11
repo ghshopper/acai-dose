@@ -1,4 +1,4 @@
-<FilesMatch "^(config|lib|schema)\.php$">
+<FilesMatch "^(config|lib|schema|loyalty|wallet_lib)\.php$">
   Require all denied
 </FilesMatch>
 Options -Indexes

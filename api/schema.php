@@ -29,7 +29,11 @@ function create_schema(): void {
         "CREATE TABLE IF NOT EXISTS customers (
             id $id, phone VARCHAR(20) NOT NULL UNIQUE, name VARCHAR(60) NOT NULL DEFAULT '', car_plate VARCHAR(20) NULL,
             car_desc VARCHAR(40) NULL, offers TINYINT NOT NULL DEFAULT 0, note VARCHAR(200) NULL,
-            created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL)$eng",
+            created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL,
+            card_token VARCHAR(32) NULL, wallet_auth VARCHAR(32) NULL, pass_updated INT NOT NULL DEFAULT 0)$eng",
+        "CREATE TABLE IF NOT EXISTS settings (k VARCHAR(40) PRIMARY KEY, v TEXT NOT NULL)$eng",
+        "CREATE TABLE IF NOT EXISTS wallet_devices (device_id VARCHAR(100) PRIMARY KEY, push_token VARCHAR(200) NOT NULL, updated_at DATETIME NOT NULL)$eng",
+        "CREATE TABLE IF NOT EXISTS wallet_regs (device_id VARCHAR(100) NOT NULL, serial VARCHAR(40) NOT NULL, created_at DATETIME NOT NULL, PRIMARY KEY (device_id, serial))$eng",
     ];
     foreach ($sql as $s) db()->exec($s);
     $idx = [
@@ -44,6 +48,7 @@ function create_schema(): void {
         "source VARCHAR(8) NOT NULL DEFAULT 'web'", "payment VARCHAR(8) NULL", "car_plate VARCHAR(20) NULL",
         "car_desc VARCHAR(40) NULL", "token VARCHAR(32) NULL", "arrived_at DATETIME NULL", "created_by INT NULL",
         "commission DECIMAL(10,3) NULL", "n_orders INT NULL",
+        "free_cups INT NOT NULL DEFAULT 0", "discount DECIMAL(10,3) NOT NULL DEFAULT 0",
     ];
     $have = [];
     foreach (q(is_mysql() ? 'SHOW COLUMNS FROM orders' : 'PRAGMA table_info(orders)')->fetchAll() as $c) $have[] = $c['Field'] ?? $c['name'];
@@ -56,6 +61,18 @@ function create_schema(): void {
     }
 
     try { db()->exec('CREATE INDEX orders_phone ON orders (phone)'); } catch (Throwable $e) { /* exists */ }
+    // v4: loyalty card per customer (secret link + Apple Wallet)
+    $have = [];
+    foreach (q(is_mysql() ? 'SHOW COLUMNS FROM customers' : 'PRAGMA table_info(customers)')->fetchAll() as $c) $have[] = $c['Field'] ?? $c['name'];
+    foreach (["card_token VARCHAR(32) NULL", "wallet_auth VARCHAR(32) NULL", "pass_updated INT NOT NULL DEFAULT 0"] as $def) {
+        $name = strtok($def, ' ');
+        if (!in_array($name, $have, true)) db()->exec("ALTER TABLE customers ADD COLUMN $def");
+    }
+    foreach (q('SELECT id FROM customers WHERE card_token IS NULL')->fetchAll() as $r)
+        q('UPDATE customers SET card_token = ?, wallet_auth = ? WHERE id = ?', [bin2hex(random_bytes(16)), bin2hex(random_bytes(16)), (int)$r['id']]);
+    try { db()->exec('CREATE UNIQUE INDEX customers_card ON customers (card_token)'); } catch (Throwable $e) { /* exists */ }
+    foreach (['loyalty_on' => '1', 'loyalty_need' => '5', 'loyalty_unit' => 'cup'] as $k => $v)
+        if (!q('SELECT 1 FROM settings WHERE k = ?', [$k])->fetch()) q('INSERT INTO settings (k, v) VALUES (?, ?)', [$k, $v]);
     // v3: one customer record per phone number, filled from earlier website orders
     if (!(int)q('SELECT COUNT(*) c FROM customers')->fetch()['c']) {
         $rows = q("SELECT phone, customer_name, car_plate, car_desc, created_at FROM orders WHERE phone <> '' ORDER BY id")->fetchAll();

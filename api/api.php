@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require __DIR__ . '/lib.php';
+require __DIR__ . '/loyalty.php';
 
 header('X-Content-Type-Options: nosniff');
 header('Referrer-Policy: same-origin');
@@ -27,6 +28,7 @@ function order_row(array $o): array {
     $o['ref'] = order_ref($o['day'] ?? date('Y-m-d'), $o['order_no']);
     $o['total'] = (float)$o['total']; $o['items'] = json_decode($o['items'], true) ?: [];
     if (array_key_exists('commission', $o)) $o['commission'] = (float)($o['commission'] ?? 0);
+    if (array_key_exists('free_cups', $o)) { $o['free_cups'] = (int)$o['free_cups']; $o['discount'] = (float)($o['discount'] ?? 0); }
     if (array_key_exists('n_orders', $o)) $o['n_orders'] = $o['n_orders'] === null ? null : (int)$o['n_orders'];
     unset($o['token']);
     return $o;
@@ -86,22 +88,42 @@ case 'place_order':
     if ($pickup !== 'ASAP' && !preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $pickup)) fail('invalid_pickup');
     if ((int)date('G') < 7) fail('closed');
     [$lines, $total] = price_items($in['items'] ?? null);
+    // Loyalty: a free cup waiting on this phone is taken off the dearest cup in the order
+    $free = 0; $discount = 0.0;
+    $ls = loyalty_state($phone);
+    if ($ls['on'] && $ls['free'] > 0) {
+        $free = 1; $discount = max(array_map(fn($l) => $l['price'], $lines)); $total = money($total - $discount);
+    }
     $token = bin2hex(random_bytes(16));
     $no = insert_order([
         'source' => 'web', 'customer_name' => $name, 'phone' => $phone, 'car_plate' => $car, 'car_desc' => $carDesc ?: null,
         'pickup_time' => $pickup, 'notes' => $notes ?: null, 'items' => json_encode($lines, JSON_UNESCAPED_UNICODE),
-        'total' => $total, 'status' => 'new', 'token' => $token,
+        'total' => $total, 'status' => 'new', 'token' => $token, 'free_cups' => $free, 'discount' => money($discount),
     ]);
     save_customer($phone, $name, $car, $carDesc, isset($in['offers']) ? !empty($in['offers']) : null);
-    out(['order_no' => $no, 'ref' => order_ref(date('Y-m-d'), $no), 'total' => $total, 'token' => $token]);
+    if ($free) loyalty_changed($phone);
+    $card = q('SELECT card_token FROM customers WHERE phone = ?', [$phone])->fetch();
+    out(['order_no' => $no, 'ref' => order_ref(date('Y-m-d'), $no), 'total' => $total, 'token' => $token,
+         'free_cups' => $free, 'discount' => money($discount), 'card' => $card['card_token'] ?? null]);
 
 case 'track':     // customer polls their own order by secret token
     $t = (string)($_GET['t'] ?? '');
     if (!preg_match('/^[a-f0-9]{32}$/', $t)) fail('not_found', 404);
-    $o = q('SELECT order_no, status, total, pickup_time, car_plate, arrived_at, day FROM orders WHERE token = ?', [$t])->fetch();
+    $o = q('SELECT order_no, status, total, pickup_time, car_plate, arrived_at, day, phone, free_cups, discount FROM orders WHERE token = ?', [$t])->fetch();
     if (!$o) fail('not_found', 404);
+    $c = q('SELECT * FROM customers WHERE phone = ?', [$o['phone']])->fetch();
+    require_once __DIR__ . '/wallet_lib.php';
     out(['order_no' => (int)$o['order_no'], 'ref' => order_ref($o['day'], (int)$o['order_no']), 'status' => $o['status'], 'total' => (float)$o['total'], 'pickup_time' => $o['pickup_time'],
-         'car_plate' => $o['car_plate'], 'arrived' => (bool)$o['arrived_at'], 'today' => $o['day'] === date('Y-m-d')]);
+         'car_plate' => $o['car_plate'], 'arrived' => (bool)$o['arrived_at'], 'today' => $o['day'] === date('Y-m-d'),
+         'free_cups' => (int)$o['free_cups'], 'discount' => (float)$o['discount'], 'loyalty' => $c ? card_info($c) + ['wallet' => wallet_ready()] : null]);
+
+case 'card':      // customer's loyalty card, by its secret link
+    $c = (string)($_GET['c'] ?? '');
+    if (!preg_match('/^[a-f0-9]{32}$/', $c)) fail('not_found', 404);
+    $row = q('SELECT * FROM customers WHERE card_token = ?', [$c])->fetch();
+    if (!$row) fail('not_found', 404);
+    require_once __DIR__ . '/wallet_lib.php';
+    out(card_info($row) + ['wallet' => wallet_ready()]);
 
 case 'arrived':   // customer taps "I've arrived"
     $post();
@@ -138,8 +160,14 @@ case 'order_status':
     $st = $in['status'] ?? '';
     if (!in_array($st, STATUSES, true)) fail('bad_status');
     $pay = in_array($in['payment'] ?? null, ['cash', 'card'], true) ? $in['payment'] : null;
-    if ($st === 'done' && $pay) q('UPDATE orders SET status = ?, payment = ?, updated_at = ? WHERE id = ?', [$st, $pay, now(), (int)($in['id'] ?? 0)]);
-    else q('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?', [$st, now(), (int)($in['id'] ?? 0)]);
+    $oid = (int)($in['id'] ?? 0);
+    if ($st === 'done' && $pay) q('UPDATE orders SET status = ?, payment = ?, updated_at = ? WHERE id = ?', [$st, $pay, now(), $oid]);
+    else q('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?', [$st, now(), $oid]);
+    // Paid or cancelled website orders change the customer's stamps
+    if ($st === 'done' || $st === 'cancelled') {
+        $o = q("SELECT phone FROM orders WHERE id = ? AND source = 'web'", [$oid])->fetch();
+        if ($o) loyalty_changed((string)$o['phone']);
+    }
     out(['ok' => true]);
 
 // ---------------- staff: POS ----------------
@@ -280,7 +308,10 @@ case 'customers':     // owner: everyone who ordered with a phone number, with t
                FROM customers c LEFT JOIN orders o ON o.phone = c.phone AND o.status <> 'cancelled'
                GROUP BY c.id, c.phone, c.name, c.car_plate, c.car_desc, c.offers, c.note, c.created_at
                ORDER BY last_at DESC")->fetchAll();
-    foreach ($rows as &$r) { $r['id'] = (int)$r['id']; $r['orders'] = (int)$r['orders']; $r['spent'] = (float)$r['spent']; $r['offers'] = (int)$r['offers']; }
+    foreach ($rows as &$r) {
+        $r['id'] = (int)$r['id']; $r['orders'] = (int)$r['orders']; $r['spent'] = (float)$r['spent']; $r['offers'] = (int)$r['offers'];
+        $ls = loyalty_state($r['phone']); $r['stamps'] = $ls['stamps']; $r['free'] = $ls['free']; $r['free_used'] = $ls['used'];
+    }
     out($rows);
 
 case 'customer_update':
@@ -298,7 +329,23 @@ case 'settings':
         q('SELECT * FROM products ORDER BY sort, id')->fetchAll());
     $u = array_map(fn($r) => ['id' => (int)$r['id'], 'username' => $r['username'], 'role' => $r['role'], 'active' => (int)$r['active']],
         q('SELECT id, username, role, active FROM users ORDER BY id')->fetchAll());
-    out(['commissions' => $c, 'products' => $p, 'users' => $u]);
+    require_once __DIR__ . '/wallet_lib.php';
+    out(['commissions' => $c, 'products' => $p, 'users' => $u, 'loyalty' => loyalty_cfg(), 'wallet' => wallet_status()]);
+
+case 'wallet_setup':  // owner uploads the Apple Pass Type ID certificate once
+    $post(); need('owner');
+    require_once __DIR__ . '/wallet_lib.php';
+    $p12 = base64_decode((string)($in['p12'] ?? ''), true); $wwdr = base64_decode((string)($in['wwdr'] ?? ''), true);
+    if (!$p12 || !$wwdr) fail('missing_files');
+    out(wallet_install($p12, (string)($in['password'] ?? ''), $wwdr));
+
+case 'save_loyalty':
+    $post(); need('owner');
+    $need = (int)($in['need'] ?? 5); if ($need < 2 || $need > 30) fail('bad_need');
+    set_setting('loyalty_on', !empty($in['on']) ? '1' : '0');
+    set_setting('loyalty_need', (string)$need);
+    set_setting('loyalty_unit', ($in['unit'] ?? '') === 'order' ? 'order' : 'cup');
+    out(['ok' => true]);
 
 case 'save_commissions':
     $post(); need('owner');

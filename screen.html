@@ -6,7 +6,7 @@
 <title>Orders | Açaí Dose</title>
 <meta name="theme-color" content="#470D43">
 <link rel="icon" href="assets/logo-purple.png">
-<link rel="stylesheet" href="assets/app.css?v=1791721445">
+<link rel="stylesheet" href="assets/app.css?v=1791722563">
 <style>
 body{background:var(--c2);font-family:'Montserrat','Tajawal',system-ui,sans-serif}
 .topbar .nav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
@@ -59,7 +59,7 @@ setTimeout(function(){if(!window.__appStarted)show('The page script did not run.
 <body>
 <div id="app"></div>
 <script type="module">
-import { api, $, esc, money, requireLogin, logout, msgEn } from './assets/common.js?v=1791721445';
+import { api, $, esc, money, requireLogin, logout, msgEn } from './assets/common.js?v=1791722563';
 window.__appStarted = true;
 (async () => {
 const app = $('#app');
@@ -150,6 +150,7 @@ function card(o) {
     <div class="meta">Pickup: ${pickupLabel(o.pickup_time)}</div>
     <ul>${o.items.map(i => `<li><b>${i.qty}×</b><span>${esc(i.name_en)}</span></li>`).join('')}</ul>
     ${o.notes ? `<div class="note" dir="auto">Note: ${esc(o.notes)}</div>` : ''}
+    ${o.free_cups ? `<div style="background:var(--o);color:var(--p);border-radius:10px;padding:6px 10px;font-weight:800;margin-bottom:8px">Loyalty: 1 cup FREE (−${money(o.discount)})</div>` : ''}
     <div class="meta" style="margin-bottom:10px">Collect: <b>${money(o.total)} OMR</b></div>
     <div class="acts">
       ${o.status === 'ready'

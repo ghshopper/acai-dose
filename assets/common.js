@@ -2,7 +2,7 @@ export const $ = (s, r = document) => r.querySelector(s);
 export const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
 export function esc(s) {
-  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 export const money = n => Number(n || 0).toFixed(3);
 export const arNum = s => String(s).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
@@ -21,7 +21,7 @@ export async function api(action, body, query = {}) {
   try { res = await fetch('api/api.php?' + qs, opt); } catch { throw new Error('network'); }
   let data = null;
   try { data = await res.json(); } catch { /* empty */ }
-  if (!res.ok) throw new Error(data?.error || 'http_' + res.status);
+  if (!res.ok) throw new Error((data && data.error) || 'http_' + res.status);
   return data;
 }
 
@@ -35,12 +35,12 @@ const MSG = {
   bad_username: 'اسم المستخدم: حروف إنجليزية أو أرقام، ٣ حروف أو أكثر',
   username_taken: 'اسم المستخدم مستخدم من قبل',
 };
-export const msg = e => MSG[e?.message] || 'صار خطأ، جرب مرة ثانية';
+export const msg = e => MSG[e && e.message] || 'صار خطأ، جرب مرة ثانية';
 const MSG_EN = {
   bad_login: 'Wrong username or password', too_many: 'Too many attempts, wait a minute', network: 'No internet connection',
   login_required: 'Please log in', forbidden: 'No permission', void_window: 'You can only void your own sale within 15 minutes',
 };
-export const msgEn = e => MSG_EN[e?.message] || 'Something went wrong, try again';
+export const msgEn = e => MSG_EN[e && e.message] || 'Something went wrong, try again';
 
 /** Shows a login card until signed in; resolves with {username, role}. */
 export async function requireLogin(root, title, en = false) {

@@ -57,6 +57,12 @@ main{position:relative;z-index:1;max-width:520px;margin:-40px auto 0;padding:0 1
 .lang{position:absolute;top:14px;inset-inline-end:14px;min-height:40px;padding:6px 16px;border-radius:999px;border:2px solid var(--c);background:transparent;color:var(--c);font-weight:800;cursor:pointer;font-family:"Tajawal","Montserrat",sans-serif}
 .lang:focus-visible{outline:3px solid var(--o);outline-offset:2px}
 </style>
+<script>
+/* Shows the reason instead of a blank page when a script fails (e.g. an old device browser). */
+(function(){var shown=false;function show(t){if(shown)return;shown=true;var d=document.createElement('div');d.style.cssText='position:fixed;inset:auto 12px 12px 12px;z-index:99999;background:#470D43;color:#FAF3E0;padding:14px 16px;border-radius:14px;font:15px/1.5 system-ui,sans-serif;direction:ltr;text-align:left';d.innerHTML='<b>Page could not start.</b><br>'+String(t).replace(/</g,'&lt;')+'<br><small>'+navigator.userAgent.replace(/</g,'&lt;')+'</small>';(document.body||document.documentElement).appendChild(d);}
+window.addEventListener('error',function(e){show(e.message||'Script error')});window.addEventListener('unhandledrejection',function(e){show((e.reason&&e.reason.message)||e.reason)});
+setTimeout(function(){if(!window.__appStarted)show('The page script did not run. Update Android System WebView / Chrome on this device.')},6000);})();
+</script>
 </head>
 <body>
 <header class="hero" style="position:relative">
@@ -108,6 +114,8 @@ main{position:relative;z-index:1;max-width:520px;margin:-40px auto 0;padding:0 1
 
 <script type="module">
 import { api, $, esc, money, arNum } from './assets/common.js';
+window.__appStarted = true;
+(async () => {
 
 const T = {
   ar: {
@@ -310,6 +318,8 @@ function showTrack(token) {
   try { products = await api('menu'); }
   catch { $('#menu').innerHTML = `<div class="card item">${L.eMenu}</div>`; return; }
   render();
+})();
+
 })();
 </script>
 </body>

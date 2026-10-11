@@ -42,11 +42,19 @@ tfoot td{font-weight:800;background:var(--c)}
 .pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:13px;font-weight:800;background:var(--c2)}
 .ok{color:var(--ok);font-weight:800}
 </style>
+<script>
+/* Shows the reason instead of a blank page when a script fails (e.g. an old device browser). */
+(function(){var shown=false;function show(t){if(shown)return;shown=true;var d=document.createElement('div');d.style.cssText='position:fixed;inset:auto 12px 12px 12px;z-index:99999;background:#470D43;color:#FAF3E0;padding:14px 16px;border-radius:14px;font:15px/1.5 system-ui,sans-serif;direction:ltr;text-align:left';d.innerHTML='<b>Page could not start.</b><br>'+String(t).replace(/</g,'&lt;')+'<br><small>'+navigator.userAgent.replace(/</g,'&lt;')+'</small>';(document.body||document.documentElement).appendChild(d);}
+window.addEventListener('error',function(e){show(e.message||'Script error')});window.addEventListener('unhandledrejection',function(e){show((e.reason&&e.reason.message)||e.reason)});
+setTimeout(function(){if(!window.__appStarted)show('The page script did not run. Update Android System WebView / Chrome on this device.')},6000);})();
+</script>
 </head>
 <body>
 <div id="app"></div>
 <script type="module">
 import { api, msg, $, $$, esc, money, ymd, requireLogin, logout } from './assets/common.js';
+window.__appStarted = true;
+(async () => {
 const app = $('#app');
 
 const me = await requireLogin(app, 'الداشبورد');
@@ -226,9 +234,9 @@ function drawApps({ apps }) {
     <h3 class="lal">السجل</h3>
     ${apps.length ? `<div class="tbl-wrap"><table>
       <thead><tr><th>التاريخ</th><th>التطبيق</th><th>المبيعات</th><th>العمولة</th><th>الصافي</th><th>الطلبات</th><th>ملاحظة</th><th></th></tr></thead>
-      <tbody>${apps.map(r => `<tr><td class="num">${r.sale_date}</td><td>${CH[r.channel]}</td><td class="num">${money(r.gross)}</td><td class="num">${money(r.commission)} <span class="pill">${+r.commission_pct}%</span></td><td class="num">${money(r.gross - r.commission)}</td><td class="num">${r.orders_count ?? '-'}</td><td>${esc(r.note || '')}</td><td><button class="del" data-del="sale:${r.id}" type="button">حذف</button></td></tr>`).join('')}</tbody>
+      <tbody>${apps.map(r => `<tr><td class="num">${r.sale_date}</td><td>${CH[r.channel]}</td><td class="num">${money(r.gross)}</td><td class="num">${money(r.commission)} <span class="pill">${+r.commission_pct}%</span></td><td class="num">${money(r.gross - r.commission)}</td><td class="num">${r.orders_count == null ? '-' : r.orders_count}</td><td>${esc(r.note || '')}</td><td><button class="del" data-del="sale:${r.id}" type="button">حذف</button></td></tr>`).join('')}</tbody>
     </table></div>` : '<div class="card empty">ما فيه مبيعات تطبيقات مسجلة في هالفترة</div>'}`;
-  const setPct = () => { $('#ap').value = commissions[$('#ac').value] ?? 0; };
+  const setPct = () => { $('#ap').value = (commissions[$('#ac').value] == null ? 0 : commissions[$('#ac').value]); };
   $('#ac').onchange = setPct; setPct();
   $('#af').onsubmit = async e => {
     e.preventDefault();
@@ -289,7 +297,7 @@ async function drawSettings() {
   $('[data-panel="set"]').innerHTML = `
     <h3 class="lal">نسبة عمولة التطبيقات</h3>
     <form class="card formrow" id="cf">
-      ${Object.entries(CH).map(([k, v]) => `<div class="field"><label for="c_${k}">${v} %</label><input type="number" id="c_${k}" step="0.01" min="0" max="100" value="${st.commissions[k] ?? 0}"></div>`).join('')}
+      ${Object.entries(CH).map(([k, v]) => `<div class="field"><label for="c_${k}">${v} %</label><input type="number" id="c_${k}" step="0.01" min="0" max="100" value="${st.commissions[k] == null ? 0 : st.commissions[k]}"></div>`).join('')}
       <button class="btn" type="submit">احفظ</button>
       <div class="err" id="cerr" role="status"></div>
     </form>
@@ -363,6 +371,8 @@ document.addEventListener('click', async e => {
 // ---------- boot ----------
 try { Object.assign(commissions, (await api('settings')).commissions); } catch { /* defaults */ }
 setPeriod('today');
+
+})();
 </script>
 </body>
 </html>

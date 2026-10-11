@@ -51,11 +51,19 @@ th{background:var(--c);font-size:13px}
 .x td{text-decoration:line-through;opacity:.5}
 .tbl{overflow-x:auto}
 </style>
+<script>
+/* Shows the reason instead of a blank page when a script fails (e.g. an old device browser). */
+(function(){var shown=false;function show(t){if(shown)return;shown=true;var d=document.createElement('div');d.style.cssText='position:fixed;inset:auto 12px 12px 12px;z-index:99999;background:#470D43;color:#FAF3E0;padding:14px 16px;border-radius:14px;font:15px/1.5 system-ui,sans-serif;direction:ltr;text-align:left';d.innerHTML='<b>Page could not start.</b><br>'+String(t).replace(/</g,'&lt;')+'<br><small>'+navigator.userAgent.replace(/</g,'&lt;')+'</small>';(document.body||document.documentElement).appendChild(d);}
+window.addEventListener('error',function(e){show(e.message||'Script error')});window.addEventListener('unhandledrejection',function(e){show((e.reason&&e.reason.message)||e.reason)});
+setTimeout(function(){if(!window.__appStarted)show('The page script did not run. Update Android System WebView / Chrome on this device.')},6000);})();
+</script>
 </head>
 <body>
 <div id="app"></div>
 <script type="module">
 import { api, $, esc, money, requireLogin, logout, msgEn } from './assets/common.js';
+window.__appStarted = true;
+(async () => {
 const app = $('#app');
 const me = await requireLogin(app, 'POS', true);
 
@@ -175,6 +183,8 @@ document.addEventListener('click', async e => {
 
 try { products = await api('menu'); } catch { $('#grid').innerHTML = '<div class="card" style="padding:20px">Could not load menu. Refresh the page.</div>'; }
 redraw(); loadToday();
+
+})();
 </script>
 </body>
 </html>

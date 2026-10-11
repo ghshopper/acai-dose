@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Orders | Açaí Dose</title>
+<meta name="theme-color" content="#470D43">
+<link rel="icon" href="assets/logo-purple.png">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+body{background:var(--c2);font-family:'Montserrat','Tajawal',system-ui,sans-serif}
+.topbar .nav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.topbar .btn.ghost{color:var(--c);border-color:var(--c)}
+.cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;padding:14px;align-items:start}
+@media (max-width:900px){.cols{grid-template-columns:1fr}}
+.col h2{margin:0 0 10px;display:flex;align-items:center;gap:10px;font-size:22px;font-weight:800}
+.col h2 .n{font-size:15px;background:var(--p);color:var(--c);border-radius:999px;padding:2px 12px}
+.col[data-s="new"] h2 .n{background:var(--o);color:var(--p)}
+.col[data-s="ready"] h2 .n{background:var(--ok)}
+.list{display:flex;flex-direction:column;gap:12px}
+.ord{padding:16px;border-left:8px solid var(--p)}
+.ord.new{border-color:var(--o);animation:pulse 1.2s ease-in-out infinite}
+.ord.ready{border-color:var(--ok)}
+.ord.arrived{outline:4px solid #2F7D4F;outline-offset:-2px}
+@keyframes pulse{50%{box-shadow:0 0 0 7px rgba(227,154,46,.5)}}
+@media (prefers-reduced-motion:reduce){.ord.new{animation:none}}
+.ord .hd{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.ord .no{font-weight:800;font-size:34px}
+.ord .age{font-weight:800;font-size:14px;opacity:.75}
+.ord .age.late{color:var(--bad);opacity:1}
+.car{display:flex;align-items:center;gap:10px;margin-top:8px;padding:8px 12px;background:var(--p);color:var(--c);border-radius:14px}
+.car b{font-size:26px;letter-spacing:.06em}
+.car span{font-size:14px;font-weight:700;opacity:.85}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;background:var(--ok);color:#fff;font-weight:800;font-size:14px}
+.ord .nm{font-weight:800;font-size:17px;margin-top:8px}
+.ord .meta{font-size:14px;font-weight:700;opacity:.8;margin-top:2px}
+.ord ul{list-style:none;margin:10px 0;padding:10px 0;border-top:2px dashed #eadfca;border-bottom:2px dashed #eadfca;display:flex;flex-direction:column;gap:6px}
+.ord li{display:flex;gap:10px;font-size:18px;font-weight:800;align-items:baseline}
+.ord li b{min-width:38px;background:var(--c2);border-radius:10px;text-align:center}
+.ord .note{background:#fff3e0;border-radius:12px;padding:8px 12px;font-weight:700;margin-bottom:10px}
+.ord .acts{display:flex;gap:8px;flex-wrap:wrap}
+.ord .acts .btn{flex:1}
+.empty{padding:22px;text-align:center;font-weight:700;opacity:.6;border:2px dashed #d8c9ae;border-radius:var(--r)}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:700}
+.live i{width:10px;height:10px;border-radius:50%;background:#7bd389}
+.live.off i{background:#e06c6c}
+.alarm{position:fixed;inset:auto 0 0 0;background:var(--o);color:var(--p);text-align:center;font-weight:800;font-size:20px;padding:14px;z-index:9}
+.gate{position:fixed;inset:0;background:rgba(46,8,40,.92);display:flex;align-items:center;justify-content:center;z-index:20;padding:20px}
+.gate .card{padding:30px;text-align:center;max-width:420px;display:flex;flex-direction:column;gap:16px}
+.pay{display:flex;gap:8px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+import { api, $, esc, money, requireLogin, logout, msgEn } from './assets/common.js';
+const app = $('#app');
+
+const me = await requireLogin(app, 'Orders Screen', true);
+
+app.innerHTML = `
+<header class="topbar">
+  <img src="assets/logo-cream.png" alt="Açaí Dose">
+  <div class="nav">
+    <span class="live" id="live"><i></i> Online</span>
+    <a class="btn small ghost" href="pos.html">POS</a>
+    ${me.role === 'owner' ? '<a class="btn small ghost" href="dashboard.html">Dashboard</a>' : ''}
+    <button class="btn small ghost" id="out" type="button">Log out</button>
+  </div>
+</header>
+<div class="cols">
+  <section class="col" data-s="new"><h2>New <span class="n">0</span></h2><div class="list"></div></section>
+  <section class="col" data-s="preparing"><h2>Preparing <span class="n">0</span></h2><div class="list"></div></section>
+  <section class="col" data-s="ready"><h2>Ready for pickup <span class="n">0</span></h2><div class="list"></div></section>
+</div>
+<div class="alarm hidden" id="alarm" role="alert">New order! Press "Accept" to stop the alarm</div>
+<div class="gate" id="gate">
+  <div class="card">
+    <img src="assets/logo-purple.png" alt="" style="width:160px;margin:0 auto">
+    <h2 style="margin:0;font-size:26px">Start the orders screen</h2>
+    <p style="margin:0;font-weight:700;line-height:1.5">Tap the button to turn on the sound. Keep this screen open during work hours.</p>
+    <button class="btn orange" id="start" type="button">Start (sound on)</button>
+  </div>
+</div>`;
+
+$('#out').onclick = logout;
+
+// ---------- sound: rings every 3 s while any order is still "New" ----------
+let ctx = null, wake = null;
+function ring() {
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  [0, 0.2, 0.4, 0.75, 0.95, 1.15].forEach((d, i) => {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'square'; o.frequency.value = i % 3 === 2 ? 1320 : 990;
+    g.gain.setValueAtTime(0.0001, t + d); g.gain.exponentialRampToValueAtTime(0.35, t + d + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.16);
+    o.connect(g).connect(ctx.destination); o.start(t + d); o.stop(t + d + 0.18);
+  });
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+}
+async function keepAwake() {
+  try { wake = await navigator.wakeLock?.request('screen'); } catch { /* not supported */ }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && ctx) keepAwake(); });
+$('#start').onclick = () => {
+  ctx = new (window.AudioContext || window.webkitAudioContext)(); ctx.resume();
+  ring(); keepAwake(); $('#gate').remove();
+};
+setInterval(() => {
+  const hasNew = [...orders.values()].some(o => o.status === 'new');
+  const arrivedWaiting = [...orders.values()].some(o => o.arrived_at && !seenArrived.has(o.id));
+  $('#alarm').classList.toggle('hidden', !hasNew);
+  if (hasNew || arrivedWaiting) ring();
+}, 3000);
+
+// ---------- data ----------
+const orders = new Map();
+const seenArrived = new Set();
+const NEXT = { new: ['preparing', 'Accept'], preparing: ['ready', 'Ready'], ready: ['done', 'Picked up'] };
+
+function pickupLabel(v) {
+  if (!v || v === 'ASAP') return 'ASAP';
+  const [h, m] = v.split(':').map(Number);
+  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+}
+function age(o) {
+  const mins = Math.floor((Date.now() - new Date(o.created_at.replace(' ', 'T'))) / 60000);
+  return { mins, text: mins < 1 ? 'just now' : `${mins} min ago` };
+}
+
+function card(o) {
+  const a = age(o), late = o.status !== 'ready' && a.mins >= 20;
+  const [ns, nl] = NEXT[o.status];
+  return `<article class="card ord ${o.status} ${o.arrived_at ? 'arrived' : ''}" data-id="${o.id}">
+    <div class="hd"><span class="no">#${esc(o.ref)}</span>
+      ${o.arrived_at ? '<span class="badge">Customer is here</span>' : `<span class="age ${late ? 'late' : ''}">${a.text}</span>`}</div>
+    ${o.car_plate ? `<div class="car"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 16h14M6 16l1.5-5h9L18 16M5 16v3h2v-2h10v2h2v-3"/><circle cx="8" cy="14.5" r=".8"/><circle cx="16" cy="14.5" r=".8"/></svg><b>${esc(o.car_plate)}</b>${o.car_desc ? `<span dir="auto">${esc(o.car_desc)}</span>` : ''}</div>` : ''}
+    <div class="nm"><bdi>${esc(o.customer_name)}</bdi> &middot; <a href="tel:${esc(o.phone)}" dir="ltr" style="color:inherit;unicode-bidi:isolate">${esc(o.phone)}</a></div>
+    <div class="meta">Pickup: ${pickupLabel(o.pickup_time)}</div>
+    <ul>${o.items.map(i => `<li><b>${i.qty}×</b><span>${esc(i.name_en)}</span></li>`).join('')}</ul>
+    ${o.notes ? `<div class="note" dir="auto">Note: ${esc(o.notes)}</div>` : ''}
+    <div class="meta" style="margin-bottom:10px">Collect: <b>${money(o.total)} OMR</b></div>
+    <div class="acts">
+      ${o.status === 'ready'
+        ? `<div class="pay" style="flex:1"><button class="btn" type="button" data-act="done" data-pay="cash" style="flex:1">Paid cash</button><button class="btn" type="button" data-act="done" data-pay="card" style="flex:1">Paid card</button></div>`
+        : `<button class="btn orange" type="button" data-act="${ns}">${nl}</button>`}
+      ${o.status === 'new' ? '<button class="btn ghost small" type="button" data-act="cancelled">Cancel</button>' : ''}
+      ${o.status !== 'new' ? `<button class="btn ghost small" type="button" data-act="${o.status === 'ready' ? 'preparing' : 'new'}">Back</button>` : ''}
+    </div>
+  </article>`;
+}
+
+function draw() {
+  for (const s of ['new', 'preparing', 'ready']) {
+    const col = document.querySelector(`.col[data-s="${s}"]`);
+    const list = [...orders.values()].filter(o => o.status === s).sort((a, b) => (b.arrived_at ? 1 : 0) - (a.arrived_at ? 1 : 0) || a.id - b.id);
+    col.querySelector('.n').textContent = list.length;
+    col.querySelector('.list').innerHTML = list.length ? list.map(card).join('') : '<div class="empty">No orders</div>';
+  }
+}
+
+document.addEventListener('click', async e => {
+  const b = e.target.closest('button[data-act]'); if (!b) return;
+  const id = +b.closest('.ord').dataset.id, status = b.dataset.act;
+  if (status === 'cancelled' && !confirm('Cancel this order?')) return;
+  b.disabled = true;
+  try { await api('order_status', { id, status, payment: b.dataset.pay }); }
+  catch (ex) { if (ex.message === 'login_required') return location.reload(); alert(msgEn(ex)); b.disabled = false; return; }
+  const o = orders.get(id);
+  if (o) { o.status = status; if (o.arrived_at) seenArrived.add(id); if (['done', 'cancelled'].includes(status)) orders.delete(id); }
+  draw();
+});
+
+async function load() {
+  let data;
+  try { data = await api('active_orders'); }
+  catch (ex) {
+    if (ex.message === 'login_required') return location.reload();
+    $('#live').classList.add('off'); $('#live').lastChild.textContent = ' Offline'; return;
+  }
+  $('#live').classList.remove('off'); $('#live').lastChild.textContent = ' Online';
+  orders.clear(); data.forEach(o => orders.set(o.id, o));
+  draw();
+}
+
+// clicking an arrived card's badge area acknowledges it (stops the arrival ring)
+document.addEventListener('click', e => {
+  const c = e.target.closest('.ord.arrived'); if (c) { seenArrived.add(+c.dataset.id); }
+});
+
+load();
+setInterval(load, 5000);
+setInterval(draw, 30000);
+</script>
+</body>
+</html>

@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>POS | Açaí Dose</title>
+<meta name="theme-color" content="#470D43">
+<link rel="icon" href="assets/logo-purple.png">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+body{background:var(--c2);font-family:'Montserrat','Tajawal',system-ui,sans-serif}
+.topbar .nav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.topbar .btn.ghost{color:var(--c);border-color:var(--c)}
+.pos{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(300px,1fr);gap:14px;padding:14px;align-items:start}
+@media (max-width:860px){.pos{grid-template-columns:1fr}}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+.prod{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 10px;border:3px solid transparent;cursor:pointer;text-align:center;min-height:220px;font:inherit;color:inherit}
+.prod:active{transform:scale(.97)}
+.prod:focus-visible{outline:3px solid var(--o)}
+.prod img{height:120px;width:auto}
+.prod .nm{font-weight:800;font-size:16px;line-height:1.25}
+.prod .pr{font-weight:800;font-size:18px;color:var(--p)}
+.prod .q{position:relative}
+.prod .cnt{position:absolute;top:-6px;right:-30px;min-width:34px;height:34px;border-radius:17px;background:var(--o);color:var(--p);font-weight:800;display:grid;place-items:center}
+.ticket{padding:18px;display:flex;flex-direction:column;gap:12px;position:sticky;top:12px}
+.ticket h2{margin:0;font-size:20px;display:flex;justify-content:space-between;align-items:center}
+.lines{display:flex;flex-direction:column;gap:8px;min-height:60px}
+.line{display:flex;align-items:center;gap:8px;font-weight:700}
+.line .n{flex:1}
+.line button{width:40px;height:40px;border-radius:50%;border:2px solid var(--p);background:#fff;font-weight:800;font-size:20px;cursor:pointer}
+.line .qq{min-width:24px;text-align:center;font-weight:800}
+.line .t{min-width:64px;text-align:right;font-weight:800}
+.total{display:flex;justify-content:space-between;align-items:baseline;border-top:2px dashed #eadfca;padding-top:12px}
+.total b{font-size:32px}
+.paybtns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.paybtns .btn{min-height:64px;font-size:20px}
+.change{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.change input{width:120px;min-height:46px;border:2px solid #e3d6bf;border-radius:12px;padding:6px 10px;font-size:18px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ok);color:#fff;font-weight:800;font-size:20px;padding:16px 28px;border-radius:999px;z-index:9;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.today{margin:0 14px 30px}
+.today h3{margin:6px 4px 10px;font-size:20px;display:flex;gap:14px;flex-wrap:wrap;align-items:baseline}
+.today h3 small{font-size:14px;font-weight:700;opacity:.8}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:var(--r);overflow:hidden;font-size:15px}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #f0e6d4;white-space:nowrap}
+th{background:var(--c);font-size:13px}
+.void{background:none;border:0;color:var(--bad);font-weight:800;cursor:pointer;min-height:40px}
+.x td{text-decoration:line-through;opacity:.5}
+.tbl{overflow-x:auto}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+import { api, $, esc, money, requireLogin, logout, msgEn } from './assets/common.js';
+const app = $('#app');
+const me = await requireLogin(app, 'POS', true);
+
+app.innerHTML = `
+<header class="topbar">
+  <img src="assets/logo-cream.png" alt="Açaí Dose">
+  <div class="nav">
+    <span class="who">${esc(me.username)}</span>
+    <a class="btn small ghost" href="screen.html">Orders screen</a>
+    ${me.role === 'owner' ? '<a class="btn small ghost" href="dashboard.html">Dashboard</a>' : ''}
+    <button class="btn small ghost" id="out" type="button">Log out</button>
+  </div>
+</header>
+<div class="pos">
+  <section aria-label="Menu"><div class="grid" id="grid"><div class="card" style="padding:20px">Loading menu…</div></div></section>
+  <aside class="card ticket" aria-label="Current sale">
+    <h2>Current sale <button class="btn small ghost" id="clear" type="button">Clear</button></h2>
+    <div class="lines" id="lines"></div>
+    <div class="total"><span style="font-weight:800">Total</span><span><b id="tot">0.000</b> OMR</span></div>
+    <div class="change"><label for="given" style="font-weight:800">Cash given</label><input id="given" type="number" step="0.001" min="0" inputmode="decimal"><span id="chg" style="font-weight:800"></span></div>
+    <div class="paybtns">
+      <button class="btn" id="cash" type="button" disabled>Cash</button>
+      <button class="btn orange" id="card" type="button" disabled>Card</button>
+    </div>
+    <div class="err" id="err" role="alert"></div>
+  </aside>
+</div>
+<section class="today">
+  <h3>Today's shop sales <small id="sum"></small></h3>
+  <div class="tbl" id="todayTbl"></div>
+</section>`;
+$('#out').onclick = logout;
+
+let products = [];
+const cart = new Map();
+
+function drawGrid() {
+  $('#grid').innerHTML = products.map(p => {
+    const q = cart.get(p.id) || 0;
+    return `<button class="card prod" type="button" data-id="${p.id}" aria-label="Add ${esc(p.name_en)}">
+      <span class="q"><img src="assets/${esc(p.img || 'cup-smoothie.png')}" alt="">${q ? `<span class="cnt">${q}</span>` : ''}</span>
+      <span class="nm">${esc(p.name_en)}</span><span class="pr">${money(p.price)}</span></button>`;
+  }).join('');
+}
+function total() { return products.reduce((s, p) => s + (cart.get(p.id) || 0) * p.price, 0); }
+function drawTicket() {
+  const rows = products.filter(p => cart.get(p.id));
+  $('#lines').innerHTML = rows.length ? rows.map(p => {
+    const q = cart.get(p.id);
+    return `<div class="line"><span class="n">${esc(p.name_en)}</span>
+      <button type="button" data-d="-1" data-id="${p.id}" aria-label="Remove one">−</button><span class="qq">${q}</span>
+      <button type="button" data-d="1" data-id="${p.id}" aria-label="Add one">+</button><span class="t">${money(q * p.price)}</span></div>`;
+  }).join('') : '<div style="opacity:.6;font-weight:700">Tap a drink to add it</div>';
+  const t = total();
+  $('#tot').textContent = money(t);
+  $('#cash').disabled = $('#card').disabled = t === 0;
+  const g = parseFloat($('#given').value);
+  $('#chg').textContent = g && t ? (g >= t ? `Change: ${money(g - t)}` : `Short: ${money(t - g)}`) : '';
+}
+function redraw() { drawGrid(); drawTicket(); }
+
+$('#grid').addEventListener('click', e => {
+  const b = e.target.closest('.prod'); if (!b) return;
+  const id = +b.dataset.id; cart.set(id, (cart.get(id) || 0) + 1); redraw();
+});
+$('#lines').addEventListener('click', e => {
+  const b = e.target.closest('button[data-id]'); if (!b) return;
+  const id = +b.dataset.id, q = (cart.get(id) || 0) + +b.dataset.d;
+  q > 0 ? cart.set(id, q) : cart.delete(id); redraw();
+});
+$('#clear').onclick = () => { cart.clear(); $('#given').value = ''; redraw(); };
+$('#given').oninput = drawTicket;
+
+async function sell(payment) {
+  const items = [...cart].map(([product_id, qty]) => ({ product_id, qty }));
+  $('#cash').disabled = $('#card').disabled = true; $('#err').textContent = '';
+  try {
+    const r = await api('pos_sale', { items, payment });
+    cart.clear(); $('#given').value = ''; redraw();
+    const t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status');
+    t.textContent = `Sale #${r.ref} saved · ${money(r.total)} OMR (${payment})`;
+    document.body.append(t); setTimeout(() => t.remove(), 2500);
+    loadToday();
+  } catch (ex) {
+    if (ex.message === 'login_required') return location.reload();
+    $('#err').textContent = msgEn(ex); drawTicket();
+  }
+}
+$('#cash').onclick = () => sell('cash');
+$('#card').onclick = () => sell('card');
+
+async function loadToday() {
+  let rows = [];
+  try { rows = await api('pos_today'); } catch (ex) { if (ex.message === 'login_required') location.reload(); return; }
+  const ok = rows.filter(r => r.status !== 'cancelled');
+  const sum = k => ok.filter(r => !k || r.payment === k).reduce((s, r) => s + r.total, 0);
+  $('#sum').textContent = `${ok.length} sales · Total ${money(sum())} · Cash ${money(sum('cash'))} · Card ${money(sum('card'))}`;
+  $('#todayTbl').innerHTML = rows.length ? `<table>
+    <thead><tr><th>Time</th><th>#</th><th>Items</th><th>Total</th><th>Paid</th><th>By</th><th></th></tr></thead>
+    <tbody>${rows.map(r => `<tr class="${r.status === 'cancelled' ? 'x' : ''}"><td>${r.created_at.slice(11, 16)}</td><td>#${esc(r.ref)}</td>
+      <td>${r.items.map(i => `${i.qty}× ${esc(i.name_en)}`).join(', ')}</td><td>${money(r.total)}</td><td>${esc(r.payment || '')}</td><td>${esc(r.by_user || '')}</td>
+      <td>${r.status === 'cancelled' ? 'Voided' : `<button class="void" type="button" data-void="${r.id}">Void</button>`}</td></tr>`).join('')}</tbody></table>`
+    : '<div class="card" style="padding:18px;font-weight:700;opacity:.7">No shop sales yet today</div>';
+}
+document.addEventListener('click', async e => {
+  const v = e.target.closest('[data-void]'); if (!v) return;
+  if (!confirm('Void this sale?')) return;
+  try { await api('pos_void', { id: +v.dataset.void }); loadToday(); } catch (ex) { alert(msgEn(ex)); }
+});
+
+try { products = await api('menu'); } catch { $('#grid').innerHTML = '<div class="card" style="padding:20px">Could not load menu. Refresh the page.</div>'; }
+redraw(); loadToday();
+</script>
+</body>
+</html>

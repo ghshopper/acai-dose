@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>الداشبورد | Açaí Dose</title>
+<meta name="theme-color" content="#470D43">
+<link rel="icon" href="assets/logo-purple.png">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+body{background:var(--c2)}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+.tabs{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 12px}
+.tabs button{flex:none;min-height:46px;padding:8px 20px;border-radius:999px;border:2px solid var(--p);background:#fff;font-weight:800;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--p);color:var(--c)}
+.period{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}
+.period button{min-height:44px;padding:6px 16px;border-radius:999px;border:0;background:#fff;font-weight:800;cursor:pointer}
+.period button[aria-pressed="true"]{background:var(--o)}
+.period .field input{min-height:44px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.kpi{padding:16px 18px}
+.kpi .l{font-weight:800;font-size:15px;opacity:.75}
+.kpi .v{font-family:'Montserrat',sans-serif;font-weight:800;font-size:28px;margin-top:6px;direction:ltr;text-align:right}
+.kpi .s{font-size:13px;font-weight:700;opacity:.65;margin-top:2px}
+.kpi.net{background:var(--p);color:var(--c)}
+.kpi.neg .v{color:var(--bad)}
+.kpi.net.neg .v{color:#ffb4b4}
+h3{margin:22px 4px 10px;font-size:24px}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:var(--r);overflow:hidden;font-size:16px}
+th,td{padding:12px 14px;text-align:right;border-bottom:1px solid #f0e6d4;white-space:nowrap}
+th{background:var(--c);font-weight:800;font-size:14px}
+td.num{font-family:'Montserrat',sans-serif;font-weight:700;direction:ltr;text-align:right}
+tfoot td{font-weight:800;background:var(--c)}
+.del{background:none;border:0;color:var(--bad);font-weight:800;cursor:pointer;min-height:40px;padding:0 8px}
+.formrow{padding:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;align-items:end}
+.bars{display:flex;align-items:flex-end;gap:6px;height:180px;padding:16px;overflow-x:auto}
+.bars .b{flex:1 0 22px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;height:100%}
+.bars .b i{display:block;width:100%;max-width:34px;background:var(--p);border-radius:8px 8px 3px 3px;min-height:3px}
+.bars .b small{font-size:11px;font-weight:700;opacity:.7}
+.empty{padding:20px;text-align:center;font-weight:700;opacity:.6}
+.pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:13px;font-weight:800;background:var(--c2)}
+.ok{color:var(--ok);font-weight:800}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+import { api, msg, $, $$, esc, money, ymd, requireLogin, logout } from './assets/common.js';
+const app = $('#app');
+
+const me = await requireLogin(app, 'الداشبورد');
+if (me.role !== 'owner') { location.href = 'screen.html'; throw 0; }
+
+const CH = { talabat: 'طلبات', snoonu: 'سنونو', khedmah: 'خدمة' };
+const CATS = ['مواد خام (آساي وفواكه)', 'أكواب وتغليف', 'رواتب', 'إيجار', 'كهرباء وماء', 'تسويق وإعلانات', 'صيانة', 'أخرى'];
+
+app.innerHTML = `
+<header class="topbar">
+  <img src="assets/logo-cream.png" alt="Açaí Dose">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end">
+    <span class="who" dir="ltr">${esc(me.username)}</span>
+    <a class="btn small ghost" style="color:var(--c);border-color:var(--c)" href="screen.html">شاشة الطلبات</a>
+    <a class="btn small ghost" style="color:var(--c);border-color:var(--c)" href="pos.html">الكاشير</a>
+    <button class="btn small ghost" style="color:var(--c);border-color:var(--c)" id="out" type="button">خروج</button>
+  </div>
+</header>
+<div class="wrap">
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-t="sum">الملخص</button>
+    <button role="tab" aria-selected="false" data-t="apps">مبيعات التطبيقات</button>
+    <button role="tab" aria-selected="false" data-t="exp">المصاريف</button>
+    <button role="tab" aria-selected="false" data-t="orders">كل الطلبات</button>
+    <button role="tab" aria-selected="false" data-t="set">الإعدادات</button>
+  </div>
+
+  <div class="period" id="period">
+    <button type="button" data-p="today" aria-pressed="true">اليوم</button>
+    <button type="button" data-p="yest" aria-pressed="false">أمس</button>
+    <button type="button" data-p="week" aria-pressed="false">آخر ٧ أيام</button>
+    <button type="button" data-p="month" aria-pressed="false">هذا الشهر</button>
+    <button type="button" data-p="last" aria-pressed="false">الشهر الماضي</button>
+    <div class="field"><label for="pf">من</label><input type="date" id="pf"></div>
+    <div class="field"><label for="pt">إلى</label><input type="date" id="pt"></div>
+  </div>
+
+  <section data-panel="sum"></section>
+  <section data-panel="apps" class="hidden"></section>
+  <section data-panel="exp" class="hidden"></section>
+  <section data-panel="orders" class="hidden"></section>
+  <section data-panel="set" class="hidden"></section>
+</div>`;
+
+$('#out').onclick = logout;
+
+// ---------- state ----------
+let tab = 'sum';
+let from, to;   // yyyy-mm-dd inclusive
+let commissions = { talabat: 0, snoonu: 0, khedmah: 0 };
+
+function setPeriod(p) {
+  const d = new Date(); const t = ymd(d);
+  if (p === 'today') { from = to = t; }
+  if (p === 'yest') { d.setDate(d.getDate() - 1); from = to = ymd(d); }
+  if (p === 'week') { to = t; d.setDate(d.getDate() - 6); from = ymd(d); }
+  if (p === 'month') { to = t; from = t.slice(0, 8) + '01'; }
+  if (p === 'last') { const s = new Date(d.getFullYear(), d.getMonth() - 1, 1), e = new Date(d.getFullYear(), d.getMonth(), 0); from = ymd(s); to = ymd(e); }
+  $('#pf').value = from; $('#pt').value = to;
+  $$('#period button').forEach(b => b.setAttribute('aria-pressed', b.dataset.p === p));
+  refresh();
+}
+$('#period').addEventListener('click', e => { const b = e.target.closest('button[data-p]'); if (b) setPeriod(b.dataset.p); });
+['#pf', '#pt'].forEach(s => $(s).addEventListener('change', () => {
+  from = $('#pf').value || from; to = $('#pt').value || to; if (from > to) [from, to] = [to, from];
+  $$('#period button').forEach(b => b.setAttribute('aria-pressed', 'false')); refresh();
+}));
+
+$('.tabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-t]'); if (!b) return;
+  tab = b.dataset.t;
+  $$('.tabs button').forEach(x => x.setAttribute('aria-selected', x === b));
+  $$('section[data-panel]').forEach(s => s.classList.toggle('hidden', s.dataset.panel !== tab));
+  $('#period').classList.toggle('hidden', tab === 'set');
+  refresh();
+});
+
+const days = () => { const out = []; for (let d = new Date(from + 'T00:00:00'); ymd(d) <= to; d.setDate(d.getDate() + 1)) out.push(ymd(d)); return out; };
+
+async function fetchAll() {
+  try { return await api('range', undefined, { from, to }); }
+  catch (ex) { if (ex.message === 'login_required') location.reload(); return { orders: [], apps: [], exps: [] }; }
+}
+
+async function refresh() {
+  if (tab === 'set') return drawSettings();
+  const d = await fetchAll();
+  ({ sum: drawSum, apps: drawApps, exp: drawExp, orders: drawOrders })[tab](d);
+}
+
+// ---------- summary ----------
+function drawSum({ orders, apps, exps }) {
+  const valid = orders.filter(o => o.status !== 'cancelled');
+  const webO = valid.filter(o => o.source !== 'pos'), posO = valid.filter(o => o.source === 'pos');
+  const site = webO.reduce((s, o) => s + +o.total, 0);
+  const pos = posO.reduce((s, o) => s + +o.total, 0);
+  const paid = k => valid.filter(o => o.payment === k).reduce((s, o) => s + +o.total, 0);
+  const appGross = apps.reduce((s, r) => s + +r.gross, 0);
+  const comm = apps.reduce((s, r) => s + +r.commission, 0);
+  const exp = exps.reduce((s, r) => s + +r.amount, 0);
+  const sales = site + pos + appGross, net = sales - comm - exp;
+  const appOrders = apps.reduce((s, r) => s + (r.orders_count || 0), 0);
+  const cups = webO.reduce((s, o) => s + o.items.reduce((a, i) => a + i.qty, 0), 0);
+  const posCups = posO.reduce((s, o) => s + o.items.reduce((a, i) => a + i.qty, 0), 0);
+
+  const byCh = Object.keys(CH).map(c => {
+    const rows = apps.filter(r => r.channel === c);
+    const g = rows.reduce((s, r) => s + +r.gross, 0), cm = rows.reduce((s, r) => s + +r.commission, 0);
+    return { c, g, cm, n: rows.reduce((s, r) => s + (r.orders_count || 0), 0) };
+  });
+
+  const prod = {};
+  valid.forEach(o => o.items.forEach(i => { prod[i.name_ar] = (prod[i.name_ar] || 0) + i.qty; }));
+  const prodRows = Object.entries(prod).sort((a, b) => b[1] - a[1]);
+
+  const ds = days();
+  const daily = ds.map(day => {
+    const s = valid.filter(o => o.created_at.slice(0, 10) === day).reduce((a, o) => a + +o.total, 0)
+      + apps.filter(r => r.sale_date === day).reduce((a, r) => a + +r.gross, 0);
+    return { day, s };
+  });
+  const max = Math.max(1, ...daily.map(x => x.s));
+
+  $('[data-panel="sum"]').innerHTML = `
+    <div class="kpis">
+      <div class="card kpi"><div class="l">إجمالي المبيعات</div><div class="v">${money(sales)}</div><div class="s">ر.ع</div></div>
+      <div class="card kpi"><div class="l">مبيعات الموقع</div><div class="v">${money(site)}</div><div class="s">${webO.length} طلب &middot; ${cups} كوب</div></div>
+      <div class="card kpi"><div class="l">مبيعات المحل (كاشير)</div><div class="v">${money(pos)}</div><div class="s">${posO.length} عملية &middot; ${posCups} كوب</div></div>
+      <div class="card kpi"><div class="l">مبيعات التطبيقات</div><div class="v">${money(appGross)}</div><div class="s">${appOrders ? appOrders + ' طلب' : '&nbsp;'}</div></div>
+      <div class="card kpi"><div class="l">العمولات</div><div class="v">${money(comm)}</div><div class="s">طلبات وسنونو وخدمة</div></div>
+      <div class="card kpi"><div class="l">المصاريف</div><div class="v">${money(exp)}</div><div class="s">${exps.length} مصروف</div></div>
+      <div class="card kpi net ${net < 0 ? 'neg' : ''}"><div class="l">صافي الربح</div><div class="v">${money(net)}</div><div class="s">المبيعات − العمولات − المصاريف</div></div>
+    </div>
+
+    <h3 class="lal">الدرج: نقد وبطاقة</h3>
+    <div class="kpis">
+      <div class="card kpi"><div class="l">نقد (كاش)</div><div class="v">${money(paid('cash'))}</div><div class="s">الكاشير + طلبات الموقع المستلمة</div></div>
+      <div class="card kpi"><div class="l">بطاقة</div><div class="v">${money(paid('card'))}</div><div class="s">الكاشير + طلبات الموقع المستلمة</div></div>
+    </div>
+
+    ${ds.length > 1 ? `<h3 class="lal">المبيعات اليومية</h3>
+    <div class="card bars" role="img" aria-label="رسم المبيعات اليومية">${daily.map(x => `<div class="b" title="${x.day}: ${money(x.s)} ر.ع"><i style="height:${Math.round(x.s / max * 100)}%"></i><small>${x.day.slice(8)}</small></div>`).join('')}</div>` : ''}
+
+    <h3 class="lal">حسب القناة</h3>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>القناة</th><th>المبيعات</th><th>العمولة</th><th>الصافي</th><th>الطلبات</th></tr></thead>
+      <tbody>
+        <tr><td>الموقع (استلام)</td><td class="num">${money(site)}</td><td class="num">0.000</td><td class="num">${money(site)}</td><td class="num">${webO.length}</td></tr>
+        <tr><td>المحل (كاشير)</td><td class="num">${money(pos)}</td><td class="num">0.000</td><td class="num">${money(pos)}</td><td class="num">${posO.length}</td></tr>
+        ${byCh.map(x => `<tr><td>${CH[x.c]}</td><td class="num">${money(x.g)}</td><td class="num">${money(x.cm)}</td><td class="num">${money(x.g - x.cm)}</td><td class="num">${x.n || '-'}</td></tr>`).join('')}
+      </tbody>
+      <tfoot><tr><td>المجموع</td><td class="num">${money(sales)}</td><td class="num">${money(comm)}</td><td class="num">${money(sales - comm)}</td><td class="num">${valid.length + appOrders}</td></tr></tfoot>
+    </table></div>
+
+    <h3 class="lal">الأكثر طلباً (الموقع والكاشير)</h3>
+    ${prodRows.length ? `<div class="tbl-wrap"><table><thead><tr><th>الصنف</th><th>عدد الأكواب</th></tr></thead><tbody>${prodRows.map(([n, q]) => `<tr><td>${esc(n)}</td><td class="num">${q}</td></tr>`).join('')}</tbody></table></div>` : '<div class="card empty">ما فيه طلبات في هالفترة</div>'}
+  `;
+}
+
+// ---------- app sales ----------
+function drawApps({ apps }) {
+  $('[data-panel="apps"]').innerHTML = `
+    <form class="card formrow" id="af">
+      <div class="field"><label for="ad">التاريخ</label><input type="date" id="ad" value="${ymd(new Date())}" required></div>
+      <div class="field"><label for="ac">التطبيق</label><select id="ac">${Object.entries(CH).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+      <div class="field"><label for="ag">المبيعات (ر.ع)</label><input type="number" id="ag" step="0.001" min="0" inputmode="decimal" required></div>
+      <div class="field"><label for="ap">العمولة %</label><input type="number" id="ap" step="0.01" min="0" max="100" inputmode="decimal"></div>
+      <div class="field"><label for="an">عدد الطلبات</label><input type="number" id="an" min="0" step="1" inputmode="numeric"></div>
+      <div class="field"><label for="ax">ملاحظة</label><input id="ax" maxlength="120"></div>
+      <button class="btn" type="submit">أضف</button>
+      <div class="err" id="aerr" role="alert"></div>
+    </form>
+    <h3 class="lal">السجل</h3>
+    ${apps.length ? `<div class="tbl-wrap"><table>
+      <thead><tr><th>التاريخ</th><th>التطبيق</th><th>المبيعات</th><th>العمولة</th><th>الصافي</th><th>الطلبات</th><th>ملاحظة</th><th></th></tr></thead>
+      <tbody>${apps.map(r => `<tr><td class="num">${r.sale_date}</td><td>${CH[r.channel]}</td><td class="num">${money(r.gross)}</td><td class="num">${money(r.commission)} <span class="pill">${+r.commission_pct}%</span></td><td class="num">${money(r.gross - r.commission)}</td><td class="num">${r.orders_count ?? '-'}</td><td>${esc(r.note || '')}</td><td><button class="del" data-del="sale:${r.id}" type="button">حذف</button></td></tr>`).join('')}</tbody>
+    </table></div>` : '<div class="card empty">ما فيه مبيعات تطبيقات مسجلة في هالفترة</div>'}`;
+  const setPct = () => { $('#ap').value = commissions[$('#ac').value] ?? 0; };
+  $('#ac').onchange = setPct; setPct();
+  $('#af').onsubmit = async e => {
+    e.preventDefault();
+    const gross = +$('#ag').value; if (!(gross >= 0) || $('#ag').value === '') { $('#aerr').textContent = 'اكتب المبلغ'; return; }
+    const row = { sale_date: $('#ad').value, channel: $('#ac').value, gross, commission_pct: +$('#ap').value || 0,
+      orders_count: $('#an').value === '' ? null : +$('#an').value, note: $('#ax').value.trim() || null };
+    try { await api('add_sale', row); } catch (ex) { $('#aerr').textContent = msg(ex); return; }
+    refresh();
+  };
+}
+
+// ---------- expenses ----------
+function drawExp({ exps }) {
+  const total = exps.reduce((s, r) => s + +r.amount, 0);
+  $('[data-panel="exp"]').innerHTML = `
+    <form class="card formrow" id="xf">
+      <div class="field"><label for="xd">التاريخ</label><input type="date" id="xd" value="${ymd(new Date())}" required></div>
+      <div class="field"><label for="xc">النوع</label><select id="xc">${CATS.map(c => `<option>${c}</option>`).join('')}</select></div>
+      <div class="field"><label for="xa">المبلغ (ر.ع)</label><input type="number" id="xa" step="0.001" min="0" inputmode="decimal" required></div>
+      <div class="field"><label for="xn">ملاحظة</label><input id="xn" maxlength="120"></div>
+      <button class="btn" type="submit">أضف</button>
+      <div class="err" id="xerr" role="alert"></div>
+    </form>
+    <h3 class="lal">السجل</h3>
+    ${exps.length ? `<div class="tbl-wrap"><table>
+      <thead><tr><th>التاريخ</th><th>النوع</th><th>المبلغ</th><th>ملاحظة</th><th></th></tr></thead>
+      <tbody>${exps.map(r => `<tr><td class="num">${r.expense_date}</td><td>${esc(r.category)}</td><td class="num">${money(r.amount)}</td><td>${esc(r.note || '')}</td><td><button class="del" data-del="expense:${r.id}" type="button">حذف</button></td></tr>`).join('')}</tbody>
+      <tfoot><tr><td colspan="2">المجموع</td><td class="num">${money(total)}</td><td colspan="2"></td></tr></tfoot>
+    </table></div>` : '<div class="card empty">ما فيه مصاريف مسجلة في هالفترة</div>'}`;
+  $('#xf').onsubmit = async e => {
+    e.preventDefault();
+    if ($('#xa').value === '') { $('#xerr').textContent = 'اكتب المبلغ'; return; }
+    try { await api('add_expense', { expense_date: $('#xd').value, category: $('#xc').value, amount: +$('#xa').value, note: $('#xn').value.trim() || null }); }
+    catch (ex) { $('#xerr').textContent = msg(ex); return; }
+    refresh();
+  };
+}
+
+// ---------- website orders ----------
+const ST = { new: 'جديد', preparing: 'يتحضر', ready: 'جاهز', done: 'تم الاستلام', cancelled: 'ملغي' };
+function drawOrders({ orders }) {
+  const SRC = { web: 'الموقع', pos: 'الكاشير' }, PAY = { cash: 'نقد', card: 'بطاقة' };
+  $('[data-panel="orders"]').innerHTML = orders.length ? `<div class="tbl-wrap"><table>
+    <thead><tr><th>الوقت</th><th>رقم</th><th>المصدر</th><th>الزبون</th><th>السيارة</th><th>الطلب</th><th>المبلغ</th><th>الدفع</th><th>الحالة</th></tr></thead>
+    <tbody>${orders.map(o => `<tr><td class="num">${o.created_at.slice(5, 16).replace('-', '/')}</td><td class="num">#${esc(o.ref)}</td>
+      <td>${SRC[o.source] || 'الموقع'}</td>
+      <td>${o.source === 'pos' ? '-' : `${esc(o.customer_name)} <span class="num" dir="ltr">${esc(o.phone)}</span>`}</td>
+      <td dir="ltr" style="text-align:right">${esc(o.car_plate || '')}</td>
+      <td>${o.items.map(i => `${i.qty}× ${esc(i.name_ar)}`).join('، ')}</td><td class="num">${money(o.total)}</td>
+      <td>${PAY[o.payment] || '-'}</td><td><span class="pill">${ST[o.status]}</span></td></tr>`).join('')}</tbody>
+  </table></div>` : '<div class="card empty">ما فيه طلبات في هالفترة</div>';
+}
+
+// ---------- settings ----------
+async function drawSettings() {
+  let st;
+  try { st = await api('settings'); } catch (ex) { if (ex.message === 'login_required') location.reload(); return; }
+  $('[data-panel="set"]').innerHTML = `
+    <h3 class="lal">نسبة عمولة التطبيقات</h3>
+    <form class="card formrow" id="cf">
+      ${Object.entries(CH).map(([k, v]) => `<div class="field"><label for="c_${k}">${v} %</label><input type="number" id="c_${k}" step="0.01" min="0" max="100" value="${st.commissions[k] ?? 0}"></div>`).join('')}
+      <button class="btn" type="submit">احفظ</button>
+      <div class="err" id="cerr" role="status"></div>
+    </form>
+
+    <h3 class="lal">المنيو والأسعار</h3>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>الصنف</th><th>السعر (ر.ع)</th><th>متوفر</th><th></th></tr></thead>
+      <tbody>${st.products.map(x => `<tr data-pid="${x.id}"><td>${esc(x.name_ar)}</td>
+        <td><input type="number" step="0.001" min="0" value="${x.price.toFixed(3)}" aria-label="سعر ${esc(x.name_ar)}" style="width:110px;min-height:42px;border:2px solid #e3d6bf;border-radius:12px;padding:4px 10px"></td>
+        <td><input type="checkbox" ${x.active ? 'checked' : ''} aria-label="${esc(x.name_ar)} متوفر" style="width:24px;height:24px"></td>
+        <td><button class="btn small" data-save-prod type="button">احفظ</button></td></tr>`).join('')}</tbody>
+    </table></div>
+
+    <h3 class="lal">حسابات العمال</h3>
+    <form class="card formrow" id="uf">
+      <div class="field"><label for="nu">اسم المستخدم (إنجليزي)</label><input id="nu" dir="ltr" autocapitalize="off" autocomplete="off" required></div>
+      <div class="field"><label for="np">كلمة السر</label><input id="np" type="text" autocomplete="off" minlength="6" required></div>
+      <button class="btn" type="submit">أضف عامل</button>
+      <div class="err" id="uerr" role="alert"></div>
+    </form>
+    <div class="tbl-wrap" style="margin-top:12px"><table>
+      <thead><tr><th>اسم المستخدم</th><th>الصلاحية</th><th>الحالة</th><th></th></tr></thead>
+      <tbody>${st.users.map(u => `<tr><td dir="ltr" style="text-align:right">${esc(u.username)}</td>
+        <td>${u.role === 'owner' ? 'صاحب المحل' : 'عامل (الشاشة بس)'}</td>
+        <td>${u.active ? '<span class="ok">فعال</span>' : '<span class="pill">موقوف</span>'}</td>
+        <td>${u.username === me.username ? '' : `<button class="btn small ghost" data-reset="${u.id}" type="button">كلمة سر جديدة</button>
+          <button class="del" data-toggle="${u.id}" data-active="${u.active}" type="button">${u.active ? 'إيقاف' : 'تفعيل'}</button>`}</td></tr>`).join('')}</tbody>
+    </table></div>`;
+
+  $('#cf').onsubmit = async e => {
+    e.preventDefault();
+    const vals = Object.fromEntries(Object.keys(CH).map(k => [k, +$('#c_' + k).value || 0]));
+    try { await api('save_commissions', vals); Object.assign(commissions, vals); $('#cerr').style.color = 'var(--ok)'; $('#cerr').textContent = 'انحفظ. تنطبق على المبيعات الجديدة.'; }
+    catch (ex) { $('#cerr').style.color = ''; $('#cerr').textContent = msg(ex); }
+  };
+  $('#uf').onsubmit = async e => {
+    e.preventDefault();
+    try { await api('add_user', { username: $('#nu').value.trim(), password: $('#np').value }); drawSettings(); }
+    catch (ex) { $('#uerr').textContent = msg(ex); }
+  };
+}
+
+document.addEventListener('click', async e => {
+  const del = e.target.closest('[data-del]');
+  if (del) {
+    if (!confirm('تبي تحذف هذا السطر؟')) return;
+    const [type, id] = del.dataset.del.split(':');
+    try { await api('delete', { type, id: +id }); } catch (ex) { alert(msg(ex)); }
+    refresh(); return;
+  }
+  const sp = e.target.closest('[data-save-prod]');
+  if (sp) {
+    const tr = sp.closest('tr'); const [price, act] = tr.querySelectorAll('input');
+    try { await api('save_product', { id: +tr.dataset.pid, price: +price.value, active: act.checked }); sp.textContent = 'انحفظ ✓'; }
+    catch { sp.textContent = 'خطأ'; }
+    setTimeout(() => sp.textContent = 'احفظ', 1500); return;
+  }
+  const rs = e.target.closest('[data-reset]');
+  if (rs) {
+    const pw = prompt('اكتب كلمة السر الجديدة (٦ حروف أو أكثر)'); if (!pw) return;
+    try { await api('user_update', { id: +rs.dataset.reset, password: pw }); alert('تم تغيير كلمة السر'); } catch (ex) { alert(msg(ex)); }
+    return;
+  }
+  const tg = e.target.closest('[data-toggle]');
+  if (tg) {
+    try { await api('user_update', { id: +tg.dataset.toggle, active: tg.dataset.active !== '1' }); } catch (ex) { alert(msg(ex)); }
+    drawSettings();
+  }
+});
+
+// ---------- boot ----------
+try { Object.assign(commissions, (await api('settings')).commissions); } catch { /* defaults */ }
+setPeriod('today');
+</script>
+</body>
+</html>

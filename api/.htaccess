@@ -1,0 +1,4 @@
+<FilesMatch "^(config|lib|schema)\.php$">
+  Require all denied
+</FilesMatch>
+Options -Indexes

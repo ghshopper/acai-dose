@@ -26,6 +26,10 @@ function create_schema(): void {
             id $id, expense_date DATE NOT NULL, category VARCHAR(60) NOT NULL, amount DECIMAL(10,3) NOT NULL,
             note VARCHAR(120), created_at DATETIME NOT NULL)$eng",
         "CREATE TABLE IF NOT EXISTS hits (k VARCHAR(120) NOT NULL, at DATETIME NOT NULL)$eng",
+        "CREATE TABLE IF NOT EXISTS customers (
+            id $id, phone VARCHAR(20) NOT NULL UNIQUE, name VARCHAR(60) NOT NULL DEFAULT '', car_plate VARCHAR(20) NULL,
+            car_desc VARCHAR(40) NULL, offers TINYINT NOT NULL DEFAULT 0, note VARCHAR(200) NULL,
+            created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL)$eng",
     ];
     foreach ($sql as $s) db()->exec($s);
     $idx = [
@@ -49,6 +53,13 @@ function create_schema(): void {
     }
     foreach (['CREATE INDEX orders_token ON orders (token)', 'CREATE INDEX orders_source ON orders (source, day)'] as $s) {
         try { db()->exec($s); } catch (Throwable $e) { /* exists */ }
+    }
+
+    try { db()->exec('CREATE INDEX orders_phone ON orders (phone)'); } catch (Throwable $e) { /* exists */ }
+    // v3: one customer record per phone number, filled from earlier website orders
+    if (!(int)q('SELECT COUNT(*) c FROM customers')->fetch()['c']) {
+        $rows = q("SELECT phone, customer_name, car_plate, car_desc, created_at FROM orders WHERE phone <> '' ORDER BY id")->fetchAll();
+        foreach ($rows as $r) save_customer($r['phone'], $r['customer_name'], $r['car_plate'], $r['car_desc'], null, $r['created_at']);
     }
 
     if (!(int)q('SELECT COUNT(*) c FROM products')->fetch()['c']) {

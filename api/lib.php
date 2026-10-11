@@ -81,6 +81,33 @@ function clean(?string $s, int $max): string { return mb_substr(trim((string)$s)
 
 /** Adds new columns on first request after an update, so re-running setup is not needed. */
 function ensure_schema(): void {
-    try { q('SELECT source, car_plate, token, commission, n_orders FROM orders LIMIT 0'); }
+    try { q('SELECT source, car_plate, token, commission, n_orders FROM orders LIMIT 0'); q('SELECT id FROM customers LIMIT 0'); }
     catch (Throwable $e) { require_once __DIR__ . '/schema.php'; create_schema(); }
+}
+
+/** Oman mobile in +968XXXXXXXX form, or '' when it isn't one. */
+function norm_phone($p): string {
+    $d = preg_replace('/\D/', '', (string)$p);
+    if (strlen($d) === 11 && str_starts_with($d, '968')) $d = substr($d, 3);
+    if (strlen($d) === 12 && str_starts_with($d, '00968')) $d = substr($d, 5);
+    return preg_match('/^[279]\d{7}$/', $d) ? '+968' . $d : '';
+}
+
+/** Adds or refreshes the customer for this phone; empty values never overwrite saved ones. */
+function save_customer(string $phone, ?string $name, ?string $car = null, ?string $carDesc = null, ?bool $offers = null, ?string $at = null): void {
+    $phone = norm_phone($phone); if ($phone === '') return;
+    $at = $at ?: now();
+    $c = q('SELECT id FROM customers WHERE phone = ?', [$phone])->fetch();
+    if (!$c) {
+        q('INSERT INTO customers (phone, name, car_plate, car_desc, offers, created_at, updated_at) VALUES (?,?,?,?,?,?,?)',
+          [$phone, (string)($name ?? ''), $car ?: null, $carDesc ?: null, $offers ? 1 : 0, $at, $at]);
+        return;
+    }
+    $set = ['updated_at = ?']; $v = [$at];
+    if ($name !== null && $name !== '' && !in_array($name, ['Walk-in', 'Imported'], true)) { $set[] = 'name = ?'; $v[] = $name; }
+    if ($car) { $set[] = 'car_plate = ?'; $v[] = $car; }
+    if ($carDesc) { $set[] = 'car_desc = ?'; $v[] = $carDesc; }
+    if ($offers !== null) { $set[] = 'offers = ?'; $v[] = $offers ? 1 : 0; }
+    $v[] = (int)$c['id'];
+    q('UPDATE customers SET ' . implode(', ', $set) . ' WHERE id = ?', $v);
 }

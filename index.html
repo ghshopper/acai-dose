@@ -6,7 +6,7 @@
 <title>اطلب | Açaí Dose</title>
 <meta name="theme-color" content="#470D43">
 <link rel="icon" href="assets/logo-purple.png">
-<link rel="stylesheet" href="assets/app.css?v=1791720042">
+<link rel="stylesheet" href="assets/app.css?v=1791721445">
 <style>
 body{background:var(--c)}
 .hero{background:var(--p);color:var(--c);text-align:center;padding:30px 20px 64px;border-radius:0 0 50% 50% / 0 0 40px 40px}
@@ -30,6 +30,8 @@ main{position:relative;z-index:1;max-width:520px;margin:-40px auto 0;padding:0 1
 .form{padding:20px;display:flex;flex-direction:column;gap:14px}
 .row2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .phone-row{display:flex;gap:8px;direction:ltr}
+.optin{display:flex;gap:12px;align-items:center;font-weight:700;font-size:16px;cursor:pointer;min-height:44px}
+.optin input{width:24px;height:24px;flex:none;accent-color:var(--p)}
 .phone-row span{display:flex;align-items:center;padding:0 12px;border:2px solid #e3d6bf;border-radius:16px;background:var(--c2);font-weight:800}
 .phone-row input{flex:1;min-width:0;width:100%;direction:ltr;text-align:left}
 .plate{direction:ltr;text-align:center;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
@@ -95,6 +97,7 @@ setTimeout(function(){if(!window.__appStarted)show('The page script did not run.
       </div>
       <div class="field"><label for="time" data-t="time"></label><select id="time"></select></div>
       <div class="field"><label for="notes" data-t="notes"></label><textarea id="notes" maxlength="300" data-ph="notesPh"></textarea></div>
+      <label class="optin"><input type="checkbox" id="offers"><span data-t="offers"></span></label>
     </form>
     <div class="info-box" style="margin-top:14px">
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none;margin-top:2px"><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.6"/></svg>
@@ -113,7 +116,7 @@ setTimeout(function(){if(!window.__appStarted)show('The page script did not run.
 </div>
 
 <script type="module">
-import { api, $, esc, money, arNum } from './assets/common.js?v=1791720042';
+import { api, $, esc, money, arNum } from './assets/common.js?v=1791721445';
 window.__appStarted = true;
 (async () => {
 
@@ -122,7 +125,7 @@ const T = {
     pick: 'اختار دوزك', details: 'بيانات الاستلام', yours: 'طلبك', sub: 'استلام من سيارتك في القرم ٢٩ · الدفع عند الاستلام',
     s1: '١ المنيو', s2: '٢ بياناتك', closed: 'المحل مسكر الحين. نفتح من ٧ الصبح لين ١٢ الليل.', loading: 'يحمّل المنيو…',
     car: 'رقم السيارة', cardesc: 'نوع ولون السيارة', cardescPh: 'مثلاً: لاندكروزر أبيض', name: 'الاسم', phone: 'رقم الجوال',
-    time: 'وقت الاستلام', notes: 'ملاحظات (اختياري)', notesPh: 'مثلاً: بدون ثلج',
+    time: 'وقت الاستلام', notes: 'ملاحظات (اختياري)', notesPh: 'مثلاً: بدون ثلج', offers: 'أبي توصلني عروض أساي دوز على الواتساب',
     howto: 'توقف قدام المحل في القرم ٢٩ واضغط "وصلت"، ونجيب لك الطلب لين سيارتك.', map: 'الموقع في الخريطة',
     back: 'رجوع', next: 'التالي', send: 'أرسل الطلب', sending: 'يرسل…', omr: 'ر.ع', edit: 'عدّل الطلب',
     none: 'ما اخترت شي', cups: n => `${arNum(n)} ${n === 1 ? 'كوب' : n === 2 ? 'كوبين' : 'أكواب'}`,
@@ -138,7 +141,7 @@ const T = {
     pick: 'Pick your dose', details: 'Pickup details', yours: 'Your order', sub: 'Curbside pickup at Al Qurum 29 · Pay on pickup',
     s1: '1 Menu', s2: '2 Your details', closed: 'We are closed now. Open daily 7 AM – 12 AM.', loading: 'Loading menu…',
     car: 'Car plate number', cardesc: 'Car model & color', cardescPh: 'e.g. White Land Cruiser', name: 'Name', phone: 'Mobile number',
-    time: 'Pickup time', notes: 'Notes (optional)', notesPh: 'e.g. No ice',
+    time: 'Pickup time', notes: 'Notes (optional)', notesPh: 'e.g. No ice', offers: 'Send me Açaí Dose offers on WhatsApp',
     howto: 'Park in front of our shop in Al Qurum 29 and tap "I\'m here". We\'ll bring your order to your car.', map: 'Open in Maps',
     back: 'Back', next: 'Next', send: 'Place order', sending: 'Sending…', omr: 'OMR', edit: 'Edit order',
     none: 'Nothing selected', cups: n => `${n} ${n === 1 ? 'cup' : 'cups'}`,
@@ -230,6 +233,7 @@ function goStep(s, quiet) {
     $('#edit').onclick = () => goStep(1);
     if (!quiet) {
       for (const k of ['name', 'phone', 'car', 'cardesc']) { const v = store.get('ad_' + k); if (v && !$('#' + k).value) $('#' + k).value = v; }
+      if (store.get('ad_offers')) $('#offers').checked = true;
       setTimeout(() => ($('#car').value ? $('#name') : $('#car')).focus(), 50);
     }
   }
@@ -257,10 +261,10 @@ $('#next').addEventListener('click', async () => {
   try {
     const r = await api('place_order', {
       name, phone: '+968' + phone, car_plate: car.toUpperCase(), car_desc: $('#cardesc').value.trim(),
-      pickup: $('#time').value, notes: $('#notes').value, items: [...cart].map(([product_id, qty]) => ({ product_id, qty })),
+      pickup: $('#time').value, notes: $('#notes').value, offers: $('#offers').checked, items: [...cart].map(([product_id, qty]) => ({ product_id, qty })),
     });
     store.set('ad_name', name); store.set('ad_phone', phone); store.set('ad_car', car); store.set('ad_cardesc', $('#cardesc').value.trim());
-    store.set('ad_track', r.token);
+    store.set('ad_track', r.token); store.set('ad_offers', $('#offers').checked ? '1' : '');
     showTrack(r.token);
   } catch (ex) {
     err.textContent = ex.message === 'too_many' ? L.eMany : ex.message === 'closed' ? L.eClosed : L.eFail;

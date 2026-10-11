@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Açaí Dose">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="stylesheet" href="assets/app.css?v=1791720042">
+<link rel="stylesheet" href="assets/app.css?v=1791721445">
 <style>
 body{background:var(--c2)}
 .wrap{max-width:1100px;margin:0 auto;padding:16px}
@@ -58,7 +58,7 @@ setTimeout(function(){if(!window.__appStarted)show('The page script did not run.
 <body>
 <div id="app"></div>
 <script type="module">
-import { api, msg, $, $$, esc, money, ymd, requireLogin, logout } from './assets/common.js?v=1791720042';
+import { api, msg, $, $$, esc, money, ymd, requireLogin, logout } from './assets/common.js?v=1791721445';
 window.__appStarted = true;
 (async () => {
 const app = $('#app');
@@ -85,6 +85,7 @@ app.innerHTML = `
     <button role="tab" aria-selected="false" data-t="apps">إدخال يدوي للتطبيقات</button>
     <button role="tab" aria-selected="false" data-t="exp">المصاريف</button>
     <button role="tab" aria-selected="false" data-t="orders">كل الطلبات</button>
+    <button role="tab" aria-selected="false" data-t="cust">العملاء</button>
     <button role="tab" aria-selected="false" data-t="data">استيراد وتصفير</button>
     <button role="tab" aria-selected="false" data-t="set">الإعدادات</button>
   </div>
@@ -103,6 +104,7 @@ app.innerHTML = `
   <section data-panel="apps" class="hidden"></section>
   <section data-panel="exp" class="hidden"></section>
   <section data-panel="orders" class="hidden"></section>
+  <section data-panel="cust" class="hidden"></section>
   <section data-panel="data" class="hidden"></section>
   <section data-panel="set" class="hidden"></section>
 </div>`;
@@ -136,7 +138,7 @@ $('.tabs').addEventListener('click', e => {
   tab = b.dataset.t;
   $$('.tabs button').forEach(x => x.setAttribute('aria-selected', x === b));
   $$('section[data-panel]').forEach(s => s.classList.toggle('hidden', s.dataset.panel !== tab));
-  $('#period').classList.toggle('hidden', tab === 'set' || tab === 'data');
+  $('#period').classList.toggle('hidden', tab === 'set' || tab === 'data' || tab === 'cust');
   refresh();
 });
 
@@ -150,6 +152,7 @@ async function fetchAll() {
 async function refresh() {
   if (tab === 'set') return drawSettings();
   if (tab === 'data') return drawData();
+  if (tab === 'cust') return drawCustomers();
   const d = await fetchAll();
   ({ sum: drawSum, apps: drawApps, exp: drawExp, orders: drawOrders })[tab](d);
 }
@@ -376,6 +379,83 @@ document.addEventListener('click', async e => {
     try { await api('user_update', { id: +tg.dataset.toggle, active: tg.dataset.active !== '1' }); } catch (ex) { alert(msg(ex)); }
     drawSettings();
   }
+});
+
+// ---------- customers ----------
+let custs = [], custQ = '', custSort = 'last';
+const daysAgo = t => t ? Math.floor((Date.now() - new Date(t.replace(' ', 'T'))) / 86400000) : null;
+const agoText = d => d === null ? '-' : d === 0 ? 'اليوم' : d === 1 ? 'أمس' : `قبل ${d} يوم`;
+
+async function drawCustomers() {
+  try { custs = await api('customers'); } catch (ex) { if (ex.message === 'login_required') location.reload(); return; }
+  const box = $('[data-panel="cust"]');
+  const total = custs.length, repeat = custs.filter(c => c.orders > 1).length, optin = custs.filter(c => c.offers).length;
+  const month = custs.filter(c => daysAgo(c.first_at) !== null && daysAgo(c.first_at) < 30).length;
+  box.innerHTML = `
+    <div class="kpis">
+      <div class="card kpi"><div class="l">كل العملاء</div><div class="v">${total}</div><div class="s">برقم جوال</div></div>
+      <div class="card kpi"><div class="l">عملاء جدد</div><div class="v">${month}</div><div class="s">آخر ٣٠ يوم</div></div>
+      <div class="card kpi"><div class="l">رجعوا وطلبوا مرة ثانية</div><div class="v">${repeat}</div><div class="s">${total ? Math.round(repeat / total * 100) : 0}% من العملاء</div></div>
+      <div class="card kpi"><div class="l">يبون العروض</div><div class="v">${optin}</div><div class="s">وافقوا على الواتساب</div></div>
+    </div>
+    <div class="card formrow" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;padding:14px;margin-top:14px">
+      <div class="field" style="flex:1 1 220px"><label for="cq">بحث بالاسم أو الرقم أو السيارة</label><input id="cq" value="${esc(custQ)}" autocomplete="off"></div>
+      <div class="field"><label for="cs">الترتيب</label><select id="cs">
+        <option value="last">آخر زيارة</option><option value="orders">الأكثر طلبات</option><option value="spent">الأكثر صرف</option><option value="away">غايبين من زمان</option></select></div>
+      <label style="display:flex;gap:8px;align-items:center;font-weight:700;min-height:50px"><input type="checkbox" id="co" style="width:22px;height:22px"> اللي يبون العروض بس</label>
+      <button class="btn ghost" id="cx" type="button">نزّل القائمة (Excel)</button>
+    </div>
+    <div id="clist" style="margin-top:12px"></div>`;
+  $('#cs').value = custSort;
+  $('#cq').oninput = e => { custQ = e.target.value; drawCustList(); };
+  $('#cs').onchange = e => { custSort = e.target.value; drawCustList(); };
+  $('#co').onchange = drawCustList;
+  $('#cx').onclick = exportCustomers;
+  drawCustList();
+}
+
+function filteredCusts() {
+  const q = custQ.trim().toLowerCase();
+  let list = custs.filter(c => (!$('#co') || !$('#co').checked || c.offers) &&
+    (!q || [c.name, c.phone, c.car_plate, c.car_desc, c.note].some(v => String(v || '').toLowerCase().includes(q))));
+  const by = { last: (a, b) => String(b.last_at || '').localeCompare(String(a.last_at || '')), orders: (a, b) => b.orders - a.orders || b.spent - a.spent,
+    spent: (a, b) => b.spent - a.spent, away: (a, b) => String(a.last_at || '').localeCompare(String(b.last_at || '')) };
+  return list.sort(by[custSort]);
+}
+
+function drawCustList() {
+  const list = filteredCusts();
+  $('#clist').innerHTML = list.length ? `<div class="tbl-wrap"><table>
+    <thead><tr><th>العميل</th><th>الجوال</th><th>الطلبات</th><th>صرف</th><th>آخر زيارة</th><th>السيارة</th><th>العروض</th><th>ملاحظة</th></tr></thead>
+    <tbody>${list.slice(0, 500).map(c => `<tr>
+      <td>${esc(c.name || '-')}${c.orders >= 5 ? ' <span class="pill">دائم</span>' : ''}</td>
+      <td dir="ltr" style="text-align:right"><a href="https://wa.me/${esc(c.phone.replace('+', ''))}" target="_blank" rel="noopener" style="color:var(--p);font-weight:800">${esc(c.phone)}</a></td>
+      <td class="num">${c.orders}</td><td class="num">${money(c.spent)}</td><td>${agoText(daysAgo(c.last_at))}</td>
+      <td>${esc([c.car_plate, c.car_desc].filter(Boolean).join(' · ') || '-')}</td>
+      <td><input type="checkbox" data-coffer="${c.id}" ${c.offers ? 'checked' : ''} aria-label="يبي العروض" style="width:22px;height:22px"></td>
+      <td><button class="btn small ghost" data-cnote="${c.id}" type="button">${c.note ? esc(c.note) : 'أضف'}</button></td></tr>`).join('')}</tbody>
+  </table></div>${list.length > 500 ? '<p>يظهر أول ٥٠٠. استخدم البحث.</p>' : ''}` : '<div class="card empty">ما فيه عملاء للحين. يتسجلون أول ما يطلبون من الموقع أو تكتبون رقمهم في الكاشير.</div>';
+}
+
+function exportCustomers() {
+  const cell = v => { const t = String(v == null ? '' : v); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+  const rows = [['الاسم', 'الجوال', 'عدد الطلبات', 'المبلغ', 'أول طلب', 'آخر طلب', 'رقم السيارة', 'السيارة', 'يبي العروض', 'ملاحظة']]
+    .concat(filteredCusts().map(c => [c.name, c.phone, c.orders, money(c.spent), (c.first_at || '').slice(0, 10), (c.last_at || '').slice(0, 10), c.car_plate, c.car_desc, c.offers ? 'نعم' : 'لا', c.note]));
+  const blob = new Blob(['﻿' + rows.map(r => r.map(cell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `acaidose-customers-${ymd(new Date())}.csv`; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+document.addEventListener('change', async e => {
+  const cb = e.target.closest('[data-coffer]'); if (!cb) return;
+  try { await api('customer_update', { id: +cb.dataset.coffer, offers: cb.checked }); const c = custs.find(x => x.id === +cb.dataset.coffer); if (c) c.offers = cb.checked ? 1 : 0; }
+  catch (ex) { cb.checked = !cb.checked; alert(msg(ex)); }
+});
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-cnote]'); if (!b) return;
+  const c = custs.find(x => x.id === +b.dataset.cnote); if (!c) return;
+  const v = prompt('ملاحظة عن العميل (مثلاً: يحب بدون ثلج)', c.note || ''); if (v === null) return;
+  try { await api('customer_update', { id: c.id, note: v }); c.note = v.trim() || null; drawCustList(); } catch (ex) { alert(msg(ex)); }
 });
 
 // ---------- import old sales + reset ----------

@@ -92,6 +92,7 @@ case 'place_order':
         'pickup_time' => $pickup, 'notes' => $notes ?: null, 'items' => json_encode($lines, JSON_UNESCAPED_UNICODE),
         'total' => $total, 'status' => 'new', 'token' => $token,
     ]);
+    save_customer($phone, $name, $car, $carDesc, isset($in['offers']) ? !empty($in['offers']) : null);
     out(['order_no' => $no, 'ref' => order_ref(date('Y-m-d'), $no), 'total' => $total, 'token' => $token]);
 
 case 'track':     // customer polls their own order by secret token
@@ -153,11 +154,14 @@ case 'pos_sale':
         $pct = (float)(q('SELECT pct FROM channel_commissions WHERE channel = ?', [$pay])->fetch()['pct'] ?? 0);
         $commission = money($total * $pct / 100);
     }
+    $cphone = '';
+    if (!empty($in['phone'])) { $cphone = norm_phone($in['phone']); if ($cphone === '') fail('invalid_phone'); }
     $no = insert_order([
-        'source' => 'pos', 'customer_name' => in_array($pay, CHANNELS, true) ? ucfirst($pay) : 'Walk-in', 'phone' => '',
+        'source' => 'pos', 'customer_name' => in_array($pay, CHANNELS, true) ? ucfirst($pay) : 'Walk-in', 'phone' => $cphone,
         'items' => json_encode($lines, JSON_UNESCAPED_UNICODE), 'total' => $total, 'status' => 'done', 'payment' => $pay,
         'commission' => $commission, 'created_by' => (int)$u['id'],
     ]);
+    if ($cphone !== '') save_customer($cphone, clean($in['name'] ?? '', 60));
     out(['order_no' => $no, 'ref' => order_ref(date('Y-m-d'), $no), 'total' => $total]);
 
 case 'pos_today':
@@ -268,6 +272,24 @@ case 'import_sales':  // owner loads old sales from the Excel template, all rows
     try { foreach ($prepared as [$d, $f]) insert_order($f, $d); $pdo->commit(); }
     catch (Throwable $e) { $pdo->rollBack(); throw $e; }
     out(['ok' => true, 'count' => count($prepared)]);
+
+case 'customers':     // owner: everyone who ordered with a phone number, with their totals
+    need('owner');
+    $rows = q("SELECT c.id, c.phone, c.name, c.car_plate, c.car_desc, c.offers, c.note, c.created_at,
+                      COUNT(o.id) AS orders, COALESCE(SUM(o.total), 0) AS spent, MAX(o.created_at) AS last_at, MIN(o.created_at) AS first_at
+               FROM customers c LEFT JOIN orders o ON o.phone = c.phone AND o.status <> 'cancelled'
+               GROUP BY c.id, c.phone, c.name, c.car_plate, c.car_desc, c.offers, c.note, c.created_at
+               ORDER BY last_at DESC")->fetchAll();
+    foreach ($rows as &$r) { $r['id'] = (int)$r['id']; $r['orders'] = (int)$r['orders']; $r['spent'] = (float)$r['spent']; $r['offers'] = (int)$r['offers']; }
+    out($rows);
+
+case 'customer_update':
+    $post(); need('owner');
+    $id = (int)($in['id'] ?? 0);
+    if (array_key_exists('name', $in)) q('UPDATE customers SET name = ? WHERE id = ?', [clean((string)$in['name'], 60), $id]);
+    if (array_key_exists('note', $in)) q('UPDATE customers SET note = ? WHERE id = ?', [clean((string)$in['note'], 200) ?: null, $id]);
+    if (array_key_exists('offers', $in)) q('UPDATE customers SET offers = ? WHERE id = ?', [$in['offers'] ? 1 : 0, $id]);
+    out(['ok' => true]);
 
 case 'settings':
     need('owner');

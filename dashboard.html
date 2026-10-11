@@ -657,7 +657,7 @@ function drawCustList() {
       <td>${esc(c.name || '-')}${c.orders >= 5 ? ' <span class="pill">دائم</span>' : ''}</td>
       <td dir="ltr" style="text-align:right"><a href="https://wa.me/${esc(c.phone.replace('+', ''))}" target="_blank" rel="noopener" style="color:var(--p);font-weight:800">${esc(c.phone)}</a></td>
       <td class="num">${c.orders}</td><td class="num">${money(c.spent)}</td>
-      <td>${c.stamps}${c.free ? ` <span class="pill" style="background:var(--o);color:var(--p)">${c.free} مجاني</span>` : ''}${c.free_used ? ` <small style="opacity:.7">(أخذ ${c.free_used})</small>` : ''}</td><td>${agoText(daysAgo(c.last_at))}</td>
+      <td style="white-space:nowrap"><button class="btn small ghost" data-cstamp="${c.id}" data-d="-1" type="button" aria-label="شيل ختم">−</button> <b>${c.stamps}/${c.need || ''}</b> <button class="btn small ghost" data-cstamp="${c.id}" data-d="1" type="button" aria-label="أضف ختم">+</button>${c.free ? ` <span class="pill" style="background:var(--o);color:var(--p)">${c.free} مجاني</span>` : ''}${c.free_used ? ` <small style="opacity:.7">(أخذ ${c.free_used})</small>` : ''}</td><td>${agoText(daysAgo(c.last_at))}</td>
       <td>${esc([c.car_plate, c.car_desc].filter(Boolean).join(' · ') || '-')}</td>
       <td><input type="checkbox" data-coffer="${c.id}" ${c.offers ? 'checked' : ''} aria-label="يبي العروض" style="width:22px;height:22px"></td>
       <td><button class="btn small ghost" data-cnote="${c.id}" type="button">${c.note ? esc(c.note) : 'أضف'}</button></td></tr>`).join('')}</tbody>
@@ -677,6 +677,13 @@ document.addEventListener('change', async e => {
   const cb = e.target.closest('[data-coffer]'); if (!cb) return;
   try { await api('customer_update', { id: +cb.dataset.coffer, offers: cb.checked }); const c = custs.find(x => x.id === +cb.dataset.coffer); if (c) c.offers = cb.checked ? 1 : 0; }
   catch (ex) { cb.checked = !cb.checked; alert(msg(ex)); }
+});
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-cstamp]'); if (!b) return;
+  const c = custs.find(x => x.id === +b.dataset.cstamp); if (!c) return;
+  b.disabled = true;
+  try { const r = await api('customer_stamps', { id: c.id, delta: +b.dataset.d }); c.stamps = r.stamps; c.free = r.free; c.need = r.need; drawCustList(); }
+  catch (ex) { b.disabled = false; alert(msg(ex)); }
 });
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-cnote]'); if (!b) return;

@@ -34,6 +34,8 @@ const MSG = {
   short_password: 'كلمة السر ٦ حروف أو أكثر',
   bad_username: 'اسم المستخدم: حروف إنجليزية أو أرقام، ٣ حروف أو أكثر',
   username_taken: 'اسم المستخدم مستخدم من قبل',
+  no_stamps: 'ما يمدي تنقص أكثر، الأختام صفر',
+  customer_exists: 'هذا الرقم مسجل من قبل',
 };
 export const msg = e => MSG[e && e.message] || 'صار خطأ، جرب مرة ثانية';
 const MSG_EN = {

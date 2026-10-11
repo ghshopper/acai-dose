@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /screen
+Disallow: /pos
+Disallow: /dashboard
+Disallow: /card.html
+Disallow: /wallet/
+
+Sitemap: https://order.acaiee.com/sitemap.xml

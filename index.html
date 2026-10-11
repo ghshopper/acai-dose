@@ -3,7 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>اطلب | Açaí Dose</title>
+<title>أساي دوز Açaí Dose | اطلب أساي سموذي واستلم من سيارتك – القرم، مسقط</title>
+<meta name="description" content="أساي دوز في القرم ٢٩، مسقط: أساي سموذي، سجنتشر، ومع الفول السوداني. اطلب من الموقع واستلم من سيارتك، والدفع عند الاستلام. Order premium açaí online in Al Qurum, Muscat and pick it up from your car.">
+<link rel="canonical" href="https://order.acaiee.com/">
+<meta name="robots" content="index, follow">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Açaí Dose">
+<meta property="og:title" content="أساي دوز | اطلب واستلم من سيارتك">
+<meta property="og:description" content="أساي سموذي في القرم ٢٩، مسقط. اطلب من الموقع واستلم من سيارتك.">
+<meta property="og:url" content="https://order.acaiee.com/">
+<meta property="og:image" content="https://order.acaiee.com/assets/og-image.jpg">
+<meta property="og:locale" content="ar_OM">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "CafeOrCoffeeShop", "name": "Açaí Dose", "alternateName": "أساي دوز", "description": "Premium açaí smoothies in Al Qurum, Muscat. Order online and pick up from your car.", "url": "https://order.acaiee.com/", "image": "https://order.acaiee.com/assets/og-image.jpg", "logo": "https://order.acaiee.com/assets/logo-purple.png", "servesCuisine": ["Açaí", "Smoothies"], "priceRange": "OMR 3–4", "currenciesAccepted": "OMR", "paymentAccepted": "Cash, Card", "address": {"@type": "PostalAddress", "addressLocality": "Al Qurum", "addressRegion": "Muscat", "addressCountry": "OM", "streetAddress": "Al Qurum 29"}, "openingHoursSpecification": [{"@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], "opens": "07:00", "closes": "23:59"}], "hasMap": "https://maps.app.goo.gl/gid6wTDGEtdCS21a7", "sameAs": ["https://instagram.com/acaidose.om", "https://acaiee.com/", "https://www.talabat.com/ar/oman/acai-dose"], "potentialAction": {"@type": "OrderAction", "target": {"@type": "EntryPoint", "urlTemplate": "https://order.acaiee.com/", "actionPlatform": ["http://schema.org/DesktopWebPlatform", "http://schema.org/MobileWebPlatform"]}, "deliveryMethod": "http://purl.org/goodrelations/v1#DeliveryModePickUp"}}</script>
 <meta name="theme-color" content="#470D43">
 <link rel="icon" href="assets/logo-purple.png">
 <link rel="stylesheet" href="assets/app.css?v=1791732362">
@@ -192,7 +205,7 @@ function applyLang() {
   $('#lang').textContent = L.switchTo;
   const card = store.get('ad_card');
   if (card && /^[a-f0-9]{32}$/.test(card)) { $('#mycard').href = 'card.html?c=' + card; $('#mycard').classList.remove('hidden'); }
-  document.title = `${lang === 'ar' ? 'اطلب' : 'Order'} | Açaí Dose`;
+  document.title = lang === 'ar' ? 'أساي دوز Açaí Dose | اطلب أساي سموذي واستلم من سيارتك – القرم، مسقط' : 'Açaí Dose | Order açaí online, curbside pickup in Al Qurum, Muscat';
   if (trackToken) return;
   const t = $('#time').value; buildTimes(); if (t) $('#time').value = t;
   if (products.length) render();

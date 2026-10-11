@@ -8,7 +8,7 @@
 <meta name="robots" content="noindex">
 <link rel="icon" href="assets/logo-purple.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
-<link rel="stylesheet" href="assets/app.css?v=1791725976">
+<link rel="stylesheet" href="assets/app.css?v=1791732362">
 <style>
 html,body{background:var(--p)}
 body{color:var(--c);min-height:100vh}
@@ -17,13 +17,11 @@ main{max-width:480px;margin:0 auto;padding:28px 18px 40px;display:flex;flex-dire
 .pass{width:100%;background:var(--p2);border-radius:28px;padding:24px 18px;display:flex;flex-direction:column;gap:16px;align-items:center;box-shadow:0 12px 30px rgba(0,0,0,.25)}
 .pass h1{margin:0;font-size:34px}
 .who{font-weight:700;color:var(--l)}
-.stamps{display:grid;grid-template-columns:repeat(3,64px);gap:14px;justify-content:center;direction:rtl}
-.stamps i{width:64px;height:64px;border-radius:50%;border:3px solid var(--l);display:flex;align-items:center;justify-content:center;font-style:normal}
-.stamps i.on{background:var(--c);border-color:var(--c)}
-.stamps i.on::after{content:'';width:24px;height:28px;background:var(--p);clip-path:polygon(0 0,100% 0,82% 100%,18% 100%)}
-.stamps i.gift{border-color:var(--o);color:var(--o);font-weight:800;font-size:15px}
+.stamps{display:grid;grid-template-columns:repeat(3,64px);gap:14px;justify-content:center;direction:rtl;background:var(--c);border-radius:22px;padding:16px 22px}
+.stamps i{width:64px;height:64px;display:flex;align-items:center;justify-content:center;font-style:normal;background:url(assets/wallet/stamp-off.png) center/contain no-repeat}
+.stamps i.on{background-image:url(assets/wallet/stamp-on.png)}
+.stamps i.gift{border:3px solid var(--o);border-radius:50%;background:none;color:var(--o);font-weight:800;font-size:15px}
 .stamps i.gift.on{background:var(--o);color:var(--p)}
-.stamps i.gift.on::after{display:none}
 .msg{font-weight:800;font-size:20px;line-height:1.5}
 .free{background:var(--o);color:var(--p);border-radius:16px;padding:12px 18px;font-weight:800;font-size:18px}
 .wallet{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:54px;padding:10px 24px;border-radius:14px;background:#000;color:#fff;font-weight:700;font-size:17px;text-decoration:none;font-family:-apple-system,'Montserrat',sans-serif;border:1px solid #444}
@@ -39,7 +37,7 @@ window.addEventListener('error',function(e){show(e.message||'Script error')});se
 <body>
 <main id="main"><p>…</p></main>
 <script type="module">
-import { api, $, esc, arNum } from './assets/common.js?v=1791725976';
+import { api, $, esc, arNum } from './assets/common.js?v=1791732362';
 window.__appStarted = true;
 (async () => {
 const T = {

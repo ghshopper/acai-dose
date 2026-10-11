@@ -1,0 +1,87 @@
+name: Build owner app (iPhone → TestFlight)
+
+on:
+  push:
+    branches: [main]
+    paths: ['owner_app/**', '.github/workflows/ios.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    env:
+      # Upload only runs once the App Store Connect key is saved in the repo secrets
+      HAS_KEYS: ${{ secrets.ASC_KEY_ID != '' && secrets.ASC_ISSUER_ID != '' && secrets.ASC_KEY_P8 != '' && secrets.APPLE_TEAM_ID != '' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Build the app (unsigned check)
+        working-directory: owner_app
+        run: |
+          set -o pipefail
+          flutter --version 2>&1 | tee ../build.log
+          # Standard iOS project files; our own files (app icon) are kept
+          flutter create --org com.acaidose --project-name owner --platforms ios . 2>&1 | tee -a ../build.log
+          rm -f test/widget_test.dart
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Açaí Dose" ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" ios/Runner/Info.plist || true
+          flutter pub get 2>&1 | tee -a ../build.log
+          flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee -a ../build.log || true
+          flutter build ios --release --no-codesign --build-number=${{ github.run_number }} 2>&1 | tee -a ../build.log
+
+      - name: Sign, archive and upload to TestFlight
+        if: env.HAS_KEYS == 'true'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -o pipefail
+          KEY="$RUNNER_TEMP/AuthKey_$ASC_KEY_ID.p8"
+          printf '%s\n' "$ASC_KEY_P8" > "$KEY"
+          AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$KEY" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+          cd owner_app/ios
+          xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/Owner.xcarchive" archive \
+            DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Automatic "${AUTH[@]}" 2>&1 | tee -a ../../build.log | grep -E "error|warning: .*sign|ARCHIVE" || true
+          test -d "$RUNNER_TEMP/Owner.xcarchive"
+          cat > "$RUNNER_TEMP/export.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>$TEAM_ID</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict></plist>
+          PLIST
+          sed -i '' 's/^          //' "$RUNNER_TEMP/export.plist"
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/Owner.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/export.plist" -exportPath "$RUNNER_TEMP/out" "${AUTH[@]}" 2>&1 | tee -a ../../build.log
+          rm -f "$KEY"
+
+      - name: Keep the build log on the ci-logs-ios branch
+        if: always()
+        run: |
+          cp build.log /tmp/build.log 2>/dev/null || echo "no log" > /tmp/build.log
+          echo "HAS_KEYS=$HAS_KEYS" >> /tmp/build.log
+          git config user.name "ci"
+          git config user.email "ci@users.noreply.github.com"
+          git checkout -q --orphan ci-logs-ios
+          git rm -rfq --cached . || true
+          git clean -fdxq
+          cp /tmp/build.log build.log
+          git add build.log
+          git commit -qm "iOS build log for ${GITHUB_SHA::7} (${{ job.status }})"
+          git push -fq origin ci-logs-ios

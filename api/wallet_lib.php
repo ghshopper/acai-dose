@@ -98,10 +98,12 @@ function wallet_pass_json(array $c): array {
         'labelColor' => 'rgb(227,154,46)',
         'sharingProhibited' => true,
         'storeCard' => [
-            'headerFields' => [['key' => 'free', 'label' => 'كوب مجاني', 'value' => $st['free'], 'textAlignment' => 'PKTextAlignmentRight',
-                                'changeMessage' => 'عندك كوب مجاني من أساي دوز! ينخصم في طلبك الجاي']],
+            'headerFields' => [['key' => 'stamps', 'label' => 'الأختام', 'value' => $st['stamps'] . '/' . $st['need'], 'textAlignment' => 'PKTextAlignmentRight',
+                                'changeMessage' => 'انضاف ختم في بطاقة أساي دوز! صار عندك %@']],
             'secondaryFields' => [
-                ['key' => 'stamps', 'label' => 'الأختام', 'value' => $st['stamps'] . ' / ' . $st['need'], 'changeMessage' => 'انضاف ختم! صار عندك %@'],
+                $st['free'] > 0
+                    ? ['key' => 'left', 'label' => 'كوب مجاني', 'value' => $st['free'] > 1 ? $st['free'] . ' أكواب جاهزة' : 'جاهز لك!', 'changeMessage' => 'عندك كوب مجاني من أساي دوز! ينخصم في طلبك الجاي']
+                    : ['key' => 'left', 'label' => 'باقي للمجاني', 'value' => ($st['need'] - $st['stamps']) . ($st['unit'] === 'cup' ? ' أكواب' : ' طلبات')],
                 ['key' => 'name', 'label' => 'الاسم', 'value' => $name, 'textAlignment' => 'PKTextAlignmentRight'],
             ],
             'backFields' => [
@@ -111,6 +113,7 @@ function wallet_pass_json(array $c): array {
                 ['key' => 'phone', 'label' => 'مربوطة برقم', 'value' => '•••• ' . substr($c['phone'], -4)],
             ],
         ],
+        'barcodes' => [['format' => 'PKBarcodeFormatQR', 'message' => $site . '/card.html?c=' . $c['card_token'], 'messageEncoding' => 'iso-8859-1', 'altText' => '•••• ' . substr($c['phone'], -4)]],
     ];
 }
 

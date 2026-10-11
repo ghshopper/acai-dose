@@ -165,7 +165,7 @@ case 'order_status':
     else q('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?', [$st, now(), $oid]);
     // Paid or cancelled website orders change the customer's stamps
     if ($st === 'done' || $st === 'cancelled') {
-        $o = q("SELECT phone FROM orders WHERE id = ? AND source = 'web'", [$oid])->fetch();
+        $o = q("SELECT phone FROM orders WHERE id = ?", [$oid])->fetch();
         if ($o) loyalty_changed((string)$o['phone']);
     }
     out(['ok' => true]);
@@ -228,7 +228,7 @@ case 'pos_void':
 case 'range':
     need('owner');
     $from = valid_date($_GET['from'] ?? ''); $to = valid_date($_GET['to'] ?? '');
-    $orders = q('SELECT id, order_no, day, created_at, customer_name, phone, car_plate, items, total, status, source, payment, commission, n_orders FROM orders WHERE day BETWEEN ? AND ? ORDER BY id DESC', [$from, $to])->fetchAll();
+    $orders = q('SELECT id, order_no, day, created_at, customer_name, phone, car_plate, items, total, status, source, payment, commission, n_orders, free_cups, discount FROM orders WHERE day BETWEEN ? AND ? ORDER BY id DESC', [$from, $to])->fetchAll();
     $apps = q('SELECT * FROM channel_sales WHERE sale_date BETWEEN ? AND ? ORDER BY sale_date DESC, id DESC', [$from, $to])->fetchAll();
     $exps = q('SELECT * FROM expenses WHERE expense_date BETWEEN ? AND ? ORDER BY expense_date DESC, id DESC', [$from, $to])->fetchAll();
     foreach ($apps as &$r) { foreach (['gross', 'commission', 'commission_pct'] as $k) $r[$k] = (float)$r[$k]; $r['id'] = (int)$r['id']; $r['orders_count'] = $r['orders_count'] === null ? null : (int)$r['orders_count']; }
@@ -320,14 +320,14 @@ case 'import_sales':  // owner loads old sales from the Excel template, all rows
 
 case 'customers':     // owner: everyone who ordered with a phone number, with their totals
     need('owner');
-    $rows = q("SELECT c.id, c.phone, c.name, c.car_plate, c.car_desc, c.offers, c.note, c.created_at,
+    $rows = q("SELECT c.id, c.phone, c.name, c.car_plate, c.car_desc, c.offers, c.note, c.created_at, c.card_token,
                       COUNT(o.id) AS orders, COALESCE(SUM(o.total), 0) AS spent, MAX(o.created_at) AS last_at, MIN(o.created_at) AS first_at
                FROM customers c LEFT JOIN orders o ON o.phone = c.phone AND o.status <> 'cancelled'
-               GROUP BY c.id, c.phone, c.name, c.car_plate, c.car_desc, c.offers, c.note, c.created_at
+               GROUP BY c.id, c.phone, c.name, c.car_plate, c.car_desc, c.offers, c.note, c.created_at, c.card_token
                ORDER BY last_at DESC")->fetchAll();
     foreach ($rows as &$r) {
         $r['id'] = (int)$r['id']; $r['orders'] = (int)$r['orders']; $r['spent'] = (float)$r['spent']; $r['offers'] = (int)$r['offers'];
-        $ls = loyalty_state($r['phone']); $r['stamps'] = $ls['stamps']; $r['free'] = $ls['free']; $r['free_used'] = $ls['used'];
+        $ls = loyalty_state($r['phone']); $r['stamps'] = $ls['stamps']; $r['free'] = $ls['free']; $r['free_used'] = $ls['used']; $r['need'] = $ls['need'];
     }
     out($rows);
 
@@ -338,6 +338,29 @@ case 'customer_update':
     if (array_key_exists('note', $in)) q('UPDATE customers SET note = ? WHERE id = ?', [clean((string)$in['note'], 200) ?: null, $id]);
     if (array_key_exists('offers', $in)) q('UPDATE customers SET offers = ? WHERE id = ?', [$in['offers'] ? 1 : 0, $id]);
     out(['ok' => true]);
+
+case 'customer_stamps':  // owner adds or takes away stamps by hand (e.g. a cup bought before the card existed)
+    $post(); need('owner');
+    $c = q('SELECT id, phone, stamp_adj FROM customers WHERE id = ?', [(int)($in['id'] ?? 0)])->fetch() ?: fail('not_found', 404);
+    $delta = (int)($in['delta'] ?? 0); if ($delta === 0 || abs($delta) > 30) fail('bad_delta');
+    $ls = loyalty_state($c['phone']);
+    if ($ls['earned'] + $delta < $ls['used'] * $ls['need']) fail('no_stamps');   // never below what free cups already used
+    q('UPDATE customers SET stamp_adj = stamp_adj + ? WHERE id = ?', [$delta, (int)$c['id']]);
+    loyalty_changed($c['phone']);
+    out(loyalty_state($c['phone']));
+
+case 'customer_add':    // owner adds a customer by mobile (gets a loyalty card straight away)
+    $post(); need('owner');
+    $ph = norm_phone($in['phone'] ?? ''); if ($ph === '') fail('invalid_phone');
+    if (q('SELECT 1 FROM customers WHERE phone = ?', [$ph])->fetch()) fail('customer_exists');
+    save_customer($ph, clean((string)($in['name'] ?? ''), 60), null, null, !empty($in['offers']));
+    out(['ok' => true]);
+
+case 'customer_orders':  // owner: one customer's order history
+    need('owner');
+    $ph = norm_phone($_GET['phone'] ?? ''); if ($ph === '') fail('invalid_phone');
+    $rows = q('SELECT id, order_no, day, created_at, items, total, status, source, payment, free_cups, discount FROM orders WHERE phone = ? ORDER BY id DESC LIMIT 60', [$ph])->fetchAll();
+    out(array_map('order_row', $rows));
 
 case 'settings':
     need('owner');

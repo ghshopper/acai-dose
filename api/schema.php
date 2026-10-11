@@ -64,7 +64,7 @@ function create_schema(): void {
     // v4: loyalty card per customer (secret link + Apple Wallet)
     $have = [];
     foreach (q(is_mysql() ? 'SHOW COLUMNS FROM customers' : 'PRAGMA table_info(customers)')->fetchAll() as $c) $have[] = $c['Field'] ?? $c['name'];
-    foreach (["card_token VARCHAR(32) NULL", "wallet_auth VARCHAR(32) NULL", "pass_updated INT NOT NULL DEFAULT 0", "gwallet TINYINT NOT NULL DEFAULT 0"] as $def) {
+    foreach (["card_token VARCHAR(32) NULL", "wallet_auth VARCHAR(32) NULL", "pass_updated INT NOT NULL DEFAULT 0", "gwallet TINYINT NOT NULL DEFAULT 0", "stamp_adj INT NOT NULL DEFAULT 0"] as $def) {
         $name = strtok($def, ' ');
         if (!in_array($name, $have, true)) db()->exec("ALTER TABLE customers ADD COLUMN $def");
     }

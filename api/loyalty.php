@@ -32,6 +32,8 @@ function loyalty_state(string $phone): array {
             $earned += $cfg['unit'] === 'cup' ? $paid : ($paid > 0 ? 1 : 0);
         }
     }
+    // Stamps the owner added or took away by hand
+    if ($phone !== '') { $adj = q('SELECT stamp_adj FROM customers WHERE phone = ?', [$phone])->fetch(); $earned = max(0, $earned + (int)($adj['stamp_adj'] ?? 0)); }
     $won = intdiv($earned, $cfg['need']);
     return ['on' => $cfg['on'], 'need' => $cfg['need'], 'unit' => $cfg['unit'], 'stamps' => $earned - $won * $cfg['need'],
             'free' => max(0, $won - $used), 'earned' => $earned, 'used' => $used];

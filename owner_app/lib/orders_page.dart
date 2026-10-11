@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'period.dart';
+import 'order_sheet.dart';
 import 'stats.dart';
-import 'summary_page.dart';
 import 'theme.dart';
+import 'widgets.dart';
 
 class OrdersPage extends StatefulWidget {
   const OrdersPage({super.key, required this.period, required this.onLoggedOut});
@@ -19,8 +20,8 @@ class _OrdersPageState extends State<OrdersPage> {
   bool _loading = false;
   String _filter = 'all';
 
-  static const _st = {'new': 'جديد', 'preparing': 'يتحضر', 'ready': 'جاهز', 'done': 'مستلم', 'cancelled': 'ملغي'};
-  static const _pay = {'cash': 'نقد', 'card': 'بطاقة', 'talabat': 'طلبات', 'snoonu': 'سنونو', 'khedmah': 'خدمة'};
+  static const _st = kStatusNames;
+  static const _pay = kPayNames;
 
   @override
   void initState() {
@@ -56,6 +57,8 @@ class _OrdersPageState extends State<OrdersPage> {
       if (_filter == 'shop') return o['source'] == 'pos';
       return true;
     }).toList();
+    final valid = list.where((o) => o['status'] != 'cancelled').toList();
+    final sum = valid.fold(0.0, (s, o) => s + numOf(o['total']));
     return Column(children: [
       PageHead(title: 'الطلبات', period: widget.period),
       if (_loading) const LinearProgressIndicator(minHeight: 3, color: kOrange, backgroundColor: kCream2),
@@ -72,11 +75,19 @@ class _OrdersPageState extends State<OrdersPage> {
           onSelectionChanged: (v) => setState(() => _filter = v.first),
         ),
       ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
+        child: Row(children: [
+          Text('${valid.length} طلب', style: const TextStyle(fontWeight: FontWeight.w900, color: kPurple)),
+          const Spacer(),
+          Text('${money(sum)} ر.ع', textDirection: TextDirection.rtl, style: const TextStyle(fontWeight: FontWeight.w900, color: kPurple)),
+        ]),
+      ),
       Expanded(
         child: RefreshIndicator(
           onRefresh: _load,
           child: list.isEmpty
-              ? ListView(children: const [Padding(padding: EdgeInsets.all(40), child: Center(child: Text('ما فيه طلبات في هالفترة', style: TextStyle(fontWeight: FontWeight.w700, color: Colors.black45))))])
+              ? ListView(children: const [EmptyNote('ما فيه طلبات في هالفترة', icon: Icons.receipt_long_outlined)])
               : ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 30),
                   itemCount: list.length,
@@ -94,9 +105,15 @@ class _OrdersPageState extends State<OrdersPage> {
     final items = ((o['items'] as List?) ?? []).map((e) => '${(e as Map)['qty']}× ${e['name_ar'] ?? e['name_en']}').join('، ');
     final when = '${o['created_at'] ?? ''}';
     final who = web ? '${o['customer_name'] ?? ''}${(o['car_plate'] ?? '') != '' ? ' · ${o['car_plate']}' : ''}' : (o['customer_name'] == 'Imported' ? 'مبيعات مستوردة' : 'المحل');
-    return Container(
+    return Panel(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
+      onTap: () async {
+        final changed = await openSheet<bool>(context, OrderSheet(order: o));
+        if (changed == true) {
+          _load();
+          if (mounted) toast(context, 'انلغى الطلب');
+        }
+      },
       child: Opacity(
         opacity: cancelled ? 0.5 : 1,
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

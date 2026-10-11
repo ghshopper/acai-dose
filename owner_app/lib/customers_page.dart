@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'api.dart';
-import 'summary_page.dart';
+import 'customer_sheet.dart';
+import 'sheets.dart';
 import 'theme.dart';
+import 'widgets.dart';
 
 class CustomersPage extends StatefulWidget {
   const CustomersPage({super.key, required this.onLoggedOut});
@@ -75,8 +77,23 @@ class _CustomersPageState extends State<CustomersPage> {
     });
     final repeat = _all.where((c) => ((c['orders'] as num?) ?? 0) > 1).length;
 
-    return Column(children: [
-      const PageHead(title: 'العملاء'),
+    return Scaffold(
+      backgroundColor: kCream2,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final ok = await openSheet<bool>(context, const AddCustomerSheet());
+          if (ok == true) {
+            _load();
+            if (mounted) toast(context, 'انضاف العميل وصارت له بطاقة');
+          }
+        },
+        backgroundColor: kOrange,
+        foregroundColor: kPurple,
+        icon: const Icon(Icons.person_add_alt_1),
+        label: const Text('عميل جديد', style: TextStyle(fontWeight: FontWeight.w800)),
+      ),
+      body: Column(children: [
+      const PageHead(title: 'العملاء', subtitle: 'الولاء والعروض'),
       if (_loading) const LinearProgressIndicator(minHeight: 3, color: kOrange, backgroundColor: kCream2),
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
@@ -125,22 +142,22 @@ class _CustomersPageState extends State<CustomersPage> {
         child: RefreshIndicator(
           onRefresh: _load,
           child: list.isEmpty
-              ? ListView(children: const [Padding(padding: EdgeInsets.all(40), child: Center(child: Text('ما فيه عملاء', style: TextStyle(fontWeight: FontWeight.w700, color: Colors.black45))))])
+              ? ListView(children: const [EmptyNote('ما فيه عملاء', icon: Icons.people_outline)])
               : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 30),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
                   itemCount: list.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (_, i) => _tile(list[i]),
                 ),
         ),
       ),
-    ]);
+    ]),
+    );
   }
 
   Widget _kpi(String v, String l) => Expanded(
-        child: Container(
+        child: Panel(
           padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
           child: Column(children: [
             Text(v, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: kPurple)),
             Text(l, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.black45)),
@@ -152,9 +169,14 @@ class _CustomersPageState extends State<CustomersPage> {
     final name = '${c['name'] ?? ''}'.trim();
     final phone = '${c['phone'] ?? ''}';
     final free = ((c['free'] as num?) ?? 0).toInt();
-    return Container(
+    final need = ((c['need'] as num?) ?? 5).toInt();
+    final stamps = ((c['stamps'] as num?) ?? 0).toInt();
+    return Panel(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
+      onTap: () async {
+        await openSheet(context, CustomerSheet(customer: c));
+        _load();
+      },
       child: Row(children: [
         CircleAvatar(
           radius: 22,
@@ -173,9 +195,20 @@ class _CustomersPageState extends State<CustomersPage> {
             Text(phone, textDirection: TextDirection.ltr, style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
             const SizedBox(height: 4),
             Text(
-              '${c['orders']} طلب · ${money(c['spent'])} ر.ع · الأختام ${c['stamps'] ?? 0} · ${_ago(c['last_at'])}',
+              '${c['orders']} طلب · ${money(c['spent'])} ر.ع · ${_ago(c['last_at'])}',
               style: const TextStyle(color: Colors.black45, fontSize: 12, fontWeight: FontWeight.w700),
             ),
+            const SizedBox(height: 6),
+            Row(children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(99),
+                  child: LinearProgressIndicator(value: need > 0 ? stamps / need : 0, minHeight: 6, color: kOrange, backgroundColor: kCream2),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text('$stamps/$need', textDirection: TextDirection.ltr, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: kPurple)),
+            ]),
           ]),
         ),
         IconButton(
@@ -183,6 +216,7 @@ class _CustomersPageState extends State<CustomersPage> {
           icon: const Icon(Icons.chat, color: kOk),
           onPressed: phone.isEmpty ? null : () => launchUrl(Uri.parse('https://wa.me/${phone.replaceAll('+', '')}'), mode: LaunchMode.externalApplication),
         ),
+        const Icon(Icons.chevron_left, color: Colors.black26),
       ]),
     );
   }

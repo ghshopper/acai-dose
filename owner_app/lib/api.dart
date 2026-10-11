@@ -92,6 +92,18 @@ const Map<String, String> kErrors = {
   'network': 'ما فيه اتصال بالإنترنت',
   'login_required': 'لازم تسجل دخول',
   'forbidden': 'هذا الحساب مب حساب صاحب المحل',
+  'invalid_phone': 'رقم الجوال غلط',
+  'customer_exists': 'هذا الرقم مسجل من قبل',
+  'no_stamps': 'ما يمدي تنقص أكثر، الأختام صفر',
+  'bad_delta': 'عدد الأختام غلط',
+  'bad_amount': 'المبلغ غلط',
+  'bad_pct': 'النسبة لازم بين 0 و 100',
+  'bad_need': 'عدد الأختام لازم بين 2 و 30',
+  'bad_username': 'اسم المستخدم إنجليزي بدون مسافات (٣ حروف أو أكثر)',
+  'short_password': 'كلمة السر ٦ حروف أو أكثر',
+  'username_taken': 'اسم المستخدم مأخوذ',
+  'cannot_change_self': 'ما تقدر تغير حسابك من هنا',
+  'server_error': 'مشكلة في السيرفر، جرب بعد شوي',
 };
 
 String errText(Object e) => kErrors[e.toString()] ?? 'صار خطأ، جرب مرة ثانية';

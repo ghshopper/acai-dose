@@ -2,34 +2,10 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'period.dart';
+import 'sheets.dart';
 import 'stats.dart';
 import 'theme.dart';
-
-/// Shared page header: logo bar with a title and the period chips.
-class PageHead extends StatelessWidget {
-  const PageHead({super.key, required this.title, this.period});
-  final String title;
-  final PeriodController? period;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: kPurple,
-      padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 10, bottom: period == null ? 16 : 12),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18),
-          child: Row(children: [
-            Text(title, style: const TextStyle(color: kCream, fontSize: 30, fontWeight: FontWeight.w900)),
-            const Spacer(),
-            Image.asset('assets/logo-cream.png', height: 30),
-          ]),
-        ),
-        if (period != null) ...[const SizedBox(height: 12), PeriodBar(period: period!)],
-      ]),
-    );
-  }
-}
+import 'widgets.dart';
 
 class SummaryPage extends StatefulWidget {
   const SummaryPage({super.key, required this.period, required this.onLoggedOut});
@@ -41,6 +17,7 @@ class SummaryPage extends StatefulWidget {
 
 class _SummaryPageState extends State<SummaryPage> {
   Stats? _s;
+  Stats? _prev;
   String? _err;
   bool _loading = false;
 
@@ -60,8 +37,18 @@ class _SummaryPageState extends State<SummaryPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final r = await Api.I.get('range', {'from': widget.period.fromStr, 'to': widget.period.toStr});
-      _s = Stats(Map<String, dynamic>.from(r as Map), widget.period.days);
+      // The same number of days just before, to compare with
+      final p = widget.period;
+      final n = p.days.length;
+      final pFrom = DateTime(p.from.year, p.from.month, p.from.day - n);
+      final pTo = DateTime(p.from.year, p.from.month, p.from.day - 1);
+      final res = await Future.wait([
+        Api.I.get('range', {'from': p.fromStr, 'to': p.toStr}),
+        Api.I.get('range', {'from': ymd(pFrom), 'to': ymd(pTo)}),
+      ]);
+      final prevDays = [for (var i = 0; i < n; i++) DateTime(pFrom.year, pFrom.month, pFrom.day + i)];
+      _s = Stats(Map<String, dynamic>.from(res[0] as Map), p.days);
+      _prev = Stats(Map<String, dynamic>.from(res[1] as Map), prevDays);
       _err = null;
     } on ApiError catch (e) {
       if (e.code == 'login_required' || e.code == 'forbidden') {
@@ -73,11 +60,39 @@ class _SummaryPageState extends State<SummaryPage> {
     if (mounted) setState(() => _loading = false);
   }
 
+  String get _greeting {
+    final h = DateTime.now().hour;
+    if (h < 12) return 'صباح الخير ☀️';
+    if (h < 18) return 'مساء الخير';
+    return 'مساء الخير 🌙';
+  }
+
+  String get _vs {
+    switch (widget.period.key) {
+      case 'today':
+        return 'مقارنة بأمس';
+      case 'yest':
+        return 'مقارنة باليوم اللي قبله';
+      case 'month':
+        return 'مقارنة بنفس عدد الأيام قبلها';
+      default:
+        return 'مقارنة بالفترة اللي قبلها';
+    }
+  }
+
+  Future<void> _quick(Widget sheet, String done) async {
+    final ok = await openSheet<bool>(context, sheet);
+    if (ok == true) {
+      _load();
+      if (mounted) toast(context, done);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = _s;
     return Column(children: [
-      PageHead(title: 'الملخص', period: widget.period),
+      PageHead(title: 'الملخص', subtitle: _greeting, period: widget.period),
       if (_loading) const LinearProgressIndicator(minHeight: 3, color: kOrange, backgroundColor: kCream2),
       Expanded(
         child: RefreshIndicator(
@@ -88,9 +103,17 @@ class _SummaryPageState extends State<SummaryPage> {
                   if (_err != null) Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(_err!, style: const TextStyle(color: kBad))),
                   _hero(s),
                   const SizedBox(height: 12),
+                  Row(children: [
+                    _quickBtn(Icons.add_card, 'مصروف', () => _quick(const AddExpenseSheet(), 'انحفظ المصروف')),
+                    const SizedBox(width: 8),
+                    _quickBtn(Icons.delivery_dining, 'مبيعات تطبيق', () => _quick(const AppSaleSheet(), 'انحفظت المبيعات')),
+                    const SizedBox(width: 8),
+                    _quickBtn(Icons.person_add_alt_1, 'عميل جديد', () => _quick(const AddCustomerSheet(), 'انضاف العميل')),
+                  ]),
+                  const SizedBox(height: 12),
                   _grid([
-                    _stat(Icons.trending_up, 'إجمالي المبيعات', s.sales, '${s.orderCount} طلب · متوسط ${money(s.avg)}'),
-                    _stat(Icons.payments_outlined, 'المصاريف', s.exp, '${s.expCount} مصروف'),
+                    _stat(Icons.trending_up, 'إجمالي المبيعات', s.sales, '${s.orderCount} طلب · متوسط ${money(s.avg)}', before: _prev?.sales),
+                    _stat(Icons.payments_outlined, 'المصاريف', s.exp, '${s.expCount} مصروف', before: _prev?.exp, lowerIsBetter: true),
                     _stat(Icons.public, 'الموقع', s.site, '${s.siteOrders} طلب · ${s.siteCups} كوب', share: s.pct(s.site)),
                     _stat(Icons.storefront, 'المحل', s.shop, '${s.shopOrders} عملية · ${s.shopCups} كوب', share: s.pct(s.shop)),
                     _stat(Icons.delivery_dining, 'التطبيقات', s.appGross, 'طلبات وسنونو وخدمة', share: s.pct(s.appGross)),
@@ -110,14 +133,38 @@ class _SummaryPageState extends State<SummaryPage> {
     ]);
   }
 
+  Widget _quickBtn(IconData icon, String label, VoidCallback onTap) => Expanded(
+        child: Panel(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          onTap: onTap,
+          child: Column(children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: kCream2, borderRadius: BorderRadius.circular(12)),
+              child: Icon(icon, color: kPurple, size: 22),
+            ),
+            const SizedBox(height: 6),
+            Text(label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+          ]),
+        ),
+      );
+
   Widget _hero(Stats s) {
     final total = s.sales <= 0 ? 1.0 : s.sales;
     int flex(double v) => (v.clamp(0, total) / total * 1000).round();
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: kPurple, borderRadius: BorderRadius.circular(24)),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [kPurple, kPurple2], begin: Alignment.topRight, end: Alignment.bottomLeft),
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: const [BoxShadow(color: Color(0x33470D43), blurRadius: 24, offset: Offset(0, 10))],
+      ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('صافي الربح', style: TextStyle(color: kLilac, fontWeight: FontWeight.w800, fontSize: 16)),
+        Row(children: [
+          const Text('صافي الربح', style: TextStyle(color: kLilac, fontWeight: FontWeight.w800, fontSize: 16)),
+          const Spacer(),
+          if (_prev != null) DeltaBadge(now: s.net, before: _prev!.net, onDark: true),
+        ]),
         const SizedBox(height: 6),
         Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
           Text(money(s.net), textDirection: TextDirection.ltr, style: TextStyle(color: s.net < 0 ? const Color(0xFFFFB4B4) : kCream, fontSize: 42, fontWeight: FontWeight.w900)),
@@ -144,6 +191,10 @@ class _SummaryPageState extends State<SummaryPage> {
           _legend(kOrange, 'العمولات ${money(s.comm)}'),
           _legend(const Color(0xFFC86A8A), 'المصاريف ${money(s.exp)}'),
         ]),
+        if (_prev != null) ...[
+          const SizedBox(height: 8),
+          Text('$_vs: ${money(_prev!.net)}', style: const TextStyle(color: kLilac, fontSize: 11, fontWeight: FontWeight.w700)),
+        ],
       ]),
     );
   }
@@ -159,17 +210,14 @@ class _SummaryPageState extends State<SummaryPage> {
         return Wrap(spacing: 10, runSpacing: 10, children: [for (final i in items) SizedBox(width: w, child: i)]);
       });
 
-  Widget _box(Widget child) => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
-        child: child,
-      );
+  Widget _box(Widget child) => Panel(padding: const EdgeInsets.all(14), child: child);
 
-  Widget _stat(IconData icon, String label, double v, String sub, {int? share}) => _box(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+  Widget _stat(IconData icon, String label, double v, String sub, {int? share, double? before, bool lowerIsBetter = false}) => _box(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Icon(icon, size: 16, color: Colors.black45),
           const SizedBox(width: 6),
           Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.black54, fontSize: 13))),
+          if (before != null) DeltaBadge(now: v, before: before, lowerIsBetter: lowerIsBetter),
         ]),
         const SizedBox(height: 6),
         Text(money(v), textDirection: TextDirection.ltr, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: kPurple)),
@@ -216,14 +264,7 @@ class _SummaryPageState extends State<SummaryPage> {
         ]),
       );
 
-  Widget _sec(String t, String sub) => Padding(
-        padding: const EdgeInsets.fromLTRB(4, 26, 4, 10),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text(t, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: kPurple)),
-          const Spacer(),
-          Flexible(child: Text(sub, textAlign: TextAlign.end, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.black45))),
-        ]),
-      );
+  Widget _sec(String t, String sub) => SectionTitle(t, note: sub);
 
   Widget _chart(Stats s) {
     final max = s.daily.fold(0.0, (m, e) => e.value > m ? e.value : m);
@@ -256,7 +297,7 @@ class _SummaryPageState extends State<SummaryPage> {
   }
 
   Widget _products(Stats s) {
-    if (s.products.isEmpty) return _box(const Center(child: Text('ما فيه طلبات في هالفترة', style: TextStyle(color: Colors.black45, fontWeight: FontWeight.w700))));
+    if (s.products.isEmpty) return _box(const EmptyNote('ما فيه طلبات في هالفترة', icon: Icons.local_drink_outlined));
     final top = s.products.first.value;
     return _box(Column(children: [
       for (final p in s.products)

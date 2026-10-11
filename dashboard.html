@@ -434,7 +434,7 @@ function drawCustList() {
       <td>${esc([c.car_plate, c.car_desc].filter(Boolean).join(' · ') || '-')}</td>
       <td><input type="checkbox" data-coffer="${c.id}" ${c.offers ? 'checked' : ''} aria-label="يبي العروض" style="width:22px;height:22px"></td>
       <td><button class="btn small ghost" data-cnote="${c.id}" type="button">${c.note ? esc(c.note) : 'أضف'}</button></td></tr>`).join('')}</tbody>
-  </table></div>${list.length > 500 ? '<p>يظهر أول ٥٠٠. استخدم البحث.</p>' : ''}` : '<div class="card empty">ما فيه عملاء للحين. يتسجلون أول ما يطلبون من الموقع أو تكتبون رقمهم في الكاشير.</div>';
+  </table></div>${list.length > 500 ? '<p>يظهر أول ٥٠٠. استخدم البحث.</p>' : ''}` : '<div class="card empty">ما فيه عملاء للحين. يتسجلون أول ما يطلبون من الموقع.</div>';
 }
 
 function exportCustomers() {

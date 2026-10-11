@@ -83,7 +83,6 @@ app.innerHTML = `
     <h2>Current sale <button class="btn small ghost" id="clear" type="button">Clear</button></h2>
     <div class="lines" id="lines"></div>
     <div class="total"><span style="font-weight:800">Total</span><span><b id="tot">0.000</b> OMR</span></div>
-    <div class="change"><label for="cphone" style="font-weight:800">Customer mobile <small style="font-weight:600;opacity:.7">(optional)</small></label><input id="cphone" type="tel" inputmode="numeric" maxlength="8" placeholder="9XXXXXXX" dir="ltr" autocomplete="off"><span></span></div>
     <div class="change"><label for="given" style="font-weight:800">Cash given</label><input id="given" type="number" step="0.001" min="0" inputmode="decimal"><span id="chg" style="font-weight:800"></span></div>
     <div class="sub">In-shop payment</div>
     <div class="paybtns">
@@ -143,17 +142,15 @@ $('#lines').addEventListener('click', e => {
   const id = +b.dataset.id, q = (cart.get(id) || 0) + +b.dataset.d;
   q > 0 ? cart.set(id, q) : cart.delete(id); redraw();
 });
-$('#clear').onclick = () => { cart.clear(); $('#given').value = ''; $('#cphone').value = ''; redraw(); };
+$('#clear').onclick = () => { cart.clear(); $('#given').value = ''; redraw(); };
 $('#given').oninput = drawTicket;
 
 async function sell(payment) {
   const items = [...cart].map(([product_id, qty]) => ({ product_id, qty }));
   document.querySelectorAll('.pay').forEach(b => { b.disabled = true; }); $('#err').textContent = '';
   try {
-    const ph = $('#cphone').value.replace(/\D/g, '');
-    if (ph && !/^[279]\d{7}$/.test(ph)) { $('#err').textContent = 'Customer mobile must be 8 digits'; $('#cphone').focus(); drawTicket(); return; }
-    const r = await api('pos_sale', { items, payment, phone: ph ? '+968' + ph : '' });
-    cart.clear(); $('#given').value = ''; $('#cphone').value = ''; redraw();
+    const r = await api('pos_sale', { items, payment });
+    cart.clear(); $('#given').value = ''; redraw();
     const t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status');
     t.textContent = `Sale #${r.ref} saved · ${money(r.total)} OMR (${payment})`;
     document.body.append(t); setTimeout(() => t.remove(), 2500);

@@ -28,9 +28,9 @@ class Stats {
     final appO = valid.where(isApp).toList();
 
     double sumT(List<Map<String, dynamic>> l) => l.fold(0.0, (s, o) => s + numOf(o['total']));
-    int cnt(List<Map<String, dynamic>> l) => l.fold(0, (s, o) => s + (o['n_orders'] is num ? (o['n_orders'] as num).toInt() : 1));
+    int cnt(List<Map<String, dynamic>> l) => l.fold<int>(0, (s, o) => s + (o['n_orders'] is num ? (o['n_orders'] as num).toInt() : 1));
     int cups(List<Map<String, dynamic>> l) =>
-        l.fold(0, (s, o) => s + ((o['items'] as List?) ?? []).fold<int>(0, (a, i) => a + ((i as Map)['qty'] as num).toInt()));
+        l.fold<int>(0, (s, o) => s + ((o['items'] as List?) ?? []).fold<int>(0, (a, i) => a + ((i as Map)['qty'] as num).toInt()));
 
     site = sumT(web);
     shop = sumT(shopO);
@@ -42,7 +42,7 @@ class Stats {
     Method mk(String k, String name, List<Map<String, dynamic>> list, List<Map<String, dynamic>> manual, bool app) {
       final gross = sumT(list) + manual.fold(0.0, (s, r) => s + numOf(r['gross']));
       final comm = list.fold(0.0, (s, o) => s + numOf(o['commission'])) + manual.fold(0.0, (s, r) => s + numOf(r['commission']));
-      final n = cnt(list) + manual.fold(0, (s, r) => s + (r['orders_count'] is num ? (r['orders_count'] as num).toInt() : 0));
+      final n = cnt(list) + manual.fold<int>(0, (s, r) => s + (r['orders_count'] is num ? (r['orders_count'] as num).toInt() : 0));
       return Method(k, name, app, gross, comm, n);
     }
 
@@ -63,7 +63,7 @@ class Stats {
     final manualGross = apps.fold(0.0, (s, r) => s + numOf(r['gross']));
     sales = sumT(valid) + manualGross;
     net = sales - comm - exp;
-    orderCount = cnt(valid) + apps.fold(0, (s, r) => s + (r['orders_count'] is num ? (r['orders_count'] as num).toInt() : 0));
+    orderCount = cnt(valid) + apps.fold<int>(0, (s, r) => s + (r['orders_count'] is num ? (r['orders_count'] as num).toInt() : 0));
 
     final prod = <String, int>{};
     for (final o in valid) {

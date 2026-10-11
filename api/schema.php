@@ -30,7 +30,7 @@ function create_schema(): void {
             id $id, phone VARCHAR(20) NOT NULL UNIQUE, name VARCHAR(60) NOT NULL DEFAULT '', car_plate VARCHAR(20) NULL,
             car_desc VARCHAR(40) NULL, offers TINYINT NOT NULL DEFAULT 0, note VARCHAR(200) NULL,
             created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL,
-            card_token VARCHAR(32) NULL, wallet_auth VARCHAR(32) NULL, pass_updated INT NOT NULL DEFAULT 0)$eng",
+            card_token VARCHAR(32) NULL, wallet_auth VARCHAR(32) NULL, pass_updated INT NOT NULL DEFAULT 0, gwallet TINYINT NOT NULL DEFAULT 0)$eng",
         "CREATE TABLE IF NOT EXISTS settings (k VARCHAR(40) PRIMARY KEY, v TEXT NOT NULL)$eng",
         "CREATE TABLE IF NOT EXISTS wallet_devices (device_id VARCHAR(100) PRIMARY KEY, push_token VARCHAR(200) NOT NULL, updated_at DATETIME NOT NULL)$eng",
         "CREATE TABLE IF NOT EXISTS wallet_regs (device_id VARCHAR(100) NOT NULL, serial VARCHAR(40) NOT NULL, created_at DATETIME NOT NULL, PRIMARY KEY (device_id, serial))$eng",
@@ -64,7 +64,7 @@ function create_schema(): void {
     // v4: loyalty card per customer (secret link + Apple Wallet)
     $have = [];
     foreach (q(is_mysql() ? 'SHOW COLUMNS FROM customers' : 'PRAGMA table_info(customers)')->fetchAll() as $c) $have[] = $c['Field'] ?? $c['name'];
-    foreach (["card_token VARCHAR(32) NULL", "wallet_auth VARCHAR(32) NULL", "pass_updated INT NOT NULL DEFAULT 0"] as $def) {
+    foreach (["card_token VARCHAR(32) NULL", "wallet_auth VARCHAR(32) NULL", "pass_updated INT NOT NULL DEFAULT 0", "gwallet TINYINT NOT NULL DEFAULT 0"] as $def) {
         $name = strtok($def, ' ');
         if (!in_array($name, $have, true)) db()->exec("ALTER TABLE customers ADD COLUMN $def");
     }

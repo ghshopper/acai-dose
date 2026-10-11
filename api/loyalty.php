@@ -49,5 +49,7 @@ function loyalty_changed(string $phone): void {
     $c = q('SELECT id, card_token FROM customers WHERE phone = ?', [$phone])->fetch();
     if (!$c) return;
     q('UPDATE customers SET pass_updated = ? WHERE id = ?', [time(), (int)$c['id']]);
-    if (is_file(__DIR__ . '/wallet_lib.php')) { require_once __DIR__ . '/wallet_lib.php'; wallet_push($c['card_token']); }
+    require_once __DIR__ . '/gwallet_lib.php';
+    wallet_push($c['card_token']);
+    gw_update($c['card_token']);
 }

@@ -22,3 +22,6 @@ New columns are added automatically on the first request after an update.
 - Apple Wallet: upload the Pass Type ID certificate (.p12 + password) and Apple's WWDR G4 certificate
   in Dashboard → Settings. They are stored outside the web root in `acai-wallet/`, beside the config file.
   Apple updates passes through `/wallet/v1/...` (rewritten to `api/wallet.php`).
+- Google Wallet: upload a Google Cloud service-account key (.json) and the Issuer ID in Dashboard → Settings.
+  Android customers then see "Add to Google Wallet" (`api/gwallet.php`); stamps update through the Wallet REST API.
+- Card artwork for both wallets is drawn by `tools/wallet_images.py`.

@@ -81,7 +81,7 @@ function clean(?string $s, int $max): string { return mb_substr(trim((string)$s)
 
 /** Adds new columns on first request after an update, so re-running setup is not needed. */
 function ensure_schema(): void {
-    try { q('SELECT source, car_plate, token, commission, n_orders FROM orders LIMIT 0'); q('SELECT id, card_token, pass_updated FROM customers LIMIT 0'); q('SELECT free_cups FROM orders LIMIT 0'); q('SELECT k FROM settings LIMIT 0'); q('SELECT serial FROM wallet_regs LIMIT 0'); }
+    try { q('SELECT source, car_plate, token, commission, n_orders FROM orders LIMIT 0'); q('SELECT id, card_token, pass_updated, gwallet FROM customers LIMIT 0'); q('SELECT free_cups FROM orders LIMIT 0'); q('SELECT k FROM settings LIMIT 0'); q('SELECT serial FROM wallet_regs LIMIT 0'); }
     catch (Throwable $e) { require_once __DIR__ . '/schema.php'; create_schema(); }
 }
 

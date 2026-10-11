@@ -112,18 +112,18 @@ case 'track':     // customer polls their own order by secret token
     $o = q('SELECT order_no, status, total, pickup_time, car_plate, arrived_at, day, phone, free_cups, discount FROM orders WHERE token = ?', [$t])->fetch();
     if (!$o) fail('not_found', 404);
     $c = q('SELECT * FROM customers WHERE phone = ?', [$o['phone']])->fetch();
-    require_once __DIR__ . '/wallet_lib.php';
+    require_once __DIR__ . '/gwallet_lib.php';
     out(['order_no' => (int)$o['order_no'], 'ref' => order_ref($o['day'], (int)$o['order_no']), 'status' => $o['status'], 'total' => (float)$o['total'], 'pickup_time' => $o['pickup_time'],
          'car_plate' => $o['car_plate'], 'arrived' => (bool)$o['arrived_at'], 'today' => $o['day'] === date('Y-m-d'),
-         'free_cups' => (int)$o['free_cups'], 'discount' => (float)$o['discount'], 'loyalty' => $c ? card_info($c) + ['wallet' => wallet_ready()] : null]);
+         'free_cups' => (int)$o['free_cups'], 'discount' => (float)$o['discount'], 'loyalty' => $c ? card_info($c) + ['wallet' => wallet_ready(), 'gwallet' => gw_ready()] : null]);
 
 case 'card':      // customer's loyalty card, by its secret link
     $c = (string)($_GET['c'] ?? '');
     if (!preg_match('/^[a-f0-9]{32}$/', $c)) fail('not_found', 404);
     $row = q('SELECT * FROM customers WHERE card_token = ?', [$c])->fetch();
     if (!$row) fail('not_found', 404);
-    require_once __DIR__ . '/wallet_lib.php';
-    out(card_info($row) + ['wallet' => wallet_ready()]);
+    require_once __DIR__ . '/gwallet_lib.php';
+    out(card_info($row) + ['wallet' => wallet_ready(), 'gwallet' => gw_ready()]);
 
 case 'arrived':   // customer taps "I've arrived"
     $post();
@@ -329,8 +329,13 @@ case 'settings':
         q('SELECT * FROM products ORDER BY sort, id')->fetchAll());
     $u = array_map(fn($r) => ['id' => (int)$r['id'], 'username' => $r['username'], 'role' => $r['role'], 'active' => (int)$r['active']],
         q('SELECT id, username, role, active FROM users ORDER BY id')->fetchAll());
-    require_once __DIR__ . '/wallet_lib.php';
-    out(['commissions' => $c, 'products' => $p, 'users' => $u, 'loyalty' => loyalty_cfg(), 'wallet' => wallet_status()]);
+    require_once __DIR__ . '/gwallet_lib.php';
+    out(['commissions' => $c, 'products' => $p, 'users' => $u, 'loyalty' => loyalty_cfg(), 'wallet' => wallet_status(), 'gwallet' => gw_status()]);
+
+case 'gw_setup':      // owner: Google Wallet service-account key + Issuer ID
+    $post(); need('owner');
+    require_once __DIR__ . '/gwallet_lib.php';
+    out(gw_install((string)($in['key'] ?? ''), trim((string)($in['issuer'] ?? ''))));
 
 case 'wallet_setup':  // owner uploads the Apple Pass Type ID certificate once
     $post(); need('owner');

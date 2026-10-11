@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Açaí Dose">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="stylesheet" href="assets/app.css?v=1791723325">
+<link rel="stylesheet" href="assets/app.css?v=1791724638">
 <style>
 body{background:var(--c2)}
 .wrap{max-width:1100px;margin:0 auto;padding:16px}
@@ -58,7 +58,7 @@ setTimeout(function(){if(!window.__appStarted)show('The page script did not run.
 <body>
 <div id="app"></div>
 <script type="module">
-import { api, msg, $, $$, esc, money, ymd, requireLogin, logout } from './assets/common.js?v=1791723325';
+import { api, msg, $, $$, esc, money, ymd, requireLogin, logout } from './assets/common.js?v=1791724638';
 window.__appStarted = true;
 (async () => {
 const app = $('#app');
@@ -354,6 +354,21 @@ async function drawSettings() {
       </form></details>
     </div>
 
+    <h3 class="lal">بطاقة Google Wallet</h3>
+    <div class="card" style="padding:16px;display:grid;gap:12px">
+      <div style="font-weight:800">${st.gwallet.ready
+        ? `<span class="ok">مربوطة ✓</span> · Issuer <span dir="ltr">${esc(st.gwallet.issuer)}</span>`
+        : '<span class="pill">مب مفعّلة للحين</span> زر جوجل يظهر لعملاء الأندرويد بعد ما ترفع المفتاح.'}</div>
+      ${st.gwallet.error ? `<div class="err" dir="ltr" style="text-align:left;font-size:13px">${esc(st.gwallet.error)}</div>` : ''}
+      ${st.gwallet.account ? `<div style="font-size:14px;font-weight:700">إيميل الـ Service Account (أضفه في Wallet Console): <span dir="ltr" style="unicode-bidi:isolate;user-select:all">${esc(st.gwallet.account)}</span></div>` : ''}
+      <form id="gf" class="formrow" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+        <div class="field"><label for="giss">Issuer ID</label><input id="giss" dir="ltr" inputmode="numeric" value="${esc(st.gwallet.issuer || '')}" autocomplete="off"></div>
+        <div class="field"><label for="gkey">ملف مفتاح Service Account (.json)</label><input type="file" id="gkey" accept=".json,application/json"></div>
+        <button class="btn" type="submit">ارفع واربط</button>
+        <div class="err" id="gerr" role="status" style="flex-basis:100%"></div>
+      </form>
+    </div>
+
     <h3 class="lal">المنيو والأسعار</h3>
     <div class="tbl-wrap"><table>
       <thead><tr><th>الصنف</th><th>السعر (ر.ع)</th><th>متوفر</th><th></th></tr></thead>
@@ -410,6 +425,17 @@ async function drawSettings() {
     if (!a || !b) { err.textContent = 'اختر الملفين: pass.cer وملف G4'; return; }
     try { await api('wallet_cer', { cer: await b64f(a), wwdr: await b64f(b) }); drawSettings(); }
     catch (ex) { err.textContent = WERR[ex.message] || msg(ex); }
+  };
+  $('#gf').onsubmit = async e => {
+    e.preventDefault();
+    const err = $('#gerr'); err.style.color = ''; err.textContent = '';
+    const f = $('#gkey').files[0];
+    if (!f) { err.textContent = 'اختر ملف المفتاح (.json)'; return; }
+    try { await api('gw_setup', { key: await f.text(), issuer: $('#giss').value.trim() }); drawSettings(); }
+    catch (ex) {
+      err.textContent = ({ gw_bad_key: 'ملف المفتاح غلط، لازم يكون JSON حق Service Account', gw_bad_issuer: 'اكتب Issuer ID (أرقام بس)',
+        gw_auth_failed: 'جوجل رفض المفتاح. تأكد إنك فعّلت Google Wallet API في المشروع', gw_class_failed: 'جوجل رفض. تأكد إنك أضفت إيميل الـ Service Account في Wallet Console' })[ex.message] || msg(ex);
+    }
   };
   $('#wf').onsubmit = async e => {
     e.preventDefault();

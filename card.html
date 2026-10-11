@@ -8,7 +8,7 @@
 <meta name="robots" content="noindex">
 <link rel="icon" href="assets/logo-purple.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
-<link rel="stylesheet" href="assets/app.css?v=1791723325">
+<link rel="stylesheet" href="assets/app.css?v=1791724638">
 <style>
 html,body{background:var(--p)}
 body{color:var(--c);min-height:100vh}
@@ -39,18 +39,18 @@ window.addEventListener('error',function(e){show(e.message||'Script error')});se
 <body>
 <main id="main"><p>…</p></main>
 <script type="module">
-import { api, $, esc, arNum } from './assets/common.js?v=1791723325';
+import { api, $, esc, arNum } from './assets/common.js?v=1791724638';
 window.__appStarted = true;
 (async () => {
 const T = {
   ar: { t: 'بطاقة الولاء', of: (a, b) => `${arNum(a)} من ${arNum(b)}`, free: 'مجاني', left: (n, u) => `باقي لك ${arNum(n)} ${u === 'order' ? (n === 1 ? 'طلب' : n === 2 ? 'طلبين' : 'طلبات') : (n === 1 ? 'كوب' : n === 2 ? 'كوبين' : 'أكواب')} وتاخذ كوب مجاني`,
     has: n => n > 1 ? `عندك ${arNum(n)} أكواب مجانية` : 'عندك كوب مجاني!', hasSub: 'ينخصم تلقائياً لما تطلب من موقعنا بنفس الرقم',
     how: (n, u) => `كل ${u === 'order' ? 'طلب' : 'كوب'} تطلبه من موقعنا وتستلمه = ختم. كل ${arNum(n)} أختام = كوب مجاني.`, linked: d => `مربوطة برقم ينتهي بـ ${d}`,
-    wallet: 'أضف إلى Apple Wallet', order: 'اطلب الحين', missing: 'ما لقينا البطاقة. اطلب من موقعنا وتنعمل لك بطاقة تلقائياً.', sw: 'English' },
+    wallet: 'أضف إلى Apple Wallet', gwallet: 'أضف إلى Google Wallet', order: 'اطلب الحين', missing: 'ما لقينا البطاقة. اطلب من موقعنا وتنعمل لك بطاقة تلقائياً.', sw: 'English' },
   en: { t: 'Loyalty card', of: (a, b) => `${a} of ${b}`, free: 'FREE', left: (n, u) => `${n} more ${u === 'order' ? (n === 1 ? 'order' : 'orders') : (n === 1 ? 'cup' : 'cups')} to a free cup`,
     has: n => n > 1 ? `You have ${n} free cups` : 'You have a free cup!', hasSub: 'Taken off automatically when you order on our site with this number',
     how: (n, u) => `Every ${u === 'order' ? 'order' : 'cup'} you order on our site and pick up = 1 stamp. ${n} stamps = 1 free cup.`, linked: d => `Linked to the number ending ${d}`,
-    wallet: 'Add to Apple Wallet', order: 'Order now', missing: 'Card not found. Order on our site and a card is made for you.', sw: 'عربي' },
+    wallet: 'Add to Apple Wallet', gwallet: 'Add to Google Wallet', order: 'Order now', missing: 'Card not found. Order on our site and a card is made for you.', sw: 'عربي' },
 };
 const ls = { get: k => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* private */ } } };
 let lang = ls.get('ad_lang') || ((navigator.language || 'ar').startsWith('ar') ? 'ar' : 'en');
@@ -79,6 +79,7 @@ function draw() {
       <div class="msg">${full ? '' : L.of(data.stamps, data.need)}</div>
       ${full ? `<div class="free">${L.has(data.free)}<div style="font-size:14px;font-weight:700;margin-top:4px">${L.hasSub}</div></div>` : `<div class="msg" style="font-size:17px">${L.left(data.need - data.stamps, data.unit)}</div>`}
     </section>
+    ${data.gwallet && !ios ? `<a class="wallet" href="api/gwallet.php?c=${esc(data.card)}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="15" rx="3"/><path d="M3 10h18M16 14h2"/></svg>${L.gwallet}</a>` : ''}
     ${data.wallet && ios ? `<a class="wallet" href="api/wallet.php?c=${esc(data.card)}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="15" rx="3"/><path d="M3 10h18M16 14h2"/></svg>${L.wallet}</a>` : ''}
     <a class="btn cream" href="./">${L.order}</a>
     <p class="how">${L.how(data.need, data.unit)}<br>${L.linked(lang === 'ar' ? arNum(data.phone_tail) : data.phone_tail)}</p>`;

@@ -1,0 +1,17 @@
+Options -Indexes
+DirectoryIndex index.html
+
+<IfModule mod_rewrite.c>
+RewriteEngine On
+# Short links: /pos -> pos.html, /screen -> screen.html, /dashboard -> dashboard.html
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME}.html -f
+RewriteRule ^(.+?)/?$ $1.html [L]
+</IfModule>
+
+# Source and project files are not part of the website
+<FilesMatch "^(README\.md|\.gitignore)$">
+  Require all denied
+</FilesMatch>
+RedirectMatch 404 ^/(android|\.github|\.git)(/|$)

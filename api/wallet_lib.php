@@ -76,6 +76,14 @@ function wallet_save(string $cert, string $key, string $wwdr): array {
     return wallet_status();
 }
 
+/** Shop location: iPhones show the card on the lock screen when the customer is nearby. */
+function wallet_locations(): array {
+    $lat = setting('shop_lat'); $lng = setting('shop_lng');
+    if (!is_numeric($lat) || !is_numeric($lng)) return [];
+    $txt = setting('nearby_text') ?: 'قريب من أساي دوز! اطلب من الموقع واستلم من سيارتك';
+    return [['latitude' => (float)$lat, 'longitude' => (float)$lng, 'relevantText' => $txt]];
+}
+
 /** pass.json for one customer. */
 function wallet_pass_json(array $c): array {
     $st = loyalty_state($c['phone']);
@@ -84,7 +92,7 @@ function wallet_pass_json(array $c): array {
     $how = $st['unit'] === 'cup'
         ? "كل كوب تطلبه من موقعنا = ختم. كل {$st['need']} أختام = كوب مجاني ينخصم تلقائياً في طلبك الجاي."
         : "كل طلب من موقعنا = ختم. كل {$st['need']} أختام = كوب مجاني ينخصم تلقائياً في طلبك الجاي.";
-    return [
+    return array_filter([
         'formatVersion' => 1,
         'passTypeIdentifier' => setting('wallet_pass_type'),
         'teamIdentifier' => setting('wallet_team'),
@@ -113,8 +121,9 @@ function wallet_pass_json(array $c): array {
                 ['key' => 'phone', 'label' => 'مربوطة برقم', 'value' => '•••• ' . substr($c['phone'], -4)],
             ],
         ],
+        'locations' => wallet_locations(),
         'barcodes' => [['format' => 'PKBarcodeFormatQR', 'message' => $site . '/card.html?c=' . $c['card_token'], 'messageEncoding' => 'iso-8859-1', 'altText' => '•••• ' . substr($c['phone'], -4)]],
-    ];
+    ], fn($v) => $v !== []);
 }
 
 /** Builds and signs the .pkpass file for one customer; returns its bytes. */

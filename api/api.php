@@ -347,7 +347,8 @@ case 'settings':
     $u = array_map(fn($r) => ['id' => (int)$r['id'], 'username' => $r['username'], 'role' => $r['role'], 'active' => (int)$r['active']],
         q('SELECT id, username, role, active FROM users ORDER BY id')->fetchAll());
     require_once __DIR__ . '/gwallet_lib.php';
-    out(['commissions' => $c, 'products' => $p, 'users' => $u, 'loyalty' => loyalty_cfg(), 'wallet' => wallet_status(), 'gwallet' => gw_status()]);
+    out(['commissions' => $c, 'products' => $p, 'users' => $u, 'loyalty' => loyalty_cfg(), 'wallet' => wallet_status(), 'gwallet' => gw_status(),
+         'location' => ['coords' => setting('shop_lat') !== '' ? setting('shop_lat') . ', ' . setting('shop_lng') : '', 'text' => setting('nearby_text')]]);
 
 case 'gw_setup':      // owner: Google Wallet service-account key + Issuer ID
     $post(); need('owner');
@@ -372,6 +373,21 @@ case 'wallet_cer':    // owner: the certificate Apple issued for that request
     $cer = base64_decode((string)($in['cer'] ?? ''), true); $wwdr = base64_decode((string)($in['wwdr'] ?? ''), true);
     if (!$cer || !$wwdr) fail('missing_files');
     out(wallet_install_cer($cer, $wwdr));
+
+case 'save_location':  // owner: shop coordinates for the "you're nearby" lock-screen card
+    $post(); need('owner');
+    require_once __DIR__ . '/gwallet_lib.php';
+    $raw = trim((string)($in['coords'] ?? ''));
+    if ($raw === '') { set_setting('shop_lat', ''); set_setting('shop_lng', ''); }
+    else {
+        if (!preg_match('/^\s*(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)\s*$/', $raw, $m) || abs((float)$m[1]) > 90 || abs((float)$m[2]) > 180) fail('bad_coords');
+        set_setting('shop_lat', $m[1]); set_setting('shop_lng', $m[2]);
+    }
+    set_setting('nearby_text', clean((string)($in['text'] ?? ''), 120));
+    // Refresh every card already in a wallet so it picks up the location
+    q('UPDATE customers SET pass_updated = ?', [time()]);
+    foreach (q('SELECT DISTINCT serial FROM wallet_regs')->fetchAll() as $r) wallet_push($r['serial']);
+    out(['ok' => true]);
 
 case 'save_loyalty':
     $post(); need('owner');

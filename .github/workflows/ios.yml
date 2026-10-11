@@ -50,9 +50,11 @@ jobs:
           printf '%s\n' "$ASC_KEY_P8" > "$KEY"
           AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$KEY" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
           cd owner_app/ios
+          # Archive without signing; the export step signs it for the App Store (cloud-managed
+          # distribution certificate), so no development profile or registered device is needed.
           xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release \
             -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/Owner.xcarchive" archive \
-            DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Automatic "${AUTH[@]}" 2>&1 | tee -a ../../build.log | grep -E "error|warning: .*sign|ARCHIVE" || true
+            DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" 2>&1 | tee -a ../../build.log | grep -E "error|ARCHIVE" || true
           test -d "$RUNNER_TEMP/Owner.xcarchive"
           cat > "$RUNNER_TEMP/export.plist" <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>

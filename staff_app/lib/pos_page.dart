@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'api.dart';
+import 'printer.dart';
+import 'receipt.dart';
 import 'theme.dart';
 
 /// In-shop sales: menu grid, current sale, payment buttons and today's sales.
@@ -135,7 +137,26 @@ class _PosPageState extends State<PosPage> {
         'use_free': shop && _freeOn,
       }) as Map);
       final loy = r['loyalty'] is Map ? Map<String, dynamic>.from(r['loyalty'] as Map) : null;
+      final receipt = ReceiptData(
+        ref: '${r['ref']}',
+        time: DateTime.now(),
+        source: 'pos',
+        items: [
+          for (final p in _products)
+            if ((_cart[_id(p)] ?? 0) > 0)
+              ReceiptItem(qty: _cart[_id(p)]!, nameEn: '${p['name_en'] ?? ''}', nameAr: '${p['name_ar'] ?? ''}', price: _price(p)),
+        ],
+        total: ((r['total'] as num?) ?? _total).toDouble(),
+        discount: ((r['free_cups'] as num?) ?? 0) > 0 ? _discount : 0,
+        payment: payment,
+        stamps: loy != null ? '${loy['stamps']}/${loy['need']}' : '',
+      );
       _reset();
+      PrintSettings.load().then((cfg) async {
+        if (!cfg.autoPos) return;
+        final perr = await ReceiptPrinter.print(receipt);
+        if (perr != null && mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(perr)));
+      });
       if (!mounted) return;
       var msg = 'Sale #${r['ref']} saved · ${money(r['total'])} OMR ($payment)';
       if (loy != null) msg += ' · Stamps ${loy['stamps']}/${loy['need']}${((loy['free'] as num?) ?? 0) > 0 ? ' · FREE cup ready' : ''}';
@@ -170,6 +191,12 @@ class _PosPageState extends State<PosPage> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errText(e))));
     }
     _loadToday();
+  }
+
+  Future<void> _reprint(Map<String, dynamic> r) async {
+    final err = await ReceiptPrinter.print(ReceiptData.fromOrder(r));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err ?? 'Receipt printed')));
   }
 
   // ---------- widgets ----------
@@ -366,7 +393,10 @@ class _PosPageState extends State<PosPage> {
             ),
             trailing: r['status'] == 'cancelled'
                 ? const Text('Voided', style: TextStyle(color: kBad, fontWeight: FontWeight.w800))
-                : TextButton(onPressed: () => _void(r), child: const Text('Void', style: TextStyle(color: kBad, fontWeight: FontWeight.w800))),
+                : Row(mainAxisSize: MainAxisSize.min, children: [
+                    IconButton(tooltip: 'Print receipt', onPressed: () => _reprint(r), icon: const Icon(Icons.print, color: kPurple)),
+                    TextButton(onPressed: () => _void(r), child: const Text('Void', style: TextStyle(color: kBad, fontWeight: FontWeight.w800))),
+                  ]),
           ),
         ),
     ]);

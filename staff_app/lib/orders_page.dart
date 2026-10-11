@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'orders_controller.dart';
+import 'printer.dart';
+import 'receipt.dart';
 import 'theme.dart';
 
 /// Website orders in three columns: New, Preparing, Ready.
@@ -132,11 +134,26 @@ class _OrderCardState extends State<OrderCard> {
       );
       if (ok != true) return;
     }
+    final wasNew = widget.order['status'] == 'new';
+    final snapshot = Map<String, dynamic>.from(widget.order);
     setState(() => _busy = true);
     final err = await widget.controller.setStatus((widget.order['id'] as num).toInt(), status, payment: payment);
     if (!mounted) return;
     setState(() => _busy = false);
-    if (err != null) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
+    if (err != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
+      return;
+    }
+    if (wasNew && status == 'preparing' && (await PrintSettings.load()).autoAccept) {
+      final perr = await ReceiptPrinter.print(ReceiptData.fromOrder(snapshot));
+      if (perr != null && mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(perr)));
+    }
+  }
+
+  Future<void> _print() async {
+    final err = await ReceiptPrinter.print(ReceiptData.fromOrder(widget.order));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err ?? 'Receipt printed')));
   }
 
   @override
@@ -161,6 +178,8 @@ class _OrderCardState extends State<OrderCard> {
             Text('#${o['ref']}', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: kPurple)),
             const Spacer(),
             Text(_age(o['created_at']), style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.black54)),
+            const SizedBox(width: 6),
+            IconButton(tooltip: 'Print receipt', onPressed: _print, icon: const Icon(Icons.print, color: kPurple)),
           ]),
           if (arrived) ...[
             const SizedBox(height: 8),

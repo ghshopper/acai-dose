@@ -3,7 +3,92 @@ import 'package:flutter/material.dart';
 import 'orders_controller.dart';
 import 'orders_page.dart';
 import 'pos_page.dart';
+import 'printer.dart';
 import 'theme.dart';
+
+/// Receipt printer settings and a test print.
+class PrinterDialog extends StatefulWidget {
+  const PrinterDialog({super.key});
+  @override
+  State<PrinterDialog> createState() => _PrinterDialogState();
+}
+
+class _PrinterDialogState extends State<PrinterDialog> {
+  PrintSettings? _cfg;
+  bool _testing = false;
+  String _msg = '';
+
+  @override
+  void initState() {
+    super.initState();
+    PrintSettings.load().then((c) => setState(() => _cfg = c));
+  }
+
+  void _set(void Function(PrintSettings c) f) {
+    final c = _cfg!;
+    setState(() => f(c));
+    c.save();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _cfg;
+    return AlertDialog(
+      title: const Text('Receipt printer'),
+      content: c == null
+          ? const SizedBox(height: 80, child: Center(child: CircularProgressIndicator()))
+          : SizedBox(
+              width: 420,
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                const Text('Paper width', style: TextStyle(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 6),
+                SegmentedButton<int>(
+                  segments: const [
+                    ButtonSegment(value: 58, label: Text('58 mm (handheld)')),
+                    ButtonSegment(value: 80, label: Text('80 mm (desktop)')),
+                  ],
+                  selected: {c.paper},
+                  onSelectionChanged: (v) => _set((c) => c.paper = v.first),
+                ),
+                const SizedBox(height: 8),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: c.autoAccept,
+                  onChanged: (v) => _set((c) => c.autoAccept = v),
+                  title: const Text('Print website orders on Accept', style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: c.autoPos,
+                  onChanged: (v) => _set((c) => c.autoPos = v),
+                  title: const Text('Print after every shop sale', style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
+                if (_msg.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Text(_msg, style: const TextStyle(fontWeight: FontWeight.w700))),
+              ]),
+            ),
+      actions: [
+        TextButton(
+          onPressed: _testing || c == null
+              ? null
+              : () async {
+                  setState(() {
+                    _testing = true;
+                    _msg = '';
+                  });
+                  final err = await ReceiptPrinter.test();
+                  if (!mounted) return;
+                  setState(() {
+                    _testing = false;
+                    _msg = err ?? 'Test receipt printed';
+                  });
+                },
+          child: Text(_testing ? 'Printing…' : 'Test print'),
+        ),
+        FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Done')),
+      ],
+    );
+  }
+}
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key, required this.me, required this.onLogout});
@@ -68,6 +153,11 @@ class _HomePageState extends State<HomePage> {
               _tabButton(0, 'Orders', Icons.receipt_long, _orders.newCount),
               _tabButton(1, 'POS', Icons.point_of_sale, 0),
               if (wide) Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: Center(child: Text('${widget.me['username']}', style: const TextStyle(color: kLilac, fontWeight: FontWeight.w700)))),
+              IconButton(
+                tooltip: 'Printer',
+                icon: const Icon(Icons.print),
+                onPressed: () => showDialog(context: context, builder: (_) => const PrinterDialog()),
+              ),
               IconButton(
                 tooltip: 'Log out',
                 icon: const Icon(Icons.logout),

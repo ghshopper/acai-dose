@@ -1,7 +1,7 @@
 name: staff
 description: Açaí Dose staff app – orders screen and POS.
 publish_to: 'none'
-version: 2.0.0+3
+version: 2.1.0+4
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -11,6 +11,7 @@ dependencies:
     sdk: flutter
   http: ^1.2.2
   shared_preferences: ^2.3.2
+  sunmi_printer_plus: ^4.1.1
 
 dev_dependencies:
   flutter_lints: ^4.0.0
@@ -20,3 +21,4 @@ flutter:
   assets:
     - assets/logo-cream.png
     - assets/logo-purple.png
+    - assets/logo-black.png

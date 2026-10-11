@@ -342,7 +342,7 @@ class _PosPageState extends State<PosPage> {
     double sum([String? k]) => ok.where((r) => k == null || r['payment'] == k).fold(0.0, (s, r) => s + (r['total'] as num).toDouble());
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       const SizedBox(height: 18),
-      Text("Today's shop sales", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+      const Text("Today's shop sales", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
       Text('${ok.length} sales · Total ${money(sum())} · Cash ${money(sum('cash'))} · Card ${money(sum('card'))}',
           style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.black54)),
       const SizedBox(height: 8),

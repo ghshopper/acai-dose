@@ -35,7 +35,7 @@ jobs:
           rm -f test/widget_test.dart
           flutter pub get 2>&1 | tee -a ../build.log
           flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee -a ../build.log || true
-          flutter build apk --release 2>&1 | tee -a ../build.log
+          flutter build apk --release --target-platform android-arm,android-arm64 2>&1 | tee -a ../build.log
 
       - name: Sign with the shop key (installs over earlier versions)
         run: |

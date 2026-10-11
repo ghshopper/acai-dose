@@ -12,17 +12,94 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Açaí Dose">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="stylesheet" href="assets/app.css?v=1791725119">
+<link rel="stylesheet" href="assets/app.css?v=1791725976">
 <style>
 body{background:var(--c2)}
-.wrap{max-width:1100px;margin:0 auto;padding:16px}
-.tabs{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 12px}
-.tabs button{flex:none;min-height:46px;padding:8px 20px;border-radius:999px;border:2px solid var(--p);background:#fff;font-weight:800;cursor:pointer}
-.tabs button[aria-selected="true"]{background:var(--p);color:var(--c)}
-.period{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}
-.period button{min-height:44px;padding:6px 16px;border-radius:999px;border:0;background:#fff;font-weight:800;cursor:pointer}
-.period button[aria-pressed="true"]{background:var(--o)}
-.period .field input{min-height:44px}
+.shell{display:flex;min-height:100vh}
+.side{flex:none;width:250px;background:var(--p);color:var(--c);display:flex;flex-direction:column;gap:18px;padding:22px 16px;position:sticky;top:0;height:100vh;overflow-y:auto}
+.side .top{display:flex;justify-content:center}
+.side .logo{height:46px;width:auto;margin:4px 0 8px}
+.tabs{display:flex;flex-direction:column;gap:4px}
+.tabs button{display:flex;align-items:center;gap:12px;min-height:48px;padding:10px 14px;border-radius:14px;border:0;background:transparent;color:var(--c);font-weight:800;font-size:16px;cursor:pointer;text-align:right}
+.tabs button svg{flex:none;opacity:.8}
+.tabs button:hover{background:rgba(250,243,224,.08)}
+.tabs button[aria-selected="true"]{background:var(--c);color:var(--p)}
+.tabs button[aria-selected="true"] svg{opacity:1}
+.side .links{margin-top:auto;display:flex;flex-direction:column;gap:8px;border-top:1px solid rgba(250,243,224,.15);padding-top:14px}
+.side .links a,.side .links button{display:flex;align-items:center;gap:10px;min-height:44px;padding:8px 12px;border-radius:12px;color:var(--l);text-decoration:none;font-weight:700;background:none;border:0;cursor:pointer;font-size:15px}
+.side .links a:hover,.side .links button:hover{background:rgba(250,243,224,.08);color:var(--c)}
+.side .who{font-size:13px;opacity:.6;padding:0 12px}
+.main{flex:1;min-width:0;padding:26px 30px 40px}
+.main-in{max-width:1180px;margin:0 auto}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:20px}
+.head h1{margin:0;font-size:38px;line-height:1}
+.period{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.seg{display:flex;background:#fff;border-radius:999px;padding:4px;gap:2px;box-shadow:0 4px 14px rgba(71,13,67,.06);overflow-x:auto;max-width:100%}
+.seg button{flex:none;min-height:40px;padding:6px 14px;border-radius:999px;border:0;background:none;font-weight:800;cursor:pointer;font-size:14px;color:var(--p)}
+.seg button[aria-pressed="true"]{background:var(--p);color:var(--c)}
+.dates{display:flex;gap:6px;align-items:center;background:#fff;border-radius:999px;padding:4px 10px;box-shadow:0 4px 14px rgba(71,13,67,.06)}
+.dates input{border:0;background:none;min-height:40px;font-weight:700;font-size:14px;color:var(--p);font-family:'Montserrat',sans-serif}
+.dates span{opacity:.5;font-weight:800}
+@media (max-width:900px){
+  .shell{display:block}
+  .side{width:auto;height:auto;position:sticky;top:0;z-index:5;padding:10px 12px 8px;gap:8px;flex-direction:column}
+  .side .logo{height:34px;margin:0}
+  .side .top{display:flex;align-items:center;justify-content:space-between}
+  .tabs{flex-direction:row;overflow-x:auto;gap:6px;padding-bottom:4px;scrollbar-width:none}
+  .tabs button{flex:none;min-height:42px;padding:8px 14px;font-size:14px;border:1px solid rgba(250,243,224,.25)}
+  .tabs button svg{display:none}
+  .side .links{display:none}
+  .side .top .mlinks{display:flex}
+  .main{padding:16px 14px 30px}
+  .head h1{font-size:30px}
+}
+.side .mlinks{display:none;gap:6px}
+.side .mlinks a,.side .mlinks button{min-height:38px;padding:6px 12px;border-radius:999px;border:1px solid rgba(250,243,224,.4);color:var(--c);text-decoration:none;font-weight:700;font-size:13px;background:none;display:inline-flex;align-items:center}
+/* summary */
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+@media (max-width:1100px){.grid4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:520px){.grid4{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.stat{padding:14px}.stat .v{font-size:22px}.stat .s{font-size:12px}.hero .v{font-size:38px}}
+.hero{grid-column:span 2;background:var(--p);color:var(--c);padding:22px 24px;display:flex;flex-direction:column;gap:10px}
+
+.hero .l{font-weight:800;opacity:.8}
+.hero .v{font-family:'Montserrat',sans-serif;font-weight:800;font-size:46px;line-height:1;direction:ltr;text-align:right}
+.hero .v small{font-size:18px;opacity:.7}
+.hero.neg .v{color:#ffb4b4}
+.flow{display:flex;height:12px;border-radius:999px;overflow:hidden;background:rgba(250,243,224,.15)}
+.flow i{display:block;height:100%}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;font-weight:700;opacity:.9}
+.legend b{display:inline-block;width:10px;height:10px;border-radius:3px;margin-inline-end:6px;vertical-align:middle}
+.stat{padding:18px 20px;display:flex;flex-direction:column;gap:6px}
+.stat .l{font-weight:800;font-size:14px;opacity:.7;display:flex;align-items:center;gap:8px}
+.stat .v{font-family:'Montserrat',sans-serif;font-weight:800;font-size:30px;direction:ltr;text-align:right}
+.stat .s{font-size:13px;font-weight:700;opacity:.6}
+.share{height:6px;border-radius:999px;background:var(--c2);overflow:hidden;margin-top:4px}
+.share i{display:block;height:100%;background:var(--o);border-radius:999px}
+.sec{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:30px 4px 12px}
+.sec h3{margin:0}
+.sec small{font-weight:700;opacity:.6}
+.paygrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.pay{padding:16px 18px;display:flex;flex-direction:column;gap:8px}
+.pay .top{display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:17px}
+.pay .tag{font-size:12px;font-weight:800;padding:3px 10px;border-radius:999px;background:var(--c2)}
+.pay .tag.t{background:#fde9c8}
+.pay .net{font-family:'Montserrat',sans-serif;font-weight:800;font-size:26px;direction:ltr;text-align:right}
+.pay .row{display:flex;justify-content:space-between;font-size:13px;font-weight:700;opacity:.7}
+.pay .row span:last-child{font-family:'Montserrat',sans-serif;direction:ltr}
+.chart{padding:18px 18px 12px}
+.chart .plot{display:flex;align-items:flex-end;gap:6px;height:200px;border-bottom:2px solid var(--c2);overflow-x:auto;padding-top:22px}
+.chart .b{flex:1 0 24px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;position:relative}
+.chart .b i{display:block;width:100%;max-width:36px;background:var(--p);border-radius:8px 8px 2px 2px;min-height:2px}
+.chart .b.today i{background:var(--o)}
+.chart .b em{font-style:normal;font-family:'Montserrat',sans-serif;font-size:10px;font-weight:700;opacity:.75;margin-bottom:4px;white-space:nowrap}
+.chart .days{display:flex;gap:6px;margin-top:6px;overflow:hidden}
+.chart .days span{flex:1 0 24px;text-align:center;font-size:11px;font-weight:700;opacity:.6}
+.topp{padding:8px 18px}
+.topp .r{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,2fr) 48px;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid #f3eadb}
+.topp .r:last-child{border-bottom:0}
+.topp .bar{height:12px;border-radius:999px;background:var(--c2);overflow:hidden}
+.topp .bar i{display:block;height:100%;background:var(--p);border-radius:999px}
+.topp .q{font-family:'Montserrat',sans-serif;font-weight:800;text-align:left}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
 .kpi{padding:16px 18px}
 .kpi .l{font-weight:800;font-size:15px;opacity:.75}
@@ -58,7 +135,7 @@ setTimeout(function(){if(!window.__appStarted)show('The page script did not run.
 <body>
 <div id="app"></div>
 <script type="module">
-import { api, msg, $, $$, esc, money, ymd, requireLogin, logout } from './assets/common.js?v=1791725119';
+import { api, msg, $, $$, esc, money, ymd, requireLogin, logout } from './assets/common.js?v=1791725976';
 window.__appStarted = true;
 (async () => {
 const app = $('#app');
@@ -70,34 +147,39 @@ const CH = { talabat: 'طلبات', snoonu: 'سنونو', khedmah: 'خدمة' };
 const CATS = ['مواد خام (آساي وفواكه)', 'أكواب وتغليف', 'رواتب', 'إيجار', 'كهرباء وماء', 'تسويق وإعلانات', 'صيانة', 'أخرى'];
 
 app.innerHTML = `
-<header class="topbar">
-  <img src="assets/logo-cream.png" alt="Açaí Dose">
-  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end">
-    <span class="who" dir="ltr">${esc(me.username)}</span>
-    <a class="btn small ghost" style="color:var(--c);border-color:var(--c)" href="screen.html">شاشة الطلبات</a>
-    <a class="btn small ghost" style="color:var(--c);border-color:var(--c)" href="pos.html">الكاشير</a>
-    <button class="btn small ghost" style="color:var(--c);border-color:var(--c)" id="out" type="button">خروج</button>
+<div class="shell">
+<aside class="side">
+  <div class="top"><img class="logo" src="assets/logo-cream.png" alt="Açaí Dose">
+    <div class="mlinks"><a href="screen.html">الطلبات</a><a href="pos.html">الكاشير</a><button type="button" data-out>خروج</button></div></div>
+  <nav class="tabs" role="tablist" aria-label="أقسام الداش بورد">
+    <button role="tab" aria-selected="true" data-t="sum"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>الملخص</span></button>
+    <button role="tab" aria-selected="false" data-t="apps"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg><span>إدخال يدوي للتطبيقات</span></button>
+    <button role="tab" aria-selected="false" data-t="exp"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span>المصاريف</span></button>
+    <button role="tab" aria-selected="false" data-t="orders"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg><span>كل الطلبات</span></button>
+    <button role="tab" aria-selected="false" data-t="cust"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M16 4a4 4 0 0 1 0 8M22 21c0-3-2-5-4-5.5"/></svg><span>العملاء</span></button>
+    <button role="tab" aria-selected="false" data-t="data"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg><span>استيراد وتصفير</span></button>
+    <button role="tab" aria-selected="false" data-t="set"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>الإعدادات</span></button>
+  </nav>
+  <div class="links">
+    <a href="screen.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>شاشة الطلبات</a>
+    <a href="pos.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h2M14 11h2M8 15h2M14 15h2"/></svg>الكاشير</a>
+    <button type="button" data-out><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l-5-5 5-5M5 12h12"/></svg>خروج</button>
+    <div class="who" dir="ltr">${esc(me.username)}</div>
   </div>
-</header>
-<div class="wrap">
-  <div class="tabs" role="tablist">
-    <button role="tab" aria-selected="true" data-t="sum">الملخص</button>
-    <button role="tab" aria-selected="false" data-t="apps">إدخال يدوي للتطبيقات</button>
-    <button role="tab" aria-selected="false" data-t="exp">المصاريف</button>
-    <button role="tab" aria-selected="false" data-t="orders">كل الطلبات</button>
-    <button role="tab" aria-selected="false" data-t="cust">العملاء</button>
-    <button role="tab" aria-selected="false" data-t="data">استيراد وتصفير</button>
-    <button role="tab" aria-selected="false" data-t="set">الإعدادات</button>
-  </div>
-
-  <div class="period" id="period">
-    <button type="button" data-p="today" aria-pressed="true">اليوم</button>
-    <button type="button" data-p="yest" aria-pressed="false">أمس</button>
-    <button type="button" data-p="week" aria-pressed="false">آخر ٧ أيام</button>
-    <button type="button" data-p="month" aria-pressed="false">هذا الشهر</button>
-    <button type="button" data-p="last" aria-pressed="false">الشهر الماضي</button>
-    <div class="field"><label for="pf">من</label><input type="date" id="pf"></div>
-    <div class="field"><label for="pt">إلى</label><input type="date" id="pt"></div>
+</aside>
+<main class="main"><div class="main-in">
+  <div class="head">
+    <h1 class="lal" id="ptitle">الملخص</h1>
+    <div class="period" id="period">
+      <div class="seg" role="group" aria-label="الفترة">
+        <button type="button" data-p="today" aria-pressed="true">اليوم</button>
+        <button type="button" data-p="yest" aria-pressed="false">أمس</button>
+        <button type="button" data-p="week" aria-pressed="false">٧ أيام</button>
+        <button type="button" data-p="month" aria-pressed="false">هذا الشهر</button>
+        <button type="button" data-p="last" aria-pressed="false">الشهر الماضي</button>
+      </div>
+      <div class="dates"><input type="date" id="pf" aria-label="من"><span>←</span><input type="date" id="pt" aria-label="إلى"></div>
+    </div>
   </div>
 
   <section data-panel="sum"></section>
@@ -107,9 +189,10 @@ app.innerHTML = `
   <section data-panel="cust" class="hidden"></section>
   <section data-panel="data" class="hidden"></section>
   <section data-panel="set" class="hidden"></section>
+</div></main>
 </div>`;
 
-$('#out').onclick = logout;
+document.querySelectorAll('[data-out]').forEach(b => { b.onclick = logout; });
 
 // ---------- state ----------
 let tab = 'sum';
@@ -124,18 +207,19 @@ function setPeriod(p) {
   if (p === 'month') { to = t; from = t.slice(0, 8) + '01'; }
   if (p === 'last') { const s = new Date(d.getFullYear(), d.getMonth() - 1, 1), e = new Date(d.getFullYear(), d.getMonth(), 0); from = ymd(s); to = ymd(e); }
   $('#pf').value = from; $('#pt').value = to;
-  $$('#period button').forEach(b => b.setAttribute('aria-pressed', b.dataset.p === p));
+  $$('#period button[data-p]').forEach(b => b.setAttribute('aria-pressed', b.dataset.p === p));
   refresh();
 }
 $('#period').addEventListener('click', e => { const b = e.target.closest('button[data-p]'); if (b) setPeriod(b.dataset.p); });
 ['#pf', '#pt'].forEach(s => $(s).addEventListener('change', () => {
   from = $('#pf').value || from; to = $('#pt').value || to; if (from > to) [from, to] = [to, from];
-  $$('#period button').forEach(b => b.setAttribute('aria-pressed', 'false')); refresh();
+  $$('#period button[data-p]').forEach(b => b.setAttribute('aria-pressed', 'false')); refresh();
 }));
 
 $('.tabs').addEventListener('click', e => {
   const b = e.target.closest('button[data-t]'); if (!b) return;
   tab = b.dataset.t;
+  $('#ptitle').textContent = b.textContent.trim();
   $$('.tabs button').forEach(x => x.setAttribute('aria-selected', x === b));
   $$('section[data-panel]').forEach(s => s.classList.toggle('hidden', s.dataset.panel !== tab));
   $('#period').classList.toggle('hidden', tab === 'set' || tab === 'data' || tab === 'cust');
@@ -199,34 +283,56 @@ function drawSum({ orders, apps, exps }) {
   });
   const max = Math.max(1, ...daily.map(x => x.s));
 
+  const nOrders = cnt(valid) + apps.reduce((a, r) => a + (r.orders_count || 0), 0);
+  const avg = nOrders ? sales / nOrders : 0;
+  const todayStr = ymd(new Date());
+  const pct = v => sales > 0 ? Math.max(0, Math.round(v / sales * 100)) : 0;
+  const chan = [
+    { l: 'الموقع', v: site, s: `${cnt(webO)} طلب · ${cupsOf(webO)} كوب`, ic: '<path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/><circle cx="12" cy="12" r="9"/>' },
+    { l: 'المحل', v: shop, s: `${cnt(shopO)} عملية · ${cupsOf(shopO)} كوب`, ic: '<path d="M3 9l1.5-5h15L21 9M4 9v11h16V9M9 20v-6h6v6"/>' },
+    { l: 'التطبيقات', v: appGross, s: 'طلبات وسنونو وخدمة', ic: '<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>' },
+  ];
+  const svg = d => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">${d}</svg>`;
+  const maxP = prodRows.length ? prodRows[0][1] : 1;
+
   $('[data-panel="sum"]').innerHTML = `
-    <div class="kpis">
-      <div class="card kpi"><div class="l">إجمالي المبيعات</div><div class="v">${money(sales)}</div><div class="s">ر.ع</div></div>
-      <div class="card kpi"><div class="l">مبيعات الموقع</div><div class="v">${money(site)}</div><div class="s">${cnt(webO)} طلب &middot; ${cupsOf(webO)} كوب</div></div>
-      <div class="card kpi"><div class="l">مبيعات المحل</div><div class="v">${money(shop)}</div><div class="s">${cnt(shopO)} عملية &middot; ${cupsOf(shopO)} كوب</div></div>
-      <div class="card kpi"><div class="l">مبيعات التطبيقات</div><div class="v">${money(appGross)}</div><div class="s">طلبات وسنونو وخدمة</div></div>
-      <div class="card kpi"><div class="l">العمولات</div><div class="v">${money(comm)}</div><div class="s">تخصمها التطبيقات</div></div>
-      <div class="card kpi"><div class="l">المصاريف</div><div class="v">${money(exp)}</div><div class="s">${exps.length} مصروف</div></div>
-      <div class="card kpi net ${net < 0 ? 'neg' : ''}"><div class="l">صافي الربح</div><div class="v">${money(net)}</div><div class="s">المبيعات − العمولات − المصاريف</div></div>
+    <div class="grid4">
+      <div class="card hero ${net < 0 ? 'neg' : ''}">
+        <div class="l">صافي الربح</div>
+        <div class="v">${money(net)} <small>ر.ع</small></div>
+        <div class="flow" role="img" aria-label="المبيعات مقسمة على الصافي والعمولات والمصاريف">
+          <i style="width:${sales > 0 ? Math.max(0, net) / sales * 100 : 0}%;background:var(--c)"></i>
+          <i style="width:${sales > 0 ? comm / sales * 100 : 0}%;background:var(--o)"></i>
+          <i style="width:${sales > 0 ? Math.min(exp, sales) / sales * 100 : 0}%;background:#c86a8a"></i>
+        </div>
+        <div class="legend"><span><b style="background:var(--c)"></b>الصافي</span><span><b style="background:var(--o)"></b>العمولات ${money(comm)}</span><span><b style="background:#c86a8a"></b>المصاريف ${money(exp)}</span></div>
+      </div>
+      <div class="card stat"><div class="l">${svg('<path d="M3 17l6-6 4 4 8-8M15 7h6v6"/>')}إجمالي المبيعات</div><div class="v">${money(sales)}</div><div class="s">${nOrders} طلب · متوسط الطلب ${money(avg)}</div></div>
+      <div class="card stat"><div class="l">${svg('<path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>')}المصاريف</div><div class="v">${money(exp)}</div><div class="s">${exps.length} مصروف</div></div>
+      ${chan.map(c => `<div class="card stat"><div class="l">${svg(c.ic)}${c.l}</div><div class="v">${money(c.v)}</div><div class="s">${c.s} · ${pct(c.v)}%</div><div class="share"><i style="width:${pct(c.v)}%"></i></div></div>`).join('')}
+      <div class="card stat"><div class="l">${svg('<path d="M4 7h16M4 12h16M4 17h10"/>')}العمولات</div><div class="v">${money(comm)}</div><div class="s">تخصمها التطبيقات</div></div>
     </div>
 
-    <h3 class="lal">طرق الدفع والحسابات</h3>
-    <div class="tbl-wrap"><table>
-      <thead><tr><th>طريقة الدفع</th><th>المبيعات</th><th>العمولة</th><th>الصافي / المفروض يوصلك</th><th>عدد الطلبات</th></tr></thead>
-      <tbody>${methods.map(m => `<tr><td>${m.name}${m.isApp ? ' <span class="pill">تحويل</span>' : ' <span class="pill">بالدرج</span>'}</td>
-        <td class="num">${money(m.gross)}</td><td class="num">${m.isApp ? money(m.comm) : '-'}</td>
-        <td class="num" style="font-weight:800">${money(m.net)}</td><td class="num">${m.n}</td></tr>`).join('')}
-        ${unpaidWeb.length ? `<tr><td>طلبات موقع ما انستلمت للحين</td><td class="num">${money(sumT(unpaidWeb))}</td><td class="num">-</td><td class="num">-</td><td class="num">${unpaidWeb.length}</td></tr>` : ''}
-      </tbody>
-      <tfoot><tr><td>المجموع</td><td class="num">${money(sales)}</td><td class="num">${money(comm)}</td><td class="num">${money(sales - comm)}</td><td class="num">${methods.reduce((s, m) => s + m.n, 0) + unpaidWeb.length}</td></tr></tfoot>
-    </table></div>
-    <p style="margin:8px 4px 0;font-weight:700;opacity:.75;line-height:1.6">"المفروض يوصلك" للتطبيقات = المبيعات ناقص العمولة. قارنه بالمبلغ اللي يحولونه لك. النقد والبطاقة = اللي المفروض في الدرج وجهاز البطاقة.</p>
+    <div class="sec"><h3 class="lal">طرق الدفع والحسابات</h3><small>"المفروض يوصلك" = المبيعات ناقص العمولة</small></div>
+    <div class="paygrid">
+      ${methods.map(m => `<div class="card pay">
+        <div class="top"><span>${m.name}</span><span class="tag ${m.isApp ? 't' : ''}">${m.isApp ? 'تحويل' : 'بالدرج'}</span></div>
+        <div class="net">${money(m.net)}</div>
+        <div class="row"><span>المبيعات</span><span>${money(m.gross)}</span></div>
+        ${m.isApp ? `<div class="row"><span>العمولة</span><span>${money(m.comm)}</span></div>` : ''}
+        <div class="row"><span>الطلبات</span><span>${m.n}</span></div>
+      </div>`).join('')}
+      ${unpaidWeb.length ? `<div class="card pay"><div class="top"><span>طلبات موقع للحين</span><span class="tag">غير مستلمة</span></div><div class="net">${money(sumT(unpaidWeb))}</div><div class="row"><span>الطلبات</span><span>${unpaidWeb.length}</span></div></div>` : ''}
+    </div>
 
-    ${ds.length > 1 ? `<h3 class="lal">المبيعات اليومية</h3>
-    <div class="card bars" role="img" aria-label="رسم المبيعات اليومية">${daily.map(x => `<div class="b" title="${x.day}: ${money(x.s)} ر.ع"><i style="height:${Math.round(x.s / max * 100)}%"></i><small>${x.day.slice(8)}</small></div>`).join('')}</div>` : ''}
+    ${ds.length > 1 ? `<div class="sec"><h3 class="lal">المبيعات اليومية</h3><small>${money(sales)} ر.ع في ${ds.length} يوم</small></div>
+    <div class="card chart" role="img" aria-label="رسم المبيعات اليومية">
+      <div class="plot">${daily.map(x => `<div class="b ${x.day === todayStr ? 'today' : ''}" title="${x.day}: ${money(x.s)} ر.ع">${x.s > 0 && ds.length <= 16 ? `<em>${x.s.toFixed(1)}</em>` : ''}<i style="height:${Math.round(x.s / max * 100)}%"></i></div>`).join('')}</div>
+      <div class="days">${daily.map(x => `<span>${x.day.slice(8)}</span>`).join('')}</div>
+    </div>` : ''}
 
-    <h3 class="lal">الأكثر طلباً</h3>
-    ${prodRows.length ? `<div class="tbl-wrap"><table><thead><tr><th>الصنف</th><th>عدد الأكواب</th></tr></thead><tbody>${prodRows.map(([n, q]) => `<tr><td>${esc(n)}</td><td class="num">${q}</td></tr>`).join('')}</tbody></table></div>` : '<div class="card empty">ما فيه طلبات في هالفترة</div>'}
+    <div class="sec"><h3 class="lal">الأكثر طلباً</h3><small>عدد الأكواب</small></div>
+    ${prodRows.length ? `<div class="card topp">${prodRows.map(([n, q]) => `<div class="r"><span style="font-weight:800">${esc(n)}</span><div class="bar"><i style="width:${Math.round(q / maxP * 100)}%"></i></div><span class="q">${q}</span></div>`).join('')}</div>` : '<div class="card empty">ما فيه طلبات في هالفترة</div>'}
   `;
 }
 

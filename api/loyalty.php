@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// Loyalty: every N cups (or orders) paid on the website earns one free cup.
+// Loyalty: every N cups (or orders) paid on the website, or in the shop with the customer's mobile, earns one free cup.
 
 function setting(string $k, string $default = ''): string {
     $r = q('SELECT v FROM settings WHERE k = ?', [$k])->fetch();
@@ -22,7 +22,7 @@ function loyalty_state(string $phone): array {
     $cfg = loyalty_cfg();
     $earned = 0; $used = 0;
     if ($phone !== '') {
-        $rows = q("SELECT items, status, payment, free_cups FROM orders WHERE phone = ? AND source = 'web' AND status <> 'cancelled'", [$phone])->fetchAll();
+        $rows = q("SELECT items, status, payment, free_cups FROM orders WHERE phone = ? AND status <> 'cancelled' AND (source = 'web' OR (source = 'pos' AND payment IN ('cash','card')))", [$phone])->fetchAll();
         foreach ($rows as $o) {
             $free = (int)$o['free_cups'];
             $used += $free;

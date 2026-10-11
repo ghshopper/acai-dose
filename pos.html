@@ -6,7 +6,7 @@
 <title>POS | Açaí Dose</title>
 <meta name="theme-color" content="#470D43">
 <link rel="icon" href="assets/logo-purple.png">
-<link rel="stylesheet" href="assets/app.css?v=1791724638">
+<link rel="stylesheet" href="assets/app.css?v=1791724891">
 <style>
 body{background:var(--c2);font-family:'Montserrat','Tajawal',system-ui,sans-serif}
 .topbar .nav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
@@ -40,6 +40,12 @@ body{background:var(--c2);font-family:'Montserrat','Tajawal',system-ui,sans-seri
 .sub{font-size:13px;font-weight:800;opacity:.7;margin-bottom:-4px}
 .change{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .change input{width:120px;min-height:46px;border:2px solid #e3d6bf;border-radius:12px;padding:6px 10px;font-size:18px}
+.cust{display:flex;flex-direction:column;gap:6px;background:var(--c);border-radius:14px;padding:10px 12px}
+.cust .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.cust input{width:150px;min-height:46px;border:2px solid #e3d6bf;border-radius:12px;padding:6px 10px;font-size:18px;direction:ltr}
+.cust .info{font-weight:700;font-size:15px}
+.cust .free{display:flex;gap:8px;align-items:center;font-weight:800;color:var(--p);background:var(--o);border-radius:10px;padding:8px 10px;cursor:pointer}
+.cust .free input{width:22px;height:22px;min-height:0}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ok);color:#fff;font-weight:800;font-size:20px;padding:16px 28px;border-radius:999px;z-index:9;box-shadow:0 10px 30px rgba(0,0,0,.25)}
 .today{margin:0 14px 30px}
 .today h3{margin:6px 4px 10px;font-size:20px;display:flex;gap:14px;flex-wrap:wrap;align-items:baseline}
@@ -61,7 +67,7 @@ setTimeout(function(){if(!window.__appStarted)show('The page script did not run.
 <body>
 <div id="app"></div>
 <script type="module">
-import { api, $, esc, money, requireLogin, logout, msgEn, watchNewOrders } from './assets/common.js?v=1791724638';
+import { api, $, esc, money, requireLogin, logout, msgEn, watchNewOrders } from './assets/common.js?v=1791724891';
 window.__appStarted = true;
 (async () => {
 const app = $('#app');
@@ -83,6 +89,11 @@ app.innerHTML = `
     <h2>Current sale <button class="btn small ghost" id="clear" type="button">Clear</button></h2>
     <div class="lines" id="lines"></div>
     <div class="total"><span style="font-weight:800">Total</span><span><b id="tot">0.000</b> OMR</span></div>
+    <div class="cust">
+      <div class="row"><label for="cphone" style="font-weight:800">Customer mobile <small style="font-weight:600;opacity:.7">(optional, loyalty)</small></label>
+        <input id="cphone" type="tel" inputmode="numeric" maxlength="8" placeholder="9XXXXXXX" autocomplete="off"></div>
+      <div class="info" id="cinfo" aria-live="polite"></div>
+    </div>
     <div class="change"><label for="given" style="font-weight:800">Cash given</label><input id="given" type="number" step="0.001" min="0" inputmode="decimal"><span id="chg" style="font-weight:800"></span></div>
     <div class="sub">In-shop payment</div>
     <div class="paybtns">
@@ -116,7 +127,30 @@ function drawGrid() {
       <span class="nm">${esc(p.name_en)}</span><span class="pr">${money(p.price)}</span></button>`;
   }).join('');
 }
-function total() { return products.reduce((s, p) => s + (cart.get(p.id) || 0) * p.price, 0); }
+let cust = null;   // loyalty info for the typed mobile
+function subtotal() { return products.reduce((s, p) => s + (cart.get(p.id) || 0) * p.price, 0); }
+function freeOn() { const f = $('#usefree'); return !!(f && f.checked && cust && cust.free > 0); }
+function discount() { if (!freeOn()) return 0; const inCart = products.filter(p => cart.get(p.id)); return inCart.length ? Math.max(...inCart.map(p => p.price)) : 0; }
+function total() { return Math.max(0, subtotal() - discount()); }
+function drawCust() {
+  const box = $('#cinfo');
+  if (!cust) { box.innerHTML = ''; return; }
+  if (!cust.on) { box.textContent = cust.found ? `${cust.name || 'Customer'} (loyalty is off)` : 'New customer'; return; }
+  const who = cust.found ? esc(cust.name || 'Customer') : 'New customer';
+  box.innerHTML = `${who} · Stamps <b>${cust.stamps}/${cust.need}</b>` +
+    (cust.free > 0 ? `<label class="free"><input type="checkbox" id="usefree"> Use FREE cup (${cust.free} available)</label>` : ' · Stamps are added for Cash / Card');
+  const f = $('#usefree'); if (f) f.onchange = drawTicket;
+}
+let lookupT = null;
+$('#cphone').addEventListener('input', e => {
+  e.target.value = e.target.value.replace(/\D/g, '').slice(0, 8);
+  cust = null; drawCust(); drawTicket(); clearTimeout(lookupT);
+  const v = e.target.value;
+  if (/^[279]\d{7}$/.test(v)) lookupT = setTimeout(async () => {
+    try { cust = await api('pos_customer', undefined, { phone: '+968' + v }); } catch { cust = null; }
+    if ($('#cphone').value === v) { drawCust(); drawTicket(); }
+  }, 250);
+});
 function drawTicket() {
   const rows = products.filter(p => cart.get(p.id));
   $('#lines').innerHTML = rows.length ? rows.map(p => {
@@ -125,8 +159,8 @@ function drawTicket() {
       <button type="button" data-d="-1" data-id="${p.id}" aria-label="Remove one">−</button><span class="qq">${q}</span>
       <button type="button" data-d="1" data-id="${p.id}" aria-label="Add one">+</button><span class="t">${money(q * p.price)}</span></div>`;
   }).join('') : '<div style="opacity:.6;font-weight:700">Tap a drink to add it</div>';
-  const t = total();
-  $('#tot').textContent = money(t);
+  const t = total(), dsc = discount();
+  $('#tot').textContent = money(t) + (dsc ? ` (−${money(dsc)} free cup)` : '');
   document.querySelectorAll('.pay').forEach(b => { b.disabled = t === 0; });
   const g = parseFloat($('#given').value);
   $('#chg').textContent = g && t ? (g >= t ? `Change: ${money(g - t)}` : `Short: ${money(t - g)}`) : '';
@@ -142,17 +176,21 @@ $('#lines').addEventListener('click', e => {
   const id = +b.dataset.id, q = (cart.get(id) || 0) + +b.dataset.d;
   q > 0 ? cart.set(id, q) : cart.delete(id); redraw();
 });
-$('#clear').onclick = () => { cart.clear(); $('#given').value = ''; redraw(); };
+function resetSale() { cart.clear(); $('#given').value = ''; $('#cphone').value = ''; cust = null; drawCust(); redraw(); }
+$('#clear').onclick = resetSale;
 $('#given').oninput = drawTicket;
 
 async function sell(payment) {
   const items = [...cart].map(([product_id, qty]) => ({ product_id, qty }));
   document.querySelectorAll('.pay').forEach(b => { b.disabled = true; }); $('#err').textContent = '';
   try {
-    const r = await api('pos_sale', { items, payment });
-    cart.clear(); $('#given').value = ''; redraw();
+    const ph = $('#cphone').value;
+    if (ph && !/^[279]\d{7}$/.test(ph)) { $('#err').textContent = 'Customer mobile must be 8 digits (or leave it empty)'; drawTicket(); return; }
+    const shop = payment === 'cash' || payment === 'card';
+    const r = await api('pos_sale', { items, payment, phone: ph && shop ? '+968' + ph : '', use_free: shop && freeOn() });
+    resetSale();
     const t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status');
-    t.textContent = `Sale #${r.ref} saved · ${money(r.total)} OMR (${payment})`;
+    t.textContent = `Sale #${r.ref} saved · ${money(r.total)} OMR (${payment})` + (r.loyalty ? ` · Stamps ${r.loyalty.stamps}/${r.loyalty.need}${r.loyalty.free ? ' · FREE cup ready' : ''}` : '');
     document.body.append(t); setTimeout(() => t.remove(), 2500);
     loadToday();
   } catch (ex) {
@@ -172,7 +210,7 @@ async function loadToday() {
   $('#todayTbl').innerHTML = rows.length ? `<table>
     <thead><tr><th>Time</th><th>#</th><th>Items</th><th>Total</th><th>Paid</th><th>By</th><th></th></tr></thead>
     <tbody>${rows.map(r => `<tr class="${r.status === 'cancelled' ? 'x' : ''}"><td>${r.created_at.slice(11, 16)}</td><td>#${esc(r.ref)}</td>
-      <td>${r.items.map(i => `${i.qty}× ${esc(i.name_en)}`).join(', ')}</td><td>${money(r.total)}</td><td>${esc(r.payment || '')}</td><td>${esc(r.by_user || '')}</td>
+      <td>${r.items.map(i => `${i.qty}× ${esc(i.name_en)}`).join(', ')}${r.free_cups ? ' <b>(1 free)</b>' : ''}${r.phone ? ` · ${esc(r.phone.slice(-4))}` : ''}</td><td>${money(r.total)}</td><td>${esc(r.payment || '')}</td><td>${esc(r.by_user || '')}</td>
       <td>${r.status === 'cancelled' ? 'Voided' : `<button class="void" type="button" data-void="${r.id}">Void</button>`}</td></tr>`).join('')}</tbody></table>`
     : '<div class="card" style="padding:18px;font-weight:700;opacity:.7">No shop sales yet today</div>';
 }

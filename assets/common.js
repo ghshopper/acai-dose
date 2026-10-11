@@ -38,7 +38,7 @@ const MSG = {
 export const msg = e => MSG[e && e.message] || 'صار خطأ، جرب مرة ثانية';
 const MSG_EN = {
   bad_login: 'Wrong username or password', too_many: 'Too many attempts, wait a minute', network: 'No internet connection',
-  login_required: 'Please log in', forbidden: 'No permission', void_window: 'You can only void your own sale within 15 minutes',
+  login_required: 'Please log in', forbidden: 'No permission', void_window: 'You can only void your own sale within 15 minutes', invalid_phone: 'Customer mobile must be 8 digits', no_free_cup: 'This customer has no free cup',
 };
 export const msgEn = e => MSG_EN[e && e.message] || 'Something went wrong, try again';
 

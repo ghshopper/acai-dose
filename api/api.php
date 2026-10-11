@@ -182,19 +182,34 @@ case 'pos_sale':
         $pct = (float)(q('SELECT pct FROM channel_commissions WHERE channel = ?', [$pay])->fetch()['pct'] ?? 0);
         $commission = money($total * $pct / 100);
     }
-    $cphone = '';
-    if (!empty($in['phone'])) { $cphone = norm_phone($in['phone']); if ($cphone === '') fail('invalid_phone'); }
+    // Optional customer mobile (shop sales only): earns loyalty stamps and can use a free cup
+    $cphone = ''; $free = 0; $discount = 0.0;
+    if (!empty($in['phone']) && in_array($pay, ['cash', 'card'], true)) {
+        $cphone = norm_phone($in['phone']); if ($cphone === '') fail('invalid_phone');
+        if (!empty($in['use_free'])) {
+            $ls = loyalty_state($cphone);
+            if (!$ls['on'] || $ls['free'] < 1) fail('no_free_cup');
+            $free = 1; $discount = max(array_map(fn($l) => $l['price'], $lines)); $total = money($total - $discount);
+        }
+    }
     $no = insert_order([
         'source' => 'pos', 'customer_name' => in_array($pay, CHANNELS, true) ? ucfirst($pay) : 'Walk-in', 'phone' => $cphone,
         'items' => json_encode($lines, JSON_UNESCAPED_UNICODE), 'total' => $total, 'status' => 'done', 'payment' => $pay,
-        'commission' => $commission, 'created_by' => (int)$u['id'],
+        'commission' => $commission, 'created_by' => (int)$u['id'], 'free_cups' => $free, 'discount' => money($discount),
     ]);
-    if ($cphone !== '') save_customer($cphone, clean($in['name'] ?? '', 60));
-    out(['order_no' => $no, 'ref' => order_ref(date('Y-m-d'), $no), 'total' => $total]);
+    $loy = null;
+    if ($cphone !== '') { save_customer($cphone, clean((string)($in['name'] ?? ''), 60)); loyalty_changed($cphone); $loy = loyalty_state($cphone); }
+    out(['order_no' => $no, 'ref' => order_ref(date('Y-m-d'), $no), 'total' => $total, 'free_cups' => $free, 'loyalty' => $loy]);
+
+case 'pos_customer':  // staff: loyalty status for a mobile typed at the till
+    need('staff');
+    $ph = norm_phone($_GET['phone'] ?? ''); if ($ph === '') fail('invalid_phone');
+    $c = q('SELECT name FROM customers WHERE phone = ?', [$ph])->fetch();
+    out(['found' => (bool)$c, 'name' => $c['name'] ?? ''] + loyalty_state($ph));
 
 case 'pos_today':
     need('staff');
-    $rows = q("SELECT o.id, o.order_no, o.day, o.created_at, o.items, o.total, o.status, o.payment, o.commission, o.source, u.username AS by_user
+    $rows = q("SELECT o.id, o.order_no, o.day, o.created_at, o.items, o.total, o.status, o.payment, o.commission, o.source, o.phone, o.free_cups, o.discount, u.username AS by_user
                FROM orders o LEFT JOIN users u ON u.id = o.created_by
                WHERE o.day = ? AND o.source = 'pos' ORDER BY o.id DESC", [date('Y-m-d')])->fetchAll();
     out(array_map('order_row', $rows));
@@ -205,6 +220,8 @@ case 'pos_void':
     if (!$o) fail('not_found', 404);
     if ($u['role'] !== 'owner' && ((int)$o['created_by'] !== (int)$u['id'] || strtotime($o['created_at']) < time() - 15 * 60)) fail('void_window');
     q("UPDATE orders SET status = 'cancelled', updated_at = ? WHERE id = ?", [now(), (int)$o['id']]);
+    $ph = q('SELECT phone FROM orders WHERE id = ?', [(int)$o['id']])->fetch()['phone'] ?? '';
+    if ($ph !== '') loyalty_changed((string)$ph);
     out(['ok' => true]);
 
 // ---------------- owner: dashboard ----------------

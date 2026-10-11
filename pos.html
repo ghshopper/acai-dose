@@ -34,6 +34,10 @@ body{background:var(--c2);font-family:'Montserrat','Tajawal',system-ui,sans-seri
 .total b{font-size:32px}
 .paybtns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .paybtns .btn{min-height:64px;font-size:20px}
+.appbtns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.appbtns .btn{min-height:52px;font-size:15px;padding:8px 6px;background:#fff;color:var(--p);border:2px solid var(--p)}
+.appbtns .btn:not(:disabled):hover{background:var(--c2)}
+.sub{font-size:13px;font-weight:800;opacity:.7;margin-bottom:-4px}
 .change{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .change input{width:120px;min-height:46px;border:2px solid #e3d6bf;border-radius:12px;padding:6px 10px;font-size:18px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ok);color:#fff;font-weight:800;font-size:20px;padding:16px 28px;border-radius:999px;z-index:9;box-shadow:0 10px 30px rgba(0,0,0,.25)}
@@ -72,9 +76,16 @@ app.innerHTML = `
     <div class="lines" id="lines"></div>
     <div class="total"><span style="font-weight:800">Total</span><span><b id="tot">0.000</b> OMR</span></div>
     <div class="change"><label for="given" style="font-weight:800">Cash given</label><input id="given" type="number" step="0.001" min="0" inputmode="decimal"><span id="chg" style="font-weight:800"></span></div>
+    <div class="sub">In-shop payment</div>
     <div class="paybtns">
-      <button class="btn" id="cash" type="button" disabled>Cash</button>
-      <button class="btn orange" id="card" type="button" disabled>Card</button>
+      <button class="btn pay" data-pay="cash" type="button" disabled>Cash</button>
+      <button class="btn orange pay" data-pay="card" type="button" disabled>Card</button>
+    </div>
+    <div class="sub">Delivery app order</div>
+    <div class="appbtns">
+      <button class="btn pay" data-pay="talabat" type="button" disabled>Talabat</button>
+      <button class="btn pay" data-pay="snoonu" type="button" disabled>Snoonu</button>
+      <button class="btn pay" data-pay="khedmah" type="button" disabled>Khedmah</button>
     </div>
     <div class="err" id="err" role="alert"></div>
   </aside>
@@ -107,7 +118,7 @@ function drawTicket() {
   }).join('') : '<div style="opacity:.6;font-weight:700">Tap a drink to add it</div>';
   const t = total();
   $('#tot').textContent = money(t);
-  $('#cash').disabled = $('#card').disabled = t === 0;
+  document.querySelectorAll('.pay').forEach(b => { b.disabled = t === 0; });
   const g = parseFloat($('#given').value);
   $('#chg').textContent = g && t ? (g >= t ? `Change: ${money(g - t)}` : `Short: ${money(t - g)}`) : '';
 }
@@ -127,7 +138,7 @@ $('#given').oninput = drawTicket;
 
 async function sell(payment) {
   const items = [...cart].map(([product_id, qty]) => ({ product_id, qty }));
-  $('#cash').disabled = $('#card').disabled = true; $('#err').textContent = '';
+  document.querySelectorAll('.pay').forEach(b => { b.disabled = true; }); $('#err').textContent = '';
   try {
     const r = await api('pos_sale', { items, payment });
     cart.clear(); $('#given').value = ''; redraw();
@@ -140,15 +151,15 @@ async function sell(payment) {
     $('#err').textContent = msgEn(ex); drawTicket();
   }
 }
-$('#cash').onclick = () => sell('cash');
-$('#card').onclick = () => sell('card');
+document.querySelectorAll('.pay').forEach(b => { b.onclick = () => sell(b.dataset.pay); });
 
 async function loadToday() {
   let rows = [];
   try { rows = await api('pos_today'); } catch (ex) { if (ex.message === 'login_required') location.reload(); return; }
   const ok = rows.filter(r => r.status !== 'cancelled');
   const sum = k => ok.filter(r => !k || r.payment === k).reduce((s, r) => s + r.total, 0);
-  $('#sum').textContent = `${ok.length} sales · Total ${money(sum())} · Cash ${money(sum('cash'))} · Card ${money(sum('card'))}`;
+  const apps = ['talabat', 'snoonu', 'khedmah'].map(k => [k, sum(k)]).filter(x => x[1]).map(([k, v]) => ` · ${k[0].toUpperCase() + k.slice(1)} ${money(v)}`).join('');
+  $('#sum').textContent = `${ok.length} sales · Total ${money(sum())} · Cash ${money(sum('cash'))} · Card ${money(sum('card'))}${apps}`;
   $('#todayTbl').innerHTML = rows.length ? `<table>
     <thead><tr><th>Time</th><th>#</th><th>Items</th><th>Total</th><th>Paid</th><th>By</th><th></th></tr></thead>
     <tbody>${rows.map(r => `<tr class="${r.status === 'cancelled' ? 'x' : ''}"><td>${r.created_at.slice(11, 16)}</td><td>#${esc(r.ref)}</td>

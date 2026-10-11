@@ -68,7 +68,7 @@ app.innerHTML = `
 <div class="wrap">
   <div class="tabs" role="tablist">
     <button role="tab" aria-selected="true" data-t="sum">الملخص</button>
-    <button role="tab" aria-selected="false" data-t="apps">مبيعات التطبيقات</button>
+    <button role="tab" aria-selected="false" data-t="apps">إدخال يدوي للتطبيقات</button>
     <button role="tab" aria-selected="false" data-t="exp">المصاريف</button>
     <button role="tab" aria-selected="false" data-t="orders">كل الطلبات</button>
     <button role="tab" aria-selected="false" data-t="set">الإعدادات</button>
@@ -140,23 +140,31 @@ async function refresh() {
 // ---------- summary ----------
 function drawSum({ orders, apps, exps }) {
   const valid = orders.filter(o => o.status !== 'cancelled');
-  const webO = valid.filter(o => o.source !== 'pos'), posO = valid.filter(o => o.source === 'pos');
-  const site = webO.reduce((s, o) => s + +o.total, 0);
-  const pos = posO.reduce((s, o) => s + +o.total, 0);
-  const paid = k => valid.filter(o => o.payment === k).reduce((s, o) => s + +o.total, 0);
-  const appGross = apps.reduce((s, r) => s + +r.gross, 0);
-  const comm = apps.reduce((s, r) => s + +r.commission, 0);
-  const exp = exps.reduce((s, r) => s + +r.amount, 0);
-  const sales = site + pos + appGross, net = sales - comm - exp;
-  const appOrders = apps.reduce((s, r) => s + (r.orders_count || 0), 0);
-  const cups = webO.reduce((s, o) => s + o.items.reduce((a, i) => a + i.qty, 0), 0);
-  const posCups = posO.reduce((s, o) => s + o.items.reduce((a, i) => a + i.qty, 0), 0);
+  const isApp = o => o.source === 'pos' && CH[o.payment];
+  const webO = valid.filter(o => o.source !== 'pos');
+  const shopO = valid.filter(o => o.source === 'pos' && !CH[o.payment]);
+  const appO = valid.filter(isApp);
+  const sumT = list => list.reduce((s, o) => s + +o.total, 0);
+  const cupsOf = list => list.reduce((s, o) => s + o.items.reduce((a, i) => a + i.qty, 0), 0);
+  const site = sumT(webO), shop = sumT(shopO);
 
-  const byCh = Object.keys(CH).map(c => {
-    const rows = apps.filter(r => r.channel === c);
-    const g = rows.reduce((s, r) => s + +r.gross, 0), cm = rows.reduce((s, r) => s + +r.commission, 0);
-    return { c, g, cm, n: rows.reduce((s, r) => s + (r.orders_count || 0), 0) };
+  // Payment methods: cash/card from shop + collected web orders; apps from POS app sales + manual entries
+  const methods = [
+    { k: 'cash', name: 'نقد', list: valid.filter(o => o.payment === 'cash') },
+    { k: 'card', name: 'بطاقة', list: valid.filter(o => o.payment === 'card') },
+    ...Object.entries(CH).map(([k, name]) => ({ k, name, list: appO.filter(o => o.payment === k), manual: apps.filter(r => r.channel === k) })),
+  ].map(m => {
+    const gross = sumT(m.list) + (m.manual || []).reduce((s, r) => s + +r.gross, 0);
+    const comm = m.list.reduce((s, o) => s + (+o.commission || 0), 0) + (m.manual || []).reduce((s, r) => s + +r.commission, 0);
+    const n = m.list.length + (m.manual || []).reduce((s, r) => s + (r.orders_count || 0), 0);
+    return { ...m, gross, comm, net: gross - comm, n, isApp: !!CH[m.k] };
   });
+  const unpaidWeb = webO.filter(o => !o.payment);
+  const appGross = methods.filter(m => m.isApp).reduce((s, m) => s + m.gross, 0);
+  const comm = methods.reduce((s, m) => s + m.comm, 0);
+  const exp = exps.reduce((s, r) => s + +r.amount, 0);
+  const manualGross = apps.reduce((s, r) => s + +r.gross, 0);
+  const sales = sumT(valid) + manualGross, net = sales - comm - exp;
 
   const prod = {};
   valid.forEach(o => o.items.forEach(i => { prod[i.name_ar] = (prod[i.name_ar] || 0) + i.qty; }));
@@ -173,35 +181,30 @@ function drawSum({ orders, apps, exps }) {
   $('[data-panel="sum"]').innerHTML = `
     <div class="kpis">
       <div class="card kpi"><div class="l">إجمالي المبيعات</div><div class="v">${money(sales)}</div><div class="s">ر.ع</div></div>
-      <div class="card kpi"><div class="l">مبيعات الموقع</div><div class="v">${money(site)}</div><div class="s">${webO.length} طلب &middot; ${cups} كوب</div></div>
-      <div class="card kpi"><div class="l">مبيعات المحل (كاشير)</div><div class="v">${money(pos)}</div><div class="s">${posO.length} عملية &middot; ${posCups} كوب</div></div>
-      <div class="card kpi"><div class="l">مبيعات التطبيقات</div><div class="v">${money(appGross)}</div><div class="s">${appOrders ? appOrders + ' طلب' : '&nbsp;'}</div></div>
-      <div class="card kpi"><div class="l">العمولات</div><div class="v">${money(comm)}</div><div class="s">طلبات وسنونو وخدمة</div></div>
+      <div class="card kpi"><div class="l">مبيعات الموقع</div><div class="v">${money(site)}</div><div class="s">${webO.length} طلب &middot; ${cupsOf(webO)} كوب</div></div>
+      <div class="card kpi"><div class="l">مبيعات المحل</div><div class="v">${money(shop)}</div><div class="s">${shopO.length} عملية &middot; ${cupsOf(shopO)} كوب</div></div>
+      <div class="card kpi"><div class="l">مبيعات التطبيقات</div><div class="v">${money(appGross)}</div><div class="s">طلبات وسنونو وخدمة</div></div>
+      <div class="card kpi"><div class="l">العمولات</div><div class="v">${money(comm)}</div><div class="s">تخصمها التطبيقات</div></div>
       <div class="card kpi"><div class="l">المصاريف</div><div class="v">${money(exp)}</div><div class="s">${exps.length} مصروف</div></div>
       <div class="card kpi net ${net < 0 ? 'neg' : ''}"><div class="l">صافي الربح</div><div class="v">${money(net)}</div><div class="s">المبيعات − العمولات − المصاريف</div></div>
     </div>
 
-    <h3 class="lal">الدرج: نقد وبطاقة</h3>
-    <div class="kpis">
-      <div class="card kpi"><div class="l">نقد (كاش)</div><div class="v">${money(paid('cash'))}</div><div class="s">الكاشير + طلبات الموقع المستلمة</div></div>
-      <div class="card kpi"><div class="l">بطاقة</div><div class="v">${money(paid('card'))}</div><div class="s">الكاشير + طلبات الموقع المستلمة</div></div>
-    </div>
+    <h3 class="lal">طرق الدفع والحسابات</h3>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>طريقة الدفع</th><th>المبيعات</th><th>العمولة</th><th>الصافي / المفروض يوصلك</th><th>عدد الطلبات</th></tr></thead>
+      <tbody>${methods.map(m => `<tr><td>${m.name}${m.isApp ? ' <span class="pill">تحويل</span>' : ' <span class="pill">بالدرج</span>'}</td>
+        <td class="num">${money(m.gross)}</td><td class="num">${m.isApp ? money(m.comm) : '-'}</td>
+        <td class="num" style="font-weight:800">${money(m.net)}</td><td class="num">${m.n}</td></tr>`).join('')}
+        ${unpaidWeb.length ? `<tr><td>طلبات موقع ما انستلمت للحين</td><td class="num">${money(sumT(unpaidWeb))}</td><td class="num">-</td><td class="num">-</td><td class="num">${unpaidWeb.length}</td></tr>` : ''}
+      </tbody>
+      <tfoot><tr><td>المجموع</td><td class="num">${money(sales)}</td><td class="num">${money(comm)}</td><td class="num">${money(sales - comm)}</td><td class="num">${methods.reduce((s, m) => s + m.n, 0) + unpaidWeb.length}</td></tr></tfoot>
+    </table></div>
+    <p style="margin:8px 4px 0;font-weight:700;opacity:.75;line-height:1.6">"المفروض يوصلك" للتطبيقات = المبيعات ناقص العمولة. قارنه بالمبلغ اللي يحولونه لك. النقد والبطاقة = اللي المفروض في الدرج وجهاز البطاقة.</p>
 
     ${ds.length > 1 ? `<h3 class="lal">المبيعات اليومية</h3>
     <div class="card bars" role="img" aria-label="رسم المبيعات اليومية">${daily.map(x => `<div class="b" title="${x.day}: ${money(x.s)} ر.ع"><i style="height:${Math.round(x.s / max * 100)}%"></i><small>${x.day.slice(8)}</small></div>`).join('')}</div>` : ''}
 
-    <h3 class="lal">حسب القناة</h3>
-    <div class="tbl-wrap"><table>
-      <thead><tr><th>القناة</th><th>المبيعات</th><th>العمولة</th><th>الصافي</th><th>الطلبات</th></tr></thead>
-      <tbody>
-        <tr><td>الموقع (استلام)</td><td class="num">${money(site)}</td><td class="num">0.000</td><td class="num">${money(site)}</td><td class="num">${webO.length}</td></tr>
-        <tr><td>المحل (كاشير)</td><td class="num">${money(pos)}</td><td class="num">0.000</td><td class="num">${money(pos)}</td><td class="num">${posO.length}</td></tr>
-        ${byCh.map(x => `<tr><td>${CH[x.c]}</td><td class="num">${money(x.g)}</td><td class="num">${money(x.cm)}</td><td class="num">${money(x.g - x.cm)}</td><td class="num">${x.n || '-'}</td></tr>`).join('')}
-      </tbody>
-      <tfoot><tr><td>المجموع</td><td class="num">${money(sales)}</td><td class="num">${money(comm)}</td><td class="num">${money(sales - comm)}</td><td class="num">${valid.length + appOrders}</td></tr></tfoot>
-    </table></div>
-
-    <h3 class="lal">الأكثر طلباً (الموقع والكاشير)</h3>
+    <h3 class="lal">الأكثر طلباً</h3>
     ${prodRows.length ? `<div class="tbl-wrap"><table><thead><tr><th>الصنف</th><th>عدد الأكواب</th></tr></thead><tbody>${prodRows.map(([n, q]) => `<tr><td>${esc(n)}</td><td class="num">${q}</td></tr>`).join('')}</tbody></table></div>` : '<div class="card empty">ما فيه طلبات في هالفترة</div>'}
   `;
 }
@@ -209,6 +212,7 @@ function drawSum({ orders, apps, exps }) {
 // ---------- app sales ----------
 function drawApps({ apps }) {
   $('[data-panel="apps"]').innerHTML = `
+    <p style="margin:0 4px 12px;font-weight:700;line-height:1.6">الأفضل العامل يسجل طلبات التطبيقات من <b>الكاشير</b> (زر Talabat / Snoonu / Khedmah) عشان تنحسب لحالها. استخدم هذي الصفحة بس للمبيعات اللي ما انسجلت هناك، مثلاً من تقرير التطبيق آخر الشهر.</p>
     <form class="card formrow" id="af">
       <div class="field"><label for="ad">التاريخ</label><input type="date" id="ad" value="${ymd(new Date())}" required></div>
       <div class="field"><label for="ac">التطبيق</label><select id="ac">${Object.entries(CH).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
@@ -266,7 +270,7 @@ function drawExp({ exps }) {
 // ---------- website orders ----------
 const ST = { new: 'جديد', preparing: 'يتحضر', ready: 'جاهز', done: 'تم الاستلام', cancelled: 'ملغي' };
 function drawOrders({ orders }) {
-  const SRC = { web: 'الموقع', pos: 'الكاشير' }, PAY = { cash: 'نقد', card: 'بطاقة' };
+  const SRC = { web: 'الموقع', pos: 'الكاشير' }, PAY = { cash: 'نقد', card: 'بطاقة', talabat: 'طلبات', snoonu: 'سنونو', khedmah: 'خدمة' };
   $('[data-panel="orders"]').innerHTML = orders.length ? `<div class="tbl-wrap"><table>
     <thead><tr><th>الوقت</th><th>رقم</th><th>المصدر</th><th>الزبون</th><th>السيارة</th><th>الطلب</th><th>المبلغ</th><th>الدفع</th><th>الحالة</th></tr></thead>
     <tbody>${orders.map(o => `<tr><td class="num">${o.created_at.slice(5, 16).replace('-', '/')}</td><td class="num">#${esc(o.ref)}</td>

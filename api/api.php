@@ -14,6 +14,7 @@ $post = fn() => $method === 'POST' || fail('method', 405);
 
 const CHANNELS = ['talabat', 'snoonu', 'khedmah'];
 const STATUSES = ['new', 'preparing', 'ready', 'done', 'cancelled'];
+const PAYMENTS = ['cash', 'card', 'talabat', 'snoonu', 'khedmah'];
 
 function valid_date($d): string {
     if (!is_string($d) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) || !strtotime($d)) fail('bad_date');
@@ -25,6 +26,7 @@ function order_row(array $o): array {
     $o['id'] = (int)$o['id']; $o['order_no'] = (int)$o['order_no'];
     $o['ref'] = order_ref($o['day'] ?? date('Y-m-d'), $o['order_no']);
     $o['total'] = (float)$o['total']; $o['items'] = json_decode($o['items'], true) ?: [];
+    if (array_key_exists('commission', $o)) $o['commission'] = (float)($o['commission'] ?? 0);
     unset($o['token']);
     return $o;
 }
@@ -142,17 +144,24 @@ case 'order_status':
 case 'pos_sale':
     $post(); $u = need('staff');
     $pay = $in['payment'] ?? '';
-    if (!in_array($pay, ['cash', 'card'], true)) fail('bad_payment');
+    if (!in_array($pay, PAYMENTS, true)) fail('bad_payment');
     [$lines, $total] = price_items($in['items'] ?? null);
+    // App orders: snapshot today's commission so later rate changes don't rewrite history
+    $commission = 0.0;
+    if (in_array($pay, CHANNELS, true)) {
+        $pct = (float)(q('SELECT pct FROM channel_commissions WHERE channel = ?', [$pay])->fetch()['pct'] ?? 0);
+        $commission = money($total * $pct / 100);
+    }
     $no = insert_order([
-        'source' => 'pos', 'customer_name' => 'Walk-in', 'phone' => '', 'items' => json_encode($lines, JSON_UNESCAPED_UNICODE),
-        'total' => $total, 'status' => 'done', 'payment' => $pay, 'created_by' => (int)$u['id'],
+        'source' => 'pos', 'customer_name' => in_array($pay, CHANNELS, true) ? ucfirst($pay) : 'Walk-in', 'phone' => '',
+        'items' => json_encode($lines, JSON_UNESCAPED_UNICODE), 'total' => $total, 'status' => 'done', 'payment' => $pay,
+        'commission' => $commission, 'created_by' => (int)$u['id'],
     ]);
     out(['order_no' => $no, 'ref' => order_ref(date('Y-m-d'), $no), 'total' => $total]);
 
 case 'pos_today':
     need('staff');
-    $rows = q("SELECT o.id, o.order_no, o.day, o.created_at, o.items, o.total, o.status, o.payment, o.source, u.username AS by_user
+    $rows = q("SELECT o.id, o.order_no, o.day, o.created_at, o.items, o.total, o.status, o.payment, o.commission, o.source, u.username AS by_user
                FROM orders o LEFT JOIN users u ON u.id = o.created_by
                WHERE o.day = ? AND o.source = 'pos' ORDER BY o.id DESC", [date('Y-m-d')])->fetchAll();
     out(array_map('order_row', $rows));
@@ -169,7 +178,7 @@ case 'pos_void':
 case 'range':
     need('owner');
     $from = valid_date($_GET['from'] ?? ''); $to = valid_date($_GET['to'] ?? '');
-    $orders = q('SELECT id, order_no, day, created_at, customer_name, phone, car_plate, items, total, status, source, payment FROM orders WHERE day BETWEEN ? AND ? ORDER BY id DESC', [$from, $to])->fetchAll();
+    $orders = q('SELECT id, order_no, day, created_at, customer_name, phone, car_plate, items, total, status, source, payment, commission FROM orders WHERE day BETWEEN ? AND ? ORDER BY id DESC', [$from, $to])->fetchAll();
     $apps = q('SELECT * FROM channel_sales WHERE sale_date BETWEEN ? AND ? ORDER BY sale_date DESC, id DESC', [$from, $to])->fetchAll();
     $exps = q('SELECT * FROM expenses WHERE expense_date BETWEEN ? AND ? ORDER BY expense_date DESC, id DESC', [$from, $to])->fetchAll();
     foreach ($apps as &$r) { foreach (['gross', 'commission', 'commission_pct'] as $k) $r[$k] = (float)$r[$k]; $r['id'] = (int)$r['id']; $r['orders_count'] = $r['orders_count'] === null ? null : (int)$r['orders_count']; }

@@ -144,7 +144,7 @@ class _OrderCardState extends State<OrderCard> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
       return;
     }
-    if (wasNew && status == 'preparing' && (await PrintSettings.load()).autoAccept) {
+    if (wasNew && status == 'preparing') {
       final perr = await ReceiptPrinter.print(ReceiptData.fromOrder(snapshot));
       if (perr != null && mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(perr)));
     }

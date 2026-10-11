@@ -25,6 +25,7 @@ class _PosPageState extends State<PosPage> {
   final _phone = TextEditingController();
   Map<String, dynamic>? _cust;
   bool _useFree = false;
+  bool _printIt = false;
   bool _busy = false;
   String _err = '';
   String _menuErr = '';
@@ -35,6 +36,9 @@ class _PosPageState extends State<PosPage> {
     super.initState();
     _loadMenu();
     _loadToday();
+    PrintSettings.load().then((c) {
+      if (mounted) setState(() => _printIt = c.autoPos);
+    });
   }
 
   @override
@@ -100,6 +104,9 @@ class _PosPageState extends State<PosPage> {
       _useFree = false;
       _err = '';
     });
+    PrintSettings.load().then((c) {
+      if (mounted) setState(() => _printIt = c.autoPos);
+    });
   }
 
   void _phoneChanged(String v) {
@@ -151,12 +158,13 @@ class _PosPageState extends State<PosPage> {
         payment: payment,
         stamps: loy != null ? '${loy['stamps']}/${loy['need']}' : '',
       );
+      final printIt = _printIt;
       _reset();
-      PrintSettings.load().then((cfg) async {
-        if (!cfg.autoPos) return;
-        final perr = await ReceiptPrinter.print(receipt);
-        if (perr != null && mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(perr)));
-      });
+      if (printIt) {
+        ReceiptPrinter.print(receipt).then((perr) {
+          if (perr != null && mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(perr)));
+        });
+      }
       if (!mounted) return;
       var msg = 'Sale #${r['ref']} saved · ${money(r['total'])} OMR ($payment)';
       if (loy != null) msg += ' · Stamps ${loy['stamps']}/${loy['need']}${((loy['free'] as num?) ?? 0) > 0 ? ' · FREE cup ready' : ''}';
@@ -341,7 +349,15 @@ class _PosPageState extends State<PosPage> {
                     style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: given >= t ? kOk : kBad)),
               ),
           ]),
-          const SizedBox(height: 12),
+          CheckboxListTile(
+            value: _printIt,
+            onChanged: (v) => setState(() => _printIt = v ?? false),
+            title: const Text('Print receipt', style: TextStyle(fontWeight: FontWeight.w800)),
+            secondary: const Icon(Icons.print, color: kPurple),
+            controlAffinity: ListTileControlAffinity.leading,
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+          ),
           const Text('In-shop payment', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.black54)),
           const SizedBox(height: 6),
           Row(children: [

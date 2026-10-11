@@ -51,17 +51,15 @@ class _PrinterDialogState extends State<PrinterDialog> {
                   onSelectionChanged: (v) => _set((c) => c.paper = v.first),
                 ),
                 const SizedBox(height: 8),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: c.autoAccept,
-                  onChanged: (v) => _set((c) => c.autoAccept = v),
-                  title: const Text('Print website orders on Accept', style: TextStyle(fontWeight: FontWeight.w700)),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                  child: Text('Website orders print when you press Accept.', style: TextStyle(fontWeight: FontWeight.w700)),
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   value: c.autoPos,
                   onChanged: (v) => _set((c) => c.autoPos = v),
-                  title: const Text('Print after every shop sale', style: TextStyle(fontWeight: FontWeight.w700)),
+                  title: const Text('Shop sales: tick "Print receipt" by default', style: TextStyle(fontWeight: FontWeight.w700)),
                 ),
                 if (_msg.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Text(_msg, style: const TextStyle(fontWeight: FontWeight.w700))),
               ]),

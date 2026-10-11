@@ -5,10 +5,9 @@ import 'receipt.dart';
 
 /// Printer settings kept on the device.
 class PrintSettings {
-  PrintSettings({required this.paper, required this.autoAccept, required this.autoPos});
+  PrintSettings({required this.paper, required this.autoPos});
   int paper; // 58 or 80 (mm)
-  bool autoAccept; // print a website order when staff press Accept
-  bool autoPos; // print after every shop sale
+  bool autoPos; // shop sales: the "Print receipt" box starts ticked (website orders always print on Accept)
 
   int get dots => paper == 80 ? 576 : 384;
 
@@ -16,16 +15,14 @@ class PrintSettings {
     final p = await SharedPreferences.getInstance();
     return PrintSettings(
       paper: p.getInt('print_paper') ?? 58,
-      autoAccept: p.getBool('print_auto_accept') ?? true,
-      autoPos: p.getBool('print_auto_pos') ?? true,
+      autoPos: p.getBool('print_pos_default') ?? false,
     );
   }
 
   Future<void> save() async {
     final p = await SharedPreferences.getInstance();
     await p.setInt('print_paper', paper);
-    await p.setBool('print_auto_accept', autoAccept);
-    await p.setBool('print_auto_pos', autoPos);
+    await p.setBool('print_pos_default', autoPos);
   }
 }
 

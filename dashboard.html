@@ -446,8 +446,16 @@ async function drawData() {
 
     <h3 class="lal" style="color:var(--bad)">تصفير المبيعات</h3>
     <form class="card" id="rf" style="display:grid;gap:12px;padding:18px;border:2px solid var(--bad)">
-      <p style="margin:0;line-height:1.7;font-weight:700">يمسح كل الطلبات ومبيعات الكاشير والتطبيقات ويرجع ترقيم الطلبات من ١. المنيو والأسعار وحسابات العمال والعمولات تظل مثل ما هي. <span style="color:var(--bad)">ما ينفع التراجع.</span></p>
-      <label style="display:flex;gap:10px;align-items:center;font-weight:700"><input type="checkbox" id="rx" style="width:22px;height:22px"> امسح المصاريف بعد</label>
+      <p style="margin:0;line-height:1.7;font-weight:700">يمسح الطلبات ومبيعات الكاشير والتطبيقات في التواريخ اللي تختارها، ويرجع ترقيم طلبات هالأيام من ١. المنيو والأسعار وحسابات العمال والعمولات تظل مثل ما هي. <span style="color:var(--bad)">ما ينفع التراجع.</span></p>
+      <div style="display:flex;gap:18px;flex-wrap:wrap;font-weight:700">
+        <label style="display:flex;gap:8px;align-items:center"><input type="radio" name="rm" value="range" checked style="width:22px;height:22px"> تواريخ معينة</label>
+        <label style="display:flex;gap:8px;align-items:center"><input type="radio" name="rm" value="all" style="width:22px;height:22px"> كل المبيعات</label>
+      </div>
+      <div class="formrow" id="rdates" style="display:flex;gap:10px;flex-wrap:wrap">
+        <div class="field"><label for="rfrom">من تاريخ</label><input id="rfrom" type="date"></div>
+        <div class="field"><label for="rto">إلى تاريخ</label><input id="rto" type="date"></div>
+      </div>
+      <label style="display:flex;gap:10px;align-items:center;font-weight:700"><input type="checkbox" id="rx" style="width:22px;height:22px"> امسح المصاريف بعد (في نفس التواريخ)</label>
       <div class="formrow" style="display:flex;gap:10px;flex-wrap:wrap">
         <div class="field"><label for="rp">كلمة السر حقك</label><input id="rp" type="password" autocomplete="current-password" required></div>
         <div class="field"><label for="rc">اكتب RESET للتأكيد</label><input id="rc" dir="ltr" autocomplete="off" autocapitalize="characters" required></div>
@@ -489,14 +497,21 @@ async function drawData() {
     e.target.value = '';
   };
 
+  const today = ymd(new Date()); $('#rfrom').value = $('#rto').value = today; $('#rfrom').max = $('#rto').max = today;
+  $$('input[name="rm"]').forEach(r => r.onchange = () => { $('#rdates').style.display = $('input[name="rm"]:checked').value === 'all' ? 'none' : 'flex'; });
   $('#rf').onsubmit = async e => {
     e.preventDefault();
     const err = $('#rerr'); err.style.color = ''; err.textContent = '';
+    const all = $('input[name="rm"]:checked').value === 'all';
+    let f = $('#rfrom').value, t = $('#rto').value || f;
+    if (!all && !f) { err.textContent = 'اختر التاريخ'; return; }
+    if (f > t) [f, t] = [t, f];
     if ($('#rc').value.trim() !== 'RESET') { err.textContent = 'اكتب RESET بالإنجليزي حروف كبيرة'; return; }
-    if (!confirm('متأكد؟ بتنمسح كل المبيعات وما تقدر ترجعها.')) return;
+    const what = all ? 'كل المبيعات' : (f === t ? `مبيعات يوم ${f}` : `المبيعات من ${f} إلى ${t}`);
+    if (!confirm(`متأكد؟ بتنمسح ${what} وما تقدر ترجعها.`)) return;
     try {
-      await api('reset_sales', { password: $('#rp').value, confirm: 'RESET', expenses: $('#rx').checked });
-      err.style.color = 'var(--ok)'; err.textContent = 'تم التصفير ✓ البداية من جديد.'; e.target.reset();
+      await api('reset_sales', { password: $('#rp').value, confirm: 'RESET', expenses: $('#rx').checked, all, from: f, to: t });
+      err.style.color = 'var(--ok)'; err.textContent = `تم ✓ انمسحت ${what}.`; e.target.reset(); $('#rdates').style.display = 'flex'; $('#rfrom').value = f || today; $('#rto').value = t || today;
     } catch (ex) { err.textContent = ex.message === 'bad_password' ? 'كلمة السر غلط' : msg(ex); }
   };
 }

@@ -218,8 +218,17 @@ case 'reset_sales':   // owner wipes sales to start fresh (menu, prices, staff a
     if (($in['confirm'] ?? '') !== 'RESET') fail('bad_confirm');
     $pdo = db(); $pdo->beginTransaction();
     try {
-        foreach (['orders', 'day_counters', 'channel_sales'] as $t) q("DELETE FROM $t");
-        if (!empty($in['expenses'])) q('DELETE FROM expenses');
+        if (!empty($in['all'])) {
+            foreach (['orders', 'day_counters', 'channel_sales'] as $t) q("DELETE FROM $t");
+            if (!empty($in['expenses'])) q('DELETE FROM expenses');
+        } else {
+            $f = valid_date($in['from'] ?? ''); $t2 = valid_date($in['to'] ?? '');
+            if ($f > $t2) [$f, $t2] = [$t2, $f];
+            q('DELETE FROM orders WHERE day BETWEEN ? AND ?', [$f, $t2]);
+            q('DELETE FROM day_counters WHERE day BETWEEN ? AND ?', [$f, $t2]);
+            q('DELETE FROM channel_sales WHERE sale_date BETWEEN ? AND ?', [$f, $t2]);
+            if (!empty($in['expenses'])) q('DELETE FROM expenses WHERE expense_date BETWEEN ? AND ?', [$f, $t2]);
+        }
         $pdo->commit();
     } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
     out(['ok' => true]);

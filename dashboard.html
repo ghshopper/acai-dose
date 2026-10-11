@@ -79,6 +79,7 @@ app.innerHTML = `
     <button role="tab" aria-selected="false" data-t="apps">إدخال يدوي للتطبيقات</button>
     <button role="tab" aria-selected="false" data-t="exp">المصاريف</button>
     <button role="tab" aria-selected="false" data-t="orders">كل الطلبات</button>
+    <button role="tab" aria-selected="false" data-t="data">استيراد وتصفير</button>
     <button role="tab" aria-selected="false" data-t="set">الإعدادات</button>
   </div>
 
@@ -96,6 +97,7 @@ app.innerHTML = `
   <section data-panel="apps" class="hidden"></section>
   <section data-panel="exp" class="hidden"></section>
   <section data-panel="orders" class="hidden"></section>
+  <section data-panel="data" class="hidden"></section>
   <section data-panel="set" class="hidden"></section>
 </div>`;
 
@@ -128,7 +130,7 @@ $('.tabs').addEventListener('click', e => {
   tab = b.dataset.t;
   $$('.tabs button').forEach(x => x.setAttribute('aria-selected', x === b));
   $$('section[data-panel]').forEach(s => s.classList.toggle('hidden', s.dataset.panel !== tab));
-  $('#period').classList.toggle('hidden', tab === 'set');
+  $('#period').classList.toggle('hidden', tab === 'set' || tab === 'data');
   refresh();
 });
 
@@ -141,6 +143,7 @@ async function fetchAll() {
 
 async function refresh() {
   if (tab === 'set') return drawSettings();
+  if (tab === 'data') return drawData();
   const d = await fetchAll();
   ({ sum: drawSum, apps: drawApps, exp: drawExp, orders: drawOrders })[tab](d);
 }
@@ -153,6 +156,7 @@ function drawSum({ orders, apps, exps }) {
   const shopO = valid.filter(o => o.source === 'pos' && !CH[o.payment]);
   const appO = valid.filter(isApp);
   const sumT = list => list.reduce((s, o) => s + +o.total, 0);
+  const cnt = list => list.reduce((s, o) => s + (o.n_orders || 1), 0);
   const cupsOf = list => list.reduce((s, o) => s + o.items.reduce((a, i) => a + i.qty, 0), 0);
   const site = sumT(webO), shop = sumT(shopO);
 
@@ -164,7 +168,7 @@ function drawSum({ orders, apps, exps }) {
   ].map(m => {
     const gross = sumT(m.list) + (m.manual || []).reduce((s, r) => s + +r.gross, 0);
     const comm = m.list.reduce((s, o) => s + (+o.commission || 0), 0) + (m.manual || []).reduce((s, r) => s + +r.commission, 0);
-    const n = m.list.length + (m.manual || []).reduce((s, r) => s + (r.orders_count || 0), 0);
+    const n = cnt(m.list) + (m.manual || []).reduce((s, r) => s + (r.orders_count || 0), 0);
     return { ...m, gross, comm, net: gross - comm, n, isApp: !!CH[m.k] };
   });
   const unpaidWeb = webO.filter(o => !o.payment);
@@ -189,8 +193,8 @@ function drawSum({ orders, apps, exps }) {
   $('[data-panel="sum"]').innerHTML = `
     <div class="kpis">
       <div class="card kpi"><div class="l">إجمالي المبيعات</div><div class="v">${money(sales)}</div><div class="s">ر.ع</div></div>
-      <div class="card kpi"><div class="l">مبيعات الموقع</div><div class="v">${money(site)}</div><div class="s">${webO.length} طلب &middot; ${cupsOf(webO)} كوب</div></div>
-      <div class="card kpi"><div class="l">مبيعات المحل</div><div class="v">${money(shop)}</div><div class="s">${shopO.length} عملية &middot; ${cupsOf(shopO)} كوب</div></div>
+      <div class="card kpi"><div class="l">مبيعات الموقع</div><div class="v">${money(site)}</div><div class="s">${cnt(webO)} طلب &middot; ${cupsOf(webO)} كوب</div></div>
+      <div class="card kpi"><div class="l">مبيعات المحل</div><div class="v">${money(shop)}</div><div class="s">${cnt(shopO)} عملية &middot; ${cupsOf(shopO)} كوب</div></div>
       <div class="card kpi"><div class="l">مبيعات التطبيقات</div><div class="v">${money(appGross)}</div><div class="s">طلبات وسنونو وخدمة</div></div>
       <div class="card kpi"><div class="l">العمولات</div><div class="v">${money(comm)}</div><div class="s">تخصمها التطبيقات</div></div>
       <div class="card kpi"><div class="l">المصاريف</div><div class="v">${money(exp)}</div><div class="s">${exps.length} مصروف</div></div>
@@ -367,6 +371,135 @@ document.addEventListener('click', async e => {
     drawSettings();
   }
 });
+
+// ---------- import old sales + reset ----------
+const PAY_WORDS = { cash: ['نقد', 'نقدي', 'كاش', 'cash'], card: ['بطاقة', 'بطاقه', 'كارد', 'فيزا', 'شبكة', 'card', 'visa'],
+  talabat: ['طلبات', 'talabat'], snoonu: ['سنونو', 'snoonu'], khedmah: ['خدمة', 'خدمه', 'khedmah'] };
+const PAY_AR = { cash: 'نقد', card: 'بطاقة', talabat: 'طلبات', snoonu: 'سنونو', khedmah: 'خدمة' };
+const IMPORT_ERR = { bad_date: 'التاريخ غلط أو في المستقبل', bad_payment: 'طريقة الدفع غلط', bad_amount: 'المبلغ غلط', bad_orders: 'عدد الطلبات غلط',
+  bad_product: 'الصنف مب موجود', bad_qty: 'عدد الأكواب غلط', bad_pct: 'نسبة العمولة غلط' };
+let parsed = null;
+
+function loadXlsx() {
+  if (window.XLSX) return Promise.resolve();
+  return new Promise((ok, bad) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    sc.onload = ok; sc.onerror = () => bad(new Error('xlsx_load')); document.head.appendChild(sc);
+  });
+}
+const norm = v => String(v == null ? '' : v).trim().toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/\s+/g, ' ');
+const pad = n => String(n).padStart(2, '0');
+function toDate(v) {
+  if (typeof v === 'number' && v > 20000 && v < 80000) { const d = new Date(Math.round((v - 25569) * 86400000)); return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`; }
+  const t = String(v == null ? '' : v).trim().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+  let m = t.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/); if (m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
+  m = t.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/); if (m) return `${m[3]}-${pad(m[2])}-${pad(m[1])}`;   // day/month/year
+  return '';
+}
+const toNum = v => { if (typeof v === 'number') return v; const t = String(v == null ? '' : v).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^\d.\-]/g, ''); return t === '' ? NaN : +t; };
+
+async function parseFile(file, products) {
+  await loadXlsx();
+  const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+  const ws = wb.Sheets['المبيعات'] || wb.Sheets[wb.SheetNames[0]];
+  const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
+  const hi = grid.findIndex(r => r.some(c => norm(c).includes('التاريخ')));
+  if (hi < 0) throw new Error('no_header');
+  const H = grid[hi].map(norm);
+  const col = (...keys) => H.findIndex(h => keys.some(k => h.includes(norm(k))));
+  const ix = { date: col('التاريخ'), pay: col('طريقة الدفع'), amt: col('المبلغ'), n: col('عدد الطلبات'), prod: col('الصنف'), qty: col('الاكواب', 'عدد الأكواب'), pct: col('العمولة'), note: col('ملاحظة', 'ملاحظه') };
+  const rows = [], errs = [];
+  grid.slice(hi + 1).forEach((r, k) => {
+    const line = hi + k + 2, get = i => (i < 0 ? '' : r[i]);
+    if ([ix.date, ix.pay, ix.amt].every(i => String(get(i)).trim() === '')) return;   // empty row
+    const e = [];
+    const date = toDate(get(ix.date)); if (!date) e.push('التاريخ');
+    const pw = norm(get(ix.pay)); const payment = Object.keys(PAY_WORDS).find(k2 => PAY_WORDS[k2].some(w => norm(w) === pw)); if (!payment) e.push('طريقة الدفع');
+    const amount = toNum(get(ix.amt)); if (!(amount > 0)) e.push('المبلغ');
+    const nRaw = get(ix.n); const orders = String(nRaw).trim() === '' ? 1 : Math.round(toNum(nRaw)); if (!(orders >= 1)) e.push('عدد الطلبات');
+    let product_id = null, qty = null; const pn = norm(get(ix.prod));
+    if (pn) {
+      const pr = products.find(x => norm(x.name_ar) === pn) || products.find(x => norm(x.name_ar).includes(pn) || pn.includes(norm(x.name_ar)));
+      if (!pr) e.push('الصنف'); else { product_id = pr.id; qty = String(get(ix.qty)).trim() === '' ? orders : Math.round(toNum(get(ix.qty))); if (!(qty >= 1)) e.push('عدد الأكواب'); }
+    }
+    const pctRaw = get(ix.pct); const commission_pct = String(pctRaw).trim() === '' ? null : toNum(pctRaw);
+    if (commission_pct !== null && !(commission_pct >= 0 && commission_pct <= 100)) e.push('العمولة');
+    if (e.length) errs.push(`سطر ${line}: ${e.join('، ')}`);
+    else rows.push({ date, payment, amount: Math.round(amount * 1000) / 1000, orders, product_id, qty, commission_pct, note: String(get(ix.note)).trim().slice(0, 300) });
+  });
+  return { rows, errs };
+}
+
+async function drawData() {
+  const box = $('[data-panel="data"]');
+  box.innerHTML = `
+    <h3 class="lal">استيراد المبيعات القديمة من إكسل</h3>
+    <div class="card" style="display:grid;gap:12px;padding:18px">
+      <p style="margin:0;line-height:1.7;font-weight:700">١. نزّل الملف وعبّه (كل سطر = يوم + طريقة دفع + مبلغ). &nbsp; ٢. ارفعه هنا وراجع المعاينة. &nbsp; ٣. اضغط «أدخل المبيعات».</p>
+      <div class="formrow" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <a class="btn ghost" href="assets/acai-sales-template.xlsx" download="acaidose-sales-template.xlsx">نزّل ملف الإكسل</a>
+        <label class="btn" style="cursor:pointer">ارفع الملف المعبّى<input type="file" id="xf" accept=".xlsx,.xls,.csv" hidden></label>
+      </div>
+      <div id="prev"></div>
+    </div>
+
+    <h3 class="lal" style="color:var(--bad)">تصفير المبيعات</h3>
+    <form class="card" id="rf" style="display:grid;gap:12px;padding:18px;border:2px solid var(--bad)">
+      <p style="margin:0;line-height:1.7;font-weight:700">يمسح كل الطلبات ومبيعات الكاشير والتطبيقات ويرجع ترقيم الطلبات من ١. المنيو والأسعار وحسابات العمال والعمولات تظل مثل ما هي. <span style="color:var(--bad)">ما ينفع التراجع.</span></p>
+      <label style="display:flex;gap:10px;align-items:center;font-weight:700"><input type="checkbox" id="rx" style="width:22px;height:22px"> امسح المصاريف بعد</label>
+      <div class="formrow" style="display:flex;gap:10px;flex-wrap:wrap">
+        <div class="field"><label for="rp">كلمة السر حقك</label><input id="rp" type="password" autocomplete="current-password" required></div>
+        <div class="field"><label for="rc">اكتب RESET للتأكيد</label><input id="rc" dir="ltr" autocomplete="off" autocapitalize="characters" required></div>
+      </div>
+      <button class="btn" type="submit" style="background:var(--bad);border-color:var(--bad);color:#fff">صفّر المبيعات</button>
+      <div class="err" id="rerr" role="alert"></div>
+    </form>`;
+
+  $('#xf').onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    const prev = $('#prev'); prev.innerHTML = '<p>جاري قراءة الملف…</p>'; parsed = null;
+    let products = [];
+    try { products = (await api('settings')).products; } catch { /* matching by name will fail */ }
+    try { parsed = await parseFile(f, products); }
+    catch (ex) { prev.innerHTML = `<div class="err">${ex.message === 'no_header' ? 'ما لقيت عمود «التاريخ». استخدم ملف الإكسل حقنا.' : ex.message === 'xlsx_load' ? 'ما قدرت أفتح الإكسل، تأكد من الإنترنت.' : 'الملف ما انقرأ، تأكد إنه ملف إكسل.'}</div>`; return; }
+    const { rows, errs } = parsed;
+    const by = {}; rows.forEach(r => { by[r.payment] = (by[r.payment] || 0) + r.amount; });
+    const ds = rows.map(r => r.date).sort();
+    prev.innerHTML = `
+      ${rows.length ? `<p style="font-weight:800;margin:0 0 8px">${rows.length} سطر جاهز${ds.length ? ` · من ${ds[0]} إلى ${ds[ds.length - 1]}` : ''} · المجموع ${money(rows.reduce((s, r) => s + r.amount, 0))} ر.ع</p>
+      <div class="tbl-wrap"><table><thead><tr><th>طريقة الدفع</th><th>المبلغ</th></tr></thead>
+        <tbody>${Object.entries(by).map(([k, v]) => `<tr><td>${PAY_AR[k]}</td><td class="num">${money(v)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="err">ما لقيت ولا سطر صالح.</p>'}
+      ${errs.length ? `<div class="err" style="margin-top:10px">فيه ${errs.length} سطر فيه غلط، صلحه بالملف وارفعه مرة ثانية:<br>${errs.slice(0, 15).map(esc).join('<br>')}${errs.length > 15 ? '<br>…' : ''}</div>` : ''}
+      ${rows.length && !errs.length ? '<button class="btn" id="imp" type="button" style="margin-top:12px">أدخل المبيعات</button>' : ''}
+      <div class="err" id="ierr" role="status"></div>`;
+    const ib = $('#imp');
+    if (ib) ib.onclick = async () => {
+      if (!confirm(`بندخل ${rows.length} سطر. متأكد؟`)) return;
+      ib.disabled = true;
+      try {
+        const r = await api('import_sales', { rows });
+        prev.innerHTML = `<p class="ok" style="font-weight:800">انضافت ${r.count} سطر ✓ — تشوفها في «الملخص» لما تختار الفترة.</p>`;
+      } catch (ex) {
+        const [ln, code] = String(ex.message).split(':');
+        $('#ierr').textContent = code ? `${ln.replace('row_', 'سطر رقم ')}: ${IMPORT_ERR[code] || code}` : msg(ex);
+        ib.disabled = false;
+      }
+    };
+    e.target.value = '';
+  };
+
+  $('#rf').onsubmit = async e => {
+    e.preventDefault();
+    const err = $('#rerr'); err.style.color = ''; err.textContent = '';
+    if ($('#rc').value.trim() !== 'RESET') { err.textContent = 'اكتب RESET بالإنجليزي حروف كبيرة'; return; }
+    if (!confirm('متأكد؟ بتنمسح كل المبيعات وما تقدر ترجعها.')) return;
+    try {
+      await api('reset_sales', { password: $('#rp').value, confirm: 'RESET', expenses: $('#rx').checked });
+      err.style.color = 'var(--ok)'; err.textContent = 'تم التصفير ✓ البداية من جديد.'; e.target.reset();
+    } catch (ex) { err.textContent = ex.message === 'bad_password' ? 'كلمة السر غلط' : msg(ex); }
+  };
+}
 
 // ---------- boot ----------
 try { Object.assign(commissions, (await api('settings')).commissions); } catch { /* defaults */ }

@@ -27,6 +27,7 @@ function order_row(array $o): array {
     $o['ref'] = order_ref($o['day'] ?? date('Y-m-d'), $o['order_no']);
     $o['total'] = (float)$o['total']; $o['items'] = json_decode($o['items'], true) ?: [];
     if (array_key_exists('commission', $o)) $o['commission'] = (float)($o['commission'] ?? 0);
+    if (array_key_exists('n_orders', $o)) $o['n_orders'] = $o['n_orders'] === null ? null : (int)$o['n_orders'];
     unset($o['token']);
     return $o;
 }
@@ -45,9 +46,9 @@ function price_items($items): array {
     return [$lines, money($total)];
 }
 /** Inserts an order with the next daily number; returns that number. */
-function insert_order(array $f): int {
-    $day = date('Y-m-d');
-    $pdo = db(); $pdo->beginTransaction();
+function insert_order(array $f, ?string $day = null): int {
+    $day = $day ?: date('Y-m-d');
+    $pdo = db(); $own = !$pdo->inTransaction(); if ($own) $pdo->beginTransaction();
     try {
         $row = q('SELECT last_no FROM day_counters WHERE day = ?' . (is_mysql() ? ' FOR UPDATE' : ''), [$day])->fetch();
         if ($row) { $no = (int)$row['last_no'] + 1; q('UPDATE day_counters SET last_no = ? WHERE day = ?', [$no, $day]); }
@@ -55,8 +56,8 @@ function insert_order(array $f): int {
         $f += ['order_no' => $no, 'day' => $day, 'created_at' => now(), 'updated_at' => now()];
         $cols = array_keys($f);
         q('INSERT INTO orders (' . implode(',', $cols) . ') VALUES (' . implode(',', array_fill(0, count($cols), '?')) . ')', array_values($f));
-        $pdo->commit();
-    } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
+        if ($own) $pdo->commit();
+    } catch (Throwable $e) { if ($own) $pdo->rollBack(); throw $e; }
     return $no;
 }
 
@@ -178,7 +179,7 @@ case 'pos_void':
 case 'range':
     need('owner');
     $from = valid_date($_GET['from'] ?? ''); $to = valid_date($_GET['to'] ?? '');
-    $orders = q('SELECT id, order_no, day, created_at, customer_name, phone, car_plate, items, total, status, source, payment, commission FROM orders WHERE day BETWEEN ? AND ? ORDER BY id DESC', [$from, $to])->fetchAll();
+    $orders = q('SELECT id, order_no, day, created_at, customer_name, phone, car_plate, items, total, status, source, payment, commission, n_orders FROM orders WHERE day BETWEEN ? AND ? ORDER BY id DESC', [$from, $to])->fetchAll();
     $apps = q('SELECT * FROM channel_sales WHERE sale_date BETWEEN ? AND ? ORDER BY sale_date DESC, id DESC', [$from, $to])->fetchAll();
     $exps = q('SELECT * FROM expenses WHERE expense_date BETWEEN ? AND ? ORDER BY expense_date DESC, id DESC', [$from, $to])->fetchAll();
     foreach ($apps as &$r) { foreach (['gross', 'commission', 'commission_pct'] as $k) $r[$k] = (float)$r[$k]; $r['id'] = (int)$r['id']; $r['orders_count'] = $r['orders_count'] === null ? null : (int)$r['orders_count']; }
@@ -208,6 +209,56 @@ case 'delete':
     $t = ['sale' => 'channel_sales', 'expense' => 'expenses'][$in['type'] ?? ''] ?? fail('bad_type');
     q("DELETE FROM $t WHERE id = ?", [(int)($in['id'] ?? 0)]);
     out(['ok' => true]);
+
+case 'reset_sales':   // owner wipes sales to start fresh (menu, prices, staff and settings stay)
+    $post(); $u = need('owner');
+    rate_limit('login', 10, 900);
+    $row = q('SELECT pass_hash FROM users WHERE id = ?', [(int)$u['id']])->fetch();
+    if (!$row || !password_verify((string)($in['password'] ?? ''), $row['pass_hash'])) fail('bad_password');
+    if (($in['confirm'] ?? '') !== 'RESET') fail('bad_confirm');
+    $pdo = db(); $pdo->beginTransaction();
+    try {
+        foreach (['orders', 'day_counters', 'channel_sales'] as $t) q("DELETE FROM $t");
+        if (!empty($in['expenses'])) q('DELETE FROM expenses');
+        $pdo->commit();
+    } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
+    out(['ok' => true]);
+
+case 'import_sales':  // owner loads old sales from the Excel template, all rows or none
+    $post(); need('owner');
+    $rows = $in['rows'] ?? null;
+    if (!is_array($rows) || !count($rows) || count($rows) > 3000) fail('bad_rows');
+    $pct = []; foreach (q('SELECT channel, pct FROM channel_commissions')->fetchAll() as $r) $pct[$r['channel']] = (float)$r['pct'];
+    $prods = q('SELECT id, name_ar, name_en, price FROM products')->fetchAll();
+    $today = date('Y-m-d'); $prepared = [];
+    foreach (array_values($rows) as $i => $r) {
+        $line = $i + 1;
+        $d = $r['date'] ?? '';
+        if (!is_string($d) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) || !strtotime($d) || $d > $today || $d < '2020-01-01') fail("row_$line:bad_date");
+        $pay = $r['payment'] ?? ''; if (!in_array($pay, PAYMENTS, true)) fail("row_$line:bad_payment");
+        $amt = (float)($r['amount'] ?? 0); if ($amt <= 0 || $amt > 100000) fail("row_$line:bad_amount");
+        $n = isset($r['orders']) && $r['orders'] !== '' && $r['orders'] !== null ? (int)$r['orders'] : 1;
+        if ($n < 1 || $n > 10000) fail("row_$line:bad_orders");
+        $items = [];
+        if (!empty($r['product_id'])) {
+            $p = null; foreach ($prods as $x) if ((int)$x['id'] === (int)$r['product_id']) $p = $x;
+            if (!$p) fail("row_$line:bad_product");
+            $qty = (int)($r['qty'] ?? 0); if ($qty < 1 || $qty > 100000) fail("row_$line:bad_qty");
+            $items[] = ['product_id' => (int)$p['id'], 'name_ar' => $p['name_ar'], 'name_en' => $p['name_en'], 'price' => (float)$p['price'], 'qty' => $qty];
+        }
+        $c = isset($r['commission_pct']) && $r['commission_pct'] !== '' && $r['commission_pct'] !== null ? (float)$r['commission_pct'] : ($pct[$pay] ?? 0);
+        if ($c < 0 || $c > 100) fail("row_$line:bad_pct");
+        $prepared[] = [$d, [
+            'source' => 'pos', 'customer_name' => 'Imported', 'phone' => '', 'notes' => clean($r['note'] ?? '', 300) ?: null,
+            'items' => json_encode($items, JSON_UNESCAPED_UNICODE), 'total' => money($amt), 'status' => 'done', 'payment' => $pay,
+            'commission' => in_array($pay, CHANNELS, true) ? money($amt * $c / 100) : 0, 'n_orders' => $n,
+            'created_at' => $d . ' 12:00:00', 'updated_at' => now(),
+        ]];
+    }
+    $pdo = db(); $pdo->beginTransaction();
+    try { foreach ($prepared as [$d, $f]) insert_order($f, $d); $pdo->commit(); }
+    catch (Throwable $e) { $pdo->rollBack(); throw $e; }
+    out(['ok' => true, 'count' => count($prepared)]);
 
 case 'settings':
     need('owner');

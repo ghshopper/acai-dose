@@ -39,7 +39,7 @@ function create_schema(): void {
     $cols = [
         "source VARCHAR(8) NOT NULL DEFAULT 'web'", "payment VARCHAR(8) NULL", "car_plate VARCHAR(20) NULL",
         "car_desc VARCHAR(40) NULL", "token VARCHAR(32) NULL", "arrived_at DATETIME NULL", "created_by INT NULL",
-        "commission DECIMAL(10,3) NULL",
+        "commission DECIMAL(10,3) NULL", "n_orders INT NULL",
     ];
     $have = [];
     foreach (q(is_mysql() ? 'SHOW COLUMNS FROM orders' : 'PRAGMA table_info(orders)')->fetchAll() as $c) $have[] = $c['Field'] ?? $c['name'];

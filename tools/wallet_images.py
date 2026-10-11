@@ -23,30 +23,38 @@ def cup(d, cx, base, h, state):
     d.line(body + [body[0]], fill=line, width=lw, joint='curve')
 
 def panel(Wpt, Hpt, stamps, free, need=5, plain=False, pad=(30, 12)):
-    """Cream panel with need cups + one free slot. Sizes in points, drawn 8x then scaled."""
+    """Cream panel with `need` cups + one free slot (two rows when there are many). Points, drawn 8x."""
     S = 8; W, H = Wpt * S, Hpt * S
     im = Image.new('RGB', (W, H), P); d = ImageDraw.Draw(im)
     px, py = pad[0] * S, pad[1] * S
     d.rounded_rectangle((px, py, W - px, H - py), radius=20 * S, fill=C)
-    n = need + 1; inner = W - 2 * px - 20 * S; step = inner / n
-    ch = min(48, (Hpt - 2 * pad[1]) * 0.42) * S          # cup height
-    cy = H / 2 - 6 * S
-    f = ImageFont.truetype(AR, int(13 * S))
+    n = need + 1
+    rows = 1 if n <= 7 else 2
+    cols = -(-n // rows)
+    inner = W - 2 * px - 20 * S; step = inner / cols
+    rowh = (H - 2 * py) / rows
+    ch = min(48 * S if rows == 1 else 30 * S, step * 0.95, rowh * (0.42 if rows == 1 else 0.62))
+    f = ImageFont.truetype(AR, int((13 if rows == 1 else 9) * S))
     for i in range(n):
-        cx = px + 10 * S + step * (n - 1 - i + 0.5)       # first stamp on the right (Arabic order)
+        r_, c_ = divmod(i, cols)
+        cx = px + 10 * S + step * (cols - 1 - c_ + 0.5)          # first stamp on the right (Arabic order)
+        cy = py + rowh * (r_ + 0.5) - (6 * S if rows == 1 else 3 * S)
         if i < need:
             cup(d, cx, cy + ch / 2, ch, 'on' if (plain or free or i < stamps) else 'off')
         else:
-            r = ch * 0.52
-            d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=O if (free or plain) else C, outline=O, width=int(2.5 * S))
-            cup(d, cx, cy + r * 0.66, ch * 0.75, 'free')
-            d.text((cx, cy + r + 14 * S), 'مجاني', font=f, fill=P if (free or plain) else O, anchor='mm', direction='rtl', language='ar')
+            rr = ch * 0.52
+            d.ellipse((cx - rr, cy - rr, cx + rr, cy + rr), fill=O if (free or plain) else C, outline=O, width=int(2.5 * S))
+            cup(d, cx, cy + rr * 0.66, ch * 0.75, 'free')
+            if rows == 1:
+                d.text((cx, cy + rr + 14 * S), 'مجاني', font=f, fill=P if (free or plain) else O, anchor='mm', direction='rtl', language='ar')
     return im
 
 def save_set(prefix, Wpt, Hpt, scales, pad):
-    for k in range(5): out(panel(Wpt, Hpt, k, False, pad=pad), f'{prefix}-{k}', Wpt, Hpt, scales)
-    out(panel(Wpt, Hpt, 5, True, pad=pad), f'{prefix}-free', Wpt, Hpt, scales)
-    out(panel(Wpt, Hpt, 0, False, plain=True, pad=pad), f'{prefix}-plain', Wpt, Hpt, scales)
+    """One image per stamp count for every rule from 3 to 10 stamps, plus a plain one."""
+    for need in range(3, 11):
+        for k in range(need): out(panel(Wpt, Hpt, k, False, need, pad=pad), f'{prefix}-{need}-{k}', Wpt, Hpt, scales)
+        out(panel(Wpt, Hpt, need, True, need, pad=pad), f'{prefix}-{need}-free', Wpt, Hpt, scales)
+    out(panel(Wpt, Hpt, 0, False, 5, plain=True, pad=pad), f'{prefix}-plain', Wpt, Hpt, scales)
 
 def out(im, name, Wpt, Hpt, scales):
     for sc, suf in scales:

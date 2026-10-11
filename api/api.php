@@ -384,9 +384,7 @@ case 'save_location':  // owner: shop coordinates for the "you're nearby" lock-s
         set_setting('shop_lat', $m[1]); set_setting('shop_lng', $m[2]);
     }
     set_setting('nearby_text', clean((string)($in['text'] ?? ''), 120));
-    // Refresh every card already in a wallet so it picks up the location
-    q('UPDATE customers SET pass_updated = ?', [time()]);
-    foreach (q('SELECT DISTINCT serial FROM wallet_regs')->fetchAll() as $r) wallet_push($r['serial']);
+    refresh_all_cards();   // cards already in wallets pick up the location
     out(['ok' => true]);
 
 case 'save_loyalty':
@@ -395,6 +393,8 @@ case 'save_loyalty':
     set_setting('loyalty_on', !empty($in['on']) ? '1' : '0');
     set_setting('loyalty_need', (string)$need);
     set_setting('loyalty_unit', ($in['unit'] ?? '') === 'order' ? 'order' : 'cup');
+    require_once __DIR__ . '/gwallet_lib.php';
+    refresh_all_cards();   // cards already in wallets show the new rule
     out(['ok' => true]);
 
 case 'save_commissions':

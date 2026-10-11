@@ -131,7 +131,7 @@ function wallet_build(array $c): string {
     if (!wallet_ready()) fail('wallet_off', 503);
     $st = loyalty_state($c['phone']);
     $img = dirname(__DIR__) . '/assets/wallet';
-    $strip = $st['need'] === 5 ? ($st['free'] > 0 ? 'strip-free' : 'strip-' . $st['stamps']) : 'strip-plain';
+    $strip = $st['need'] >= 3 && $st['need'] <= 10 ? 'strip-' . $st['need'] . '-' . ($st['free'] > 0 ? 'free' : $st['stamps']) : 'strip-plain';
     $files = ['pass.json' => json_encode(wallet_pass_json($c), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)];
     foreach (['icon.png', 'icon@2x.png', 'icon@3x.png', 'logo.png', 'logo@2x.png', 'logo@3x.png'] as $f) $files[$f] = file_get_contents("$img/$f");
     foreach (['' => '', '@2x' => '@2x', '@3x' => '@3x'] as $s) $files["strip$s.png"] = file_get_contents("$img/$strip$s.png");

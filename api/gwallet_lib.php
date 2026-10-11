@@ -84,7 +84,7 @@ function gw_class(): array {
 /** The customer's card as a Google loyalty object (same data as the Apple pass). */
 function gw_object(array $c): array {
     $st = loyalty_state($c['phone']);
-    $hero = $st['need'] === 5 ? ($st['free'] > 0 ? 'g-hero-free.png' : 'g-hero-' . $st['stamps'] . '.png') : 'g-hero-plain.png';
+    $hero = $st['need'] >= 3 && $st['need'] <= 10 ? 'g-hero-' . $st['need'] . '-' . ($st['free'] > 0 ? 'free' : $st['stamps']) . '.png' : 'g-hero-plain.png';
     $left = $st['free'] > 0 ? ($st['free'] > 1 ? $st['free'] . ' أكواب مجانية جاهزة' : 'كوب مجاني جاهز لك!')
         : ($st['need'] - $st['stamps']) . ($st['unit'] === 'cup' ? ' أكواب' : ' طلبات') . ' وتاخذ كوب مجاني';
     $site = wallet_site();
@@ -143,6 +143,13 @@ function gw_update(string $card): void {
         $obj = gw_object($c);
         gw_http('PATCH', GW_API . '/loyaltyObject/' . rawurlencode($obj['id']), json_encode($obj, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     } catch (Throwable $e) { error_log('acai gwallet update: ' . $e->getMessage()); }
+}
+
+/** After a design or rule change: every card already in a wallet fetches its new version. */
+function refresh_all_cards(): void {
+    q('UPDATE customers SET pass_updated = ?', [time()]);
+    foreach (q('SELECT DISTINCT serial FROM wallet_regs')->fetchAll() as $r) wallet_push($r['serial']);
+    foreach (q('SELECT card_token FROM customers WHERE gwallet = 1')->fetchAll() as $r) gw_update($r['card_token']);
 }
 
 /** Owner uploads the service-account key and Issuer ID. */

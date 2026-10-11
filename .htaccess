@@ -6,6 +6,8 @@ RewriteEngine On
 # Apple Wallet calls /wallet/v1/... with an Authorization header
 RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 RewriteRule ^wallet/(.*)$ api/wallet.php?p=$1 [QSA,L]
+# Short link to the staff app download: order.acaiee.com/app
+RewriteRule ^app/?$ https://github.com/ghshopper/acai-dose/releases/download/app-latest/acai-dose-staff.apk [R=302,L]
 # Short links: /pos -> pos.html, /screen -> screen.html, /dashboard -> dashboard.html
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d

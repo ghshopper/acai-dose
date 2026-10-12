@@ -156,12 +156,12 @@ case 'active_orders':
     need('staff');
     $since = date('Y-m-d H:i:s', time() - 36 * 3600);
     $rows = q("SELECT * FROM orders WHERE source = 'web' AND status IN ('new','preparing','ready') AND created_at >= ? ORDER BY id", [$since])->fetchAll();
-    out(array_map('order_row', $rows));
+    out(array_map(fn($o) => order_row($o) + ['track' => $o['token']], $rows));   // staff can send the customer their tracking link
 
 case 'web_today':   // staff phones: today's website orders that are finished (handed over or cancelled)
     need('staff');
     $rows = q("SELECT * FROM orders WHERE source = 'web' AND day = ? AND status IN ('done','cancelled') ORDER BY updated_at DESC, id DESC", [date('Y-m-d')])->fetchAll();
-    out(array_map('order_row', $rows));
+    out(array_map(fn($o) => order_row($o) + ['track' => $o['token']], $rows));
 
 case 'order_status':
     $post(); need('staff');

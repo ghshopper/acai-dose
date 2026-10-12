@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'api.dart';
 import 'theme.dart';
 
 /// Opens a WhatsApp chat with the customer, with an optional ready-made message.
@@ -33,15 +34,17 @@ String waText(String key, Map<String, dynamic> o) {
   final hi = name.isEmpty ? 'Hi 👋' : 'Hi $name 👋';
   final ref = '${o['ref'] ?? ''}';
   final plate = '${o['car_plate'] ?? ''}'.trim();
+  final t = '${o['track'] ?? ''}';
+  final link = t.isEmpty ? '' : '\nTrack your order: $kSite/?t=$t';
   switch (key) {
     case 'ready':
-      return '$hi\nYour Açaí Dose order #$ref is ready ✅\nWhen you arrive, tap "I\'m here" on your order page and we\'ll bring it to your car 💜';
+      return '$hi\nYour Açaí Dose order #$ref is ready ✅\nWhen you arrive, tap "I\'m here" on your order page and we\'ll bring it to your car 💜$link';
     case 'coming':
-      return '$hi\nWe\'re coming out with your order now 🚶${plate.isEmpty ? '' : '\nIs your car $plate?'}';
+      return '$hi\nWe\'re coming out with your order now 🚶${plate.isEmpty ? '' : '\nIs your car $plate?'}$link';
     case 'where':
       return '$hi\nWe\'re outside with your order but can\'t find your car 🙏\nCould you send us its colour or exactly where you parked?';
     case 'delay':
-      return '$hi\nYour order #$ref needs a few more minutes, sorry for the wait 🙏';
+      return '$hi\nYour order #$ref needs a few more minutes, sorry for the wait 🙏$link';
     case 'thanks':
       return 'Thank you${name.isEmpty ? '' : ' $name'} 💜\nHope you enjoyed your açaí! Don\'t forget your loyalty card, see you soon 😊\n@acaidose.om';
     default:

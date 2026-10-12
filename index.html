@@ -390,6 +390,9 @@ function showTrack(token) {
 (async () => {
   applyLang();
   api('shop_info').then(r => { shopWa = (r && r.whatsapp) || ''; showWaFab(); }).catch(() => {});
+  // Tracking link sent by the shop (…/?t=<token>) opens that order even after the page was closed
+  const fromLink = new URLSearchParams(location.search).get('t');
+  if (fromLink && /^[a-f0-9]{32}$/.test(fromLink)) { store.set('ad_track', fromLink); history.replaceState(null, '', location.pathname); }
   const saved = store.get('ad_track');
   if (saved && /^[a-f0-9]{32}$/.test(saved)) return showTrack(saved);
   try { products = await api('menu'); }

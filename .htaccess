@@ -8,6 +8,7 @@ RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 RewriteRule ^wallet/(.*)$ api/wallet.php?p=$1 [QSA,L]
 # Short link to the staff app download: order.acaiee.com/app
 RewriteRule ^app/?$ https://github.com/ghshopper/acai-dose/releases/download/app-latest/acai-dose-staff.apk [R=302,L]
+RewriteRule ^orders/?$ https://github.com/ghshopper/acai-dose/releases/download/orders-latest/acai-dose-orders.apk [R=302,L]
 # Short links: /pos -> pos.html, /screen -> screen.html, /dashboard -> dashboard.html
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
@@ -19,7 +20,7 @@ RewriteRule ^(.+?)/?$ $1.html [L]
 <FilesMatch "^(README\.md|\.gitignore)$">
   Require all denied
 </FilesMatch>
-RedirectMatch 404 ^/(android|staff_app|owner_app|tools|\.github|\.git)(/|$)
+RedirectMatch 404 ^/(android|staff_app|owner_app|orders_app|tools|\.github|\.git)(/|$)
 # Always check for a fresh copy so updates reach the shop devices straight away.
 <IfModule mod_headers.c>
 <FilesMatch "\.(html|js|css)$">

@@ -155,6 +155,11 @@ case 'active_orders':
     $rows = q("SELECT * FROM orders WHERE source = 'web' AND status IN ('new','preparing','ready') AND created_at >= ? ORDER BY id", [$since])->fetchAll();
     out(array_map('order_row', $rows));
 
+case 'web_today':   // staff phones: today's website orders that are finished (handed over or cancelled)
+    need('staff');
+    $rows = q("SELECT * FROM orders WHERE source = 'web' AND day = ? AND status IN ('done','cancelled') ORDER BY updated_at DESC, id DESC", [date('Y-m-d')])->fetchAll();
+    out(array_map('order_row', $rows));
+
 case 'order_status':
     $post(); need('staff');
     $st = $in['status'] ?? '';

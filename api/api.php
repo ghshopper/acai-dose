@@ -73,6 +73,9 @@ case 'menu':
         'img' => $p['img'], 'price' => (float)$p['price']],
         q('SELECT * FROM products WHERE active = 1 ORDER BY sort, id')->fetchAll()));
 
+case 'shop_info':    // public: how customers can reach the shop
+    out(['whatsapp' => setting('shop_whatsapp')]);
+
 case 'place_order':
     $post();
     rate_limit('order', 15, 600);
@@ -376,6 +379,7 @@ case 'settings':
         q('SELECT id, username, role, active FROM users ORDER BY id')->fetchAll());
     require_once __DIR__ . '/gwallet_lib.php';
     out(['commissions' => $c, 'products' => $p, 'users' => $u, 'loyalty' => loyalty_cfg(), 'wallet' => wallet_status(), 'gwallet' => gw_status(),
+         'whatsapp' => setting('shop_whatsapp'),
          'location' => ['coords' => setting('shop_lat') !== '' ? setting('shop_lat') . ', ' . setting('shop_lng') : '', 'text' => setting('nearby_text')]]);
 
 case 'gw_setup':      // owner: Google Wallet service-account key + Issuer ID
@@ -401,6 +405,14 @@ case 'wallet_cer':    // owner: the certificate Apple issued for that request
     $cer = base64_decode((string)($in['cer'] ?? ''), true); $wwdr = base64_decode((string)($in['wwdr'] ?? ''), true);
     if (!$cer || !$wwdr) fail('missing_files');
     out(wallet_install_cer($cer, $wwdr));
+
+case 'save_contact':  // owner: WhatsApp number shown to customers on the order page
+    $post(); need('owner');
+    $raw = trim((string)($in['whatsapp'] ?? ''));
+    $ph = $raw === '' ? '' : norm_phone($raw);
+    if ($raw !== '' && $ph === '') fail('invalid_phone');
+    set_setting('shop_whatsapp', $ph);
+    out(['ok' => true, 'whatsapp' => $ph]);
 
 case 'save_location':  // owner: shop coordinates for the "you're nearby" lock-screen card
     $post(); need('owner');

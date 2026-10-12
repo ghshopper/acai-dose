@@ -432,6 +432,14 @@ async function drawSettings() {
       <p style="margin:0;flex-basis:100%;font-weight:700;opacity:.75;line-height:1.6">ينختم العميل تلقائياً لما العامل يضغط Paid cash أو Paid card لطلب من الموقع. الكوب المجاني ينخصم تلقائياً في طلبه الجاي (أغلى كوب في الطلب).</p>
     </form>
 
+    <h3 class="lal">واتساب المحل</h3>
+    <form class="card formrow" id="waf" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;padding:16px">
+      <div class="field" style="flex:1 1 220px"><label for="wanum">رقم الواتساب</label><input id="wanum" dir="ltr" inputmode="tel" placeholder="9XXXXXXX" value="${esc((st.whatsapp || '').replace('+968', ''))}" autocomplete="off"></div>
+      <button class="btn" type="submit">احفظ</button>
+      <div class="err" id="waerr" role="status" style="flex-basis:100%"></div>
+      <p style="margin:0;flex-basis:100%;font-weight:700;opacity:.75;line-height:1.6">يطلع للزبون زر واتساب في صفحة الطلب، وفي صفحة متابعة طلبه برسالة فيها رقم الطلب. خلّه فاضي عشان يختفي الزر.</p>
+    </form>
+
     <h3 class="lal">تنبيه «قريب من المحل»</h3>
     <form class="card formrow" id="locf" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;padding:16px">
       <div class="field" style="flex:1 1 220px"><label for="lcoords">إحداثيات المحل</label><input id="lcoords" dir="ltr" placeholder="23.6100, 58.5400" value="${esc(st.location.coords)}" autocomplete="off"></div>
@@ -541,6 +549,12 @@ async function drawSettings() {
     if (!a || !b) { err.textContent = 'اختر الملفين: pass.cer وملف G4'; return; }
     try { await api('wallet_cer', { cer: await b64f(a), wwdr: await b64f(b) }); drawSettings(); }
     catch (ex) { err.textContent = WERR[ex.message] || msg(ex); }
+  };
+  $('#waf').onsubmit = async e => {
+    e.preventDefault();
+    const err = $('#waerr');
+    try { await api('save_contact', { whatsapp: $('#wanum').value.trim() }); err.style.color = 'var(--ok)'; err.textContent = $('#wanum').value.trim() ? 'انحفظ ✓ الزر طالع للزبائن' : 'انشال الزر'; }
+    catch (ex) { err.style.color = ''; err.textContent = ex.message === 'invalid_phone' ? 'الرقم لازم ٨ أرقام (رقم عماني)' : msg(ex); }
   };
   $('#locf').onsubmit = async e => {
     e.preventDefault();

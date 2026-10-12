@@ -23,6 +23,8 @@ class _SettingsPageState extends State<SettingsPage> {
   String _unit = 'cup';
   bool _loyDirty = false;
 
+  final _wa = TextEditingController();
+
   // commissions
   final Map<String, TextEditingController> _comm = {for (final k in kChannelNames.keys) k: TextEditingController()};
 
@@ -37,6 +39,7 @@ class _SettingsPageState extends State<SettingsPage> {
     for (final c in _comm.values) {
       c.dispose();
     }
+    _wa.dispose();
     super.dispose();
   }
 
@@ -52,6 +55,7 @@ class _SettingsPageState extends State<SettingsPage> {
         _need = ((l['need'] as num?) ?? 6).toInt();
         _unit = '${l['unit'] ?? 'cup'}';
         _loyDirty = false;
+        _wa.text = '${r['whatsapp'] ?? ''}'.replaceFirst('+968', '');
         for (final k in _comm.keys) {
           final v = ((c[k] as num?) ?? 0).toDouble();
           _comm[k]!.text = v == v.roundToDouble() ? v.toInt().toString() : v.toString();
@@ -91,6 +95,24 @@ class _SettingsPageState extends State<SettingsPage> {
                   child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 40), children: [
                     const SectionTitle('المنيو والأسعار', note: 'اللي تطفيه يختفي من الموقع والكاشير'),
                     for (final p in (s['products'] as List)) _ProductRow(product: Map<String, dynamic>.from(p as Map), onSave: (body) => _post('save_product', body, 'انحفظ السعر')),
+                    const SectionTitle('واتساب المحل', note: 'يطلع زر للزبائن في صفحة الطلب'),
+                    Panel(
+                      child: Row(children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _wa,
+                            keyboardType: TextInputType.phone,
+                            textDirection: TextDirection.ltr,
+                            decoration: const InputDecoration(prefixText: '+968  ', hintText: '9XXXXXXX', isDense: true),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        FilledButton(
+                          onPressed: () => _post('save_contact', {'whatsapp': _wa.text.trim()}, _wa.text.trim().isEmpty ? 'انشال زر الواتساب' : 'انحفظ، الزر طالع للزبائن'),
+                          child: const Text('احفظ'),
+                        ),
+                      ]),
+                    ),
                     const SectionTitle('بطاقة الولاء'),
                     _loyalty(),
                     const SectionTitle('عمولات التطبيقات', note: 'تنحسب على الطلبات الجديدة'),

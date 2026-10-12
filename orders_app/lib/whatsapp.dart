@@ -27,23 +27,23 @@ const kTemplates = [
   WaTemplate('thanks', 'Thank you', Icons.favorite),
 ];
 
-/// The message for one template, in Arabic (what customers read), filled with the order's details.
+/// The message for one template, filled with the order's details.
 String waText(String key, Map<String, dynamic> o) {
   final name = '${o['customer_name'] ?? ''}'.trim();
-  final hi = name.isEmpty ? 'هلا 👋' : 'هلا $name 👋';
+  final hi = name.isEmpty ? 'Hi 👋' : 'Hi $name 👋';
   final ref = '${o['ref'] ?? ''}';
   final plate = '${o['car_plate'] ?? ''}'.trim();
   switch (key) {
     case 'ready':
-      return '$hi\nطلبك رقم $ref من أساي دوز جاهز ✅\nإذا وصلت اضغط «وصلت» من رابط الطلب ونطلع لك لين السيارة 💜';
+      return '$hi\nYour Açaí Dose order #$ref is ready ✅\nWhen you arrive, tap "I\'m here" on your order page and we\'ll bring it to your car 💜';
     case 'coming':
-      return '$hi\nطالعين لك بالطلب الحين 🚶${plate.isEmpty ? '' : '\nسيارتك رقم $plate صح؟'}';
+      return '$hi\nWe\'re coming out with your order now 🚶${plate.isEmpty ? '' : '\nIs your car $plate?'}';
     case 'where':
-      return '$hi\nحنا برا بالطلب بس ما لقينا سيارتك 🙏\nممكن ترسل لنا لونها أو وين واقف بالضبط؟';
+      return '$hi\nWe\'re outside with your order but can\'t find your car 🙏\nCould you send us its colour or exactly where you parked?';
     case 'delay':
-      return '$hi\nطلبك رقم $ref يحتاج كم دقيقة زيادة، آسفين على التأخير 🙏';
+      return '$hi\nYour order #$ref needs a few more minutes, sorry for the wait 🙏';
     case 'thanks':
-      return 'شكراً${name.isEmpty ? '' : ' $name'} 💜\nنتمنى عجبك الأساي! لا تنسى بطاقة الولاء، ونشوفك قريب 😊\n@acaidose.om';
+      return 'Thank you${name.isEmpty ? '' : ' $name'} 💜\nHope you enjoyed your açaí! Don\'t forget your loyalty card, see you soon 😊\n@acaidose.om';
     default:
       return '';
   }
@@ -73,7 +73,7 @@ Future<void> showWhatsAppSheet(BuildContext context, Map<String, dynamic> o) {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   leading: Icon(t.icon, color: const Color(0xFF25D366)),
                   title: Text(t.label, style: const TextStyle(fontWeight: FontWeight.w800)),
-                  subtitle: Text(waText(t.key, o), maxLines: 2, overflow: TextOverflow.ellipsis, textDirection: TextDirection.rtl),
+                  subtitle: Text(waText(t.key, o), maxLines: 2, overflow: TextOverflow.ellipsis),
                   onTap: () {
                     Navigator.pop(c);
                     openWhatsApp(phone, waText(t.key, o));

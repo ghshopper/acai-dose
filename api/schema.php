@@ -89,8 +89,9 @@ function create_schema(): void {
     if (!q("SELECT 1 FROM products WHERE name_en LIKE 'Mini %' LIMIT 1")->fetch()) {
         foreach (q("SELECT * FROM products WHERE name_en NOT LIKE 'Mini %' ORDER BY sort, id")->fetchAll() as $r)
             q('INSERT INTO products (name_ar, name_en, img, price, sort, active) VALUES (?,?,?,?,?,0)',
-              ['ميني ' . $r['name_ar'], 'Mini ' . $r['name_en'], $r['img'], 0, (int)$r['sort'] + 10]);
+              ['ميني ' . $r['name_ar'], 'Mini ' . $r['name_en'], $r['img'], 2.4, (int)$r['sort'] + 10]);
     }
+    q("UPDATE products SET price = 2.4 WHERE name_en LIKE 'Mini %' AND price = 0");   // owner's Mini price: 2.400
     foreach (['talabat', 'snoonu', 'khedmah'] as $c) {
         if (!q('SELECT 1 FROM channel_commissions WHERE channel = ?', [$c])->fetch())
             q('INSERT INTO channel_commissions (channel, pct) VALUES (?, 0)', [$c]);

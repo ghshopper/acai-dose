@@ -51,8 +51,13 @@ export const TOPPING_ORDER = ['granola', 'banana', 'straw', 'blue', 'rasp', 'alm
 
 /** The bowl as an SVG string. `on` = the topping keys to show. */
 export function bowlSVG(on = [], { label = '' } = {}) {
-  const set = new Set(on);
-  const layers = TOPPING_ORDER.map(k => `<g class="tp tp-${k}${set.has(k) ? ' on' : ''}">${LAYERS[k]()}</g>`).join('');
+  // `on` may repeat a key (double banana); the 2nd and 3rd portions are extra copies, shifted a little
+  const n = {}; on.forEach(k => { n[k] = (n[k] || 0) + 1; });
+  const SHIFT = { 2: 'translate(10 9)', 3: 'translate(-11 7)' };
+  const layers = [1, 2, 3].map(i => TOPPING_ORDER.map(k => {
+    const g = `<g class="tp tp-${k} tp-${k}-${i}${(n[k] || 0) >= i ? ' on' : ''}">${LAYERS[k]()}</g>`;
+    return i === 1 ? g : `<g transform="${SHIFT[i]}">${g}</g>`;
+  }).join('')).join('');
   return `<svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${label}">
   <ellipse cx="200" cy="278" rx="118" ry="13" fill="#470D43" opacity=".12"/>
   <path d="M32 124 C38 226 118 270 200 270 C282 270 362 226 368 124 Z" fill="#FFFFFF"/>

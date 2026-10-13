@@ -45,21 +45,26 @@ function price_items($items): array {
         if (!$p) fail('invalid_product');
         $line = ['product_id' => (int)$p['id'], 'name_ar' => $p['name_ar'], 'name_en' => $p['name_en'], 'price' => (float)$p['price'], 'qty' => $qty];
         if (($p['kind'] ?? 'cup') === 'build') {
-            $ids = array_values(array_unique(array_map('intval', is_array($it['toppings'] ?? null) ? $it['toppings'] : [])));
-            if (count($ids) > 12) fail('invalid_items');
-            $tops = [];
-            foreach ($ids as $tid) {
+            // Toppings as a list of ids; an id can repeat (double banana = the id twice), up to 3 times each
+            $ids = array_map('intval', is_array($it['toppings'] ?? null) ? $it['toppings'] : []);
+            if (count($ids) > 20) fail('invalid_items');
+            $counts = array_count_values($ids); ksort($counts);
+            $tops = []; $extra = 0.0; $namesAr = []; $namesEn = [];
+            foreach ($counts as $tid => $n) {
+                if ($n > 3) fail('invalid_items');
                 $t = q('SELECT id, k, name_ar, name_en, price FROM toppings WHERE id = ? AND active = 1', [$tid])->fetch();
                 if (!$t) fail('invalid_topping');
-                $tops[] = $t;
+                $tops[] = ['id' => (int)$t['id'], 'k' => $t['k'], 'name_ar' => $t['name_ar'], 'name_en' => $t['name_en'], 'price' => (float)$t['price'], 'n' => $n];
+                $extra += (float)$t['price'] * $n;
+                $namesAr[] = $t['name_ar'] . ($n > 1 ? " ×$n" : '');
+                $namesEn[] = $t['name_en'] . ($n > 1 ? " x$n" : '');
             }
-            usort($tops, fn($a, $b) => $a['id'] <=> $b['id']);
             $line['base'] = $line['price'];
-            $line['toppings'] = array_map(fn($t) => ['id' => (int)$t['id'], 'k' => $t['k'], 'name_ar' => $t['name_ar'], 'name_en' => $t['name_en'], 'price' => (float)$t['price']], $tops);
-            $line['price'] = money($line['price'] + array_sum(array_map(fn($t) => (float)$t['price'], $tops)));
+            $line['toppings'] = $tops;
+            $line['price'] = money($line['price'] + $extra);
             if ($tops) {
-                $line['name_ar'] .= ' (' . implode('، ', array_map(fn($t) => $t['name_ar'], $tops)) . ')';
-                $line['name_en'] .= ' (' . implode(', ', array_map(fn($t) => $t['name_en'], $tops)) . ')';
+                $line['name_ar'] .= ' (' . implode('، ', $namesAr) . ')';
+                $line['name_en'] .= ' (' . implode(', ', $namesEn) . ')';
             }
         }
         $lines[] = $line;

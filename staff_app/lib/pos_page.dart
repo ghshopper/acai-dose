@@ -110,7 +110,15 @@ class _PosPageState extends State<PosPage> {
   String _lineName(String k, {bool ar = false}) {
     final p = _prod(_keyPid(k));
     if (p == null) return '';
-    final tops = _topsOf(k).map((t) => '${ar ? t['name_ar'] : t['name_en']}').toList();
+    final counts = <int, int>{};
+    for (final id in _keyTops(k)) {
+      counts[id] = (counts[id] ?? 0) + 1;
+    }
+    final tops = [
+      for (final e in counts.entries)
+        for (final t in _toppings)
+          if ((t['id'] as num).toInt() == e.key) '${ar ? t['name_ar'] : t['name_en']}${e.value > 1 ? ' x${e.value}' : ''}'
+    ];
     final base = '${ar ? p['name_ar'] : p['name_en']}';
     return tops.isEmpty ? base : '$base (${tops.join(ar ? '، ' : ', ')})';
   }
@@ -138,27 +146,41 @@ class _PosPageState extends State<PosPage> {
     });
   }
 
-  /// Build-your-bowl: pick toppings, then the bowl goes into the sale.
+  /// Build-your-bowl: pick toppings (each up to 3 times), then the bowl goes into the sale.
   Future<void> _buildBowl(Map<String, dynamic> p) async {
-    final picked = <int>{};
+    final picked = <int, int>{};
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => StatefulBuilder(
         builder: (c, set) {
-          final sum = _price(p) + _toppings.where((t) => picked.contains((t['id'] as num).toInt())).fold(0.0, (s, t) => s + (t['price'] as num).toDouble());
+          var sum = _price(p);
+          for (final t in _toppings) {
+            sum += (t['price'] as num).toDouble() * (picked[(t['id'] as num).toInt()] ?? 0);
+          }
           return AlertDialog(
             title: Text('${p['name_en']}'),
             content: SizedBox(
-              width: 420,
-              child: Wrap(spacing: 8, runSpacing: 8, children: [
-                for (final t in _toppings)
-                  FilterChip(
-                    label: Text('${t['name_en']}${(t['price'] as num) > 0 ? '  +${money(t['price'])}' : ''}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                    selected: picked.contains((t['id'] as num).toInt()),
-                    selectedColor: kOrange,
-                    onSelected: (v) => set(() => v ? picked.add((t['id'] as num).toInt()) : picked.remove((t['id'] as num).toInt())),
-                  ),
-              ]),
+              width: 440,
+              child: SingleChildScrollView(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  for (final t in _toppings)
+                    Builder(builder: (_) {
+                      final id = (t['id'] as num).toInt();
+                      final n = picked[id] ?? 0;
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(color: n > 0 ? kOrange.withAlpha(60) : kCream, borderRadius: BorderRadius.circular(12)),
+                        child: Row(children: [
+                          Expanded(child: Text('${t['name_en']}${(t['price'] as num) > 0 ? '  +${money(t['price'])}' : ''}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
+                          IconButton(onPressed: n > 0 ? () => set(() => n > 1 ? picked[id] = n - 1 : picked.remove(id)) : null, icon: const Icon(Icons.remove_circle_outline)),
+                          SizedBox(width: 26, child: Text('$n', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18))),
+                          IconButton(onPressed: n < 3 ? () => set(() => picked[id] = n + 1) : null, icon: const Icon(Icons.add_circle, color: kPurple)),
+                        ]),
+                      );
+                    }),
+                ]),
+              ),
             ),
             actions: [
               TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
@@ -169,7 +191,7 @@ class _PosPageState extends State<PosPage> {
       ),
     );
     if (ok != true) return;
-    final ids = picked.toList()..sort();
+    final ids = <int>[for (final e in picked.entries) ...List.filled(e.value, e.key)]..sort();
     _add('${_id(p)}:${ids.join('.')}', 1);
   }
 

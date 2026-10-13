@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'api.dart';
+import 'cost_page.dart';
 import 'settings_page.dart';
 import 'sheets.dart';
 import 'theme.dart';
@@ -44,6 +45,8 @@ class MorePage extends StatelessWidget {
         child: ListView(padding: const EdgeInsets.fromLTRB(16, 18, 16, 30), children: [
           _item(context, Icons.tune, 'الإعدادات', 'الأسعار، الولاء، العمولات، حسابات العمال',
               () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsPage()))),
+          _item(context, Icons.inventory_2_outlined, 'التكلفة والمخزون', 'تكلفة كل كوب، الجرد، المشتريات، أسعار المكونات',
+              () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CostPage()))),
           _item(context, Icons.delivery_dining, 'مبيعات التطبيقات', 'أدخل مبيعات طلبات وسنونو وخدمة من الكشف', () async {
             final ok = await openSheet<bool>(context, const AppSaleSheet());
             if (ok == true && context.mounted) toast(context, 'انحفظت المبيعات');

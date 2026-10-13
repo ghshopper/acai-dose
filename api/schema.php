@@ -26,6 +26,9 @@ function create_schema(): void {
             id $id, expense_date DATE NOT NULL, category VARCHAR(60) NOT NULL, amount DECIMAL(10,3) NOT NULL,
             note VARCHAR(120), created_at DATETIME NOT NULL)$eng",
         "CREATE TABLE IF NOT EXISTS hits (k VARCHAR(120) NOT NULL, at DATETIME NOT NULL)$eng",
+        "CREATE TABLE IF NOT EXISTS toppings (
+            id $id, k VARCHAR(20) NOT NULL, name_ar VARCHAR(60) NOT NULL, name_en VARCHAR(60) NOT NULL,
+            price DECIMAL(10,3) NOT NULL DEFAULT 0, sort INT NOT NULL DEFAULT 0, active TINYINT NOT NULL DEFAULT 1)$eng",
         "CREATE TABLE IF NOT EXISTS customers (
             id $id, phone VARCHAR(20) NOT NULL UNIQUE, name VARCHAR(60) NOT NULL DEFAULT '', car_plate VARCHAR(20) NULL,
             car_desc VARCHAR(40) NULL, offers TINYINT NOT NULL DEFAULT 0, note VARCHAR(200) NULL,
@@ -85,6 +88,26 @@ function create_schema(): void {
               ['آساي سموذي مع الفول السوداني', 'Açaí Smoothie with Peanut Butter', 'cup-peanut.png', 3.4, 3]];
         foreach ($p as $r) q('INSERT INTO products (name_ar, name_en, img, price, sort) VALUES (?,?,?,?,?)', $r);
     }
+    // v7: bowls. kind = cup | bowl (ready) | build (customer picks toppings); short description per product
+    $have = [];
+    foreach (q(is_mysql() ? 'SHOW COLUMNS FROM products' : 'PRAGMA table_info(products)')->fetchAll() as $c) $have[] = $c['Field'] ?? $c['name'];
+    foreach (["kind VARCHAR(10) NOT NULL DEFAULT 'cup'", 'desc_ar VARCHAR(300) NULL', 'desc_en VARCHAR(300) NULL'] as $def) {
+        $name = strtok($def, ' ');
+        if (!in_array($name, $have, true)) db()->exec("ALTER TABLE products ADD COLUMN $def");
+    }
+    if (!q("SELECT 1 FROM settings WHERE k = 'bowls_added'")->fetch()) {
+        // Hidden until the owner sets prices and switches them on
+        q("INSERT INTO products (name_ar, name_en, img, price, sort, active, kind) VALUES (?,?,?,?,?,0,'bowl')", ['أساي باول', 'Açaí Bowl', 'bowl.png', 0, 30]);
+        q("INSERT INTO products (name_ar, name_en, img, price, sort, active, kind) VALUES (?,?,?,?,?,0,'build')", ['اصنع أساي باولك', 'Build Your Açaí Bowl', 'bowl-build.png', 0, 31]);
+        if (!(int)q('SELECT COUNT(*) c FROM toppings')->fetch()['c']) {
+            $t = [['pb', 'زبدة فول سوداني', 'Peanut butter'], ['straw', 'فراولة', 'Strawberry'], ['granola', 'جرانولا', 'Granola'],
+                  ['blue', 'توت أزرق', 'Blueberry'], ['rasp', 'توت أحمر', 'Raspberry'], ['banana', 'موز', 'Banana'],
+                  ['almond', 'لوز مقروش', 'Crushed almonds'], ['honey', 'عسل', 'Honey']];
+            foreach ($t as $i => $r) q('INSERT INTO toppings (k, name_ar, name_en, price, sort, active) VALUES (?,?,?,0,?,1)', [$r[0], $r[1], $r[2], $i + 1]);
+        }
+        q("INSERT INTO settings (k, v) VALUES ('bowls_added', '1')");
+    }
+
     // v6: Mini (8oz) version of each cup, hidden until the owner sets a price and switches it on
     if (!q("SELECT 1 FROM products WHERE name_en LIKE 'Mini %' LIMIT 1")->fetch()) {
         foreach (q("SELECT * FROM products WHERE name_en NOT LIKE 'Mini %' ORDER BY sort, id")->fetchAll() as $r)

@@ -71,6 +71,28 @@ main{position:relative;z-index:1;max-width:520px;margin:-40px auto 0;padding:0 1
 .wa-fab.low{bottom:20px}
 .wa-fab svg{width:30px;height:30px}
 .btn.wa{background:#25D366;color:#fff;border-color:#25D366}
+.item .desc{font-size:14px;font-weight:600;opacity:.75;margin-top:4px;line-height:1.5}
+.item.bowl img{width:110px;height:84px}
+.btn.build{min-height:48px;padding:8px 18px;font-size:16px;white-space:nowrap}
+.blines{display:flex;flex-direction:column;gap:8px;padding:0 14px 14px;margin-top:-4px}
+.bline{display:flex;align-items:center;gap:10px;background:var(--c);border-radius:14px;padding:8px 10px}
+.bline .t{flex:1;min-width:0;font-weight:700;font-size:14px;line-height:1.4}
+.bline .qty button{width:38px;height:38px;font-size:20px}
+.sheet-bg{position:fixed;inset:0;z-index:50;background:rgba(40,8,38,.55);display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--c);width:100%;max-width:560px;max-height:94vh;overflow:auto;border-radius:28px 28px 0 0;padding:16px 18px calc(18px + env(safe-area-inset-bottom,0px));box-sizing:border-box;animation:up .3s ease-out}
+@keyframes up{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+.sheet h2{margin:4px 0 2px;font-size:24px}
+.sheet .x{float:inline-end;width:44px;height:44px;border-radius:50%;border:0;background:#fff;color:var(--p);font-size:24px;font-weight:800;cursor:pointer}
+.bowlbox{background:#fff;border-radius:24px;margin:12px 0;padding:6px}
+.bowlbox svg{display:block;width:100%;height:auto}
+.tp{opacity:0;transform:translateY(-26px);transition:opacity .3s,transform .5s cubic-bezier(.2,1.5,.4,1)}
+.tp.on{opacity:1;transform:none}
+.chips{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.chip{min-height:52px;border-radius:16px;border:2px solid #e3d6bf;background:#fff;color:var(--p);font-weight:800;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:6px;padding:8px 12px;font-family:inherit;text-align:start}
+.chip small{font-weight:700;opacity:.7;font-size:13px}
+.chip[aria-pressed="true"]{background:var(--p);color:var(--c);border-color:var(--p)}
+.sheet .total{display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:18px;margin:14px 2px 10px}
+.preview{background:var(--o);color:var(--p);text-align:center;font-weight:800;padding:10px 14px}
 .freebox{background:var(--o);color:var(--p);border-radius:14px;padding:10px 16px;font-weight:800}
 .track .num{font-family:'Montserrat',sans-serif;font-weight:800;font-size:68px;line-height:1}
 .prog{display:flex;width:100%;gap:6px;margin:6px 0}
@@ -144,6 +166,7 @@ setTimeout(function(){if(!window.__appStarted)show('The page script did not run.
 
 <script type="module">
 import { api, $, esc, money, arNum } from './assets/common.js?v=1791732362';
+import { bowlSVG } from './assets/bowl.js?v=1';
 window.__appStarted = true;
 (async () => {
 
@@ -155,6 +178,8 @@ const T = {
     time: 'وقت الاستلام', notes: 'ملاحظات (اختياري)', notesPh: 'مثلاً: بدون ثلج', offers: 'أبي توصلني عروض أساي دوز على الواتساب',
     howto: 'توقف قدام المحل في القرم ٢٩ واضغط "وصلت"، ونجيب لك الطلب لين سيارتك.', map: 'الموقع في الخريطة',
     back: 'رجوع', next: 'التالي', send: 'أرسل الطلب', sending: 'يرسل…', omr: 'ر.ع', edit: 'عدّل الطلب',
+    build: 'اصنع باولك', from: 'يبدأ من', tops: 'اختار الإضافات', baseBowl: 'باول أساي', addTo: t => `أضف للطلب · ${t}`, items: n => `${arNum(n)} ${n === 1 ? 'صنف' : 'أصناف'}`,
+    preview: 'صفحة معاينة · الطلب مقفل هني', previewNo: 'هذي صفحة معاينة بس، الطلب منها مقفل',
     none: 'ما اخترت شي', cups: n => `${arNum(n)} ${n === 1 ? 'كوب' : n === 2 ? 'كوبين' : 'أكواب'}`,
     asap: 'بأسرع وقت (١٥ – ٢٠ دقيقة)', am: 'ص', pm: 'م', add: 'أضف', less: 'نقّص',
     eCar: 'اكتب رقم السيارة', eName: 'اكتب اسمك', ePhone: 'اكتب رقم جوال عماني من ٨ أرقام', eClosed: 'المحل مسكر الحين',
@@ -176,6 +201,8 @@ const T = {
     time: 'Pickup time', notes: 'Notes (optional)', notesPh: 'e.g. No ice', offers: 'Send me Açaí Dose offers on WhatsApp',
     howto: 'Park in front of our shop in Al Qurum 29 and tap "I\'m here". We\'ll bring your order to your car.', map: 'Open in Maps',
     back: 'Back', next: 'Next', send: 'Place order', sending: 'Sending…', omr: 'OMR', edit: 'Edit order',
+    build: 'Build yours', from: 'From', tops: 'Pick your toppings', baseBowl: 'Açaí bowl', addTo: t => `Add to order · ${t}`, items: n => `${n} ${n === 1 ? 'item' : 'items'}`,
+    preview: 'Preview page · ordering is off here', previewNo: 'This is only a preview, ordering is off here',
     none: 'Nothing selected', cups: n => `${n} ${n === 1 ? 'cup' : 'cups'}`,
     asap: 'As soon as possible (15 – 20 min)', am: 'AM', pm: 'PM', add: 'Add', less: 'Remove one',
     eCar: 'Enter your car plate number', eName: 'Enter your name', ePhone: 'Enter an 8-digit Omani mobile number', eClosed: 'We are closed now',
@@ -199,7 +226,9 @@ const store = {
 };
 let lang = store.get('ad_lang') || ((navigator.language || '').toLowerCase().startsWith('ar') ? 'ar' : 'en');
 let L = T[lang];
-const cart = new Map();
+const cart = new Map();   // key -> { pid, qty, tops: [topping ids] }
+const PREVIEW = new URLSearchParams(location.search).has('preview');
+let toppings = [];
 let products = [], step = 1, trackToken = null, shopWa = '';
 const WA_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 11.9 11.9 0 0 0 4.6 4c1.7.7 2.4.8 3.2.7.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>';
 const waLink = text => `https://wa.me/${shopWa.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`;
@@ -246,24 +275,83 @@ function buildTimes() {
 const isOpen = () => $('#time').options.length > 0;
 const pname = p => lang === 'ar' ? p.name_ar : p.name_en;
 
+const prod = id => products.find(p => p.id === id);
+const pdesc = p => (lang === 'ar' ? p.desc_ar : p.desc_en) || '';
+const topById = id => toppings.find(t => t.id === id);
+const lineUnit = l => (prod(l.pid) ? prod(l.pid).price : 0) + l.tops.reduce((a, id) => a + (topById(id) ? topById(id).price : 0), 0);
+const lineName = l => {
+  const p = prod(l.pid); if (!p) return '';
+  const names = l.tops.map(id => topById(id)).filter(Boolean).map(t => lang === 'ar' ? t.name_ar : t.name_en);
+  return pname(p) + (names.length ? ` (${names.join(lang === 'ar' ? '، ' : ', ')})` : '');
+};
+const qtyBtns = (key, q, label) => `<div class="qty">
+  ${q ? `<button type="button" data-key="${key}" data-d="-1" aria-label="${L.less} ${esc(label)}">−</button><span aria-live="polite">${L.num(q)}</span>` : ''}
+  <button type="button" class="add" data-key="${key}" data-d="1" aria-label="${L.add} ${esc(label)}">+</button></div>`;
+
 function render() {
   $('#menu').innerHTML = products.map(p => {
-    const q = cart.get(p.id) || 0;
     const main = lang === 'ar' ? `<div class="ar lal">${esc(p.name_ar)}</div><div class="en mon">${esc(p.name_en)}</div>`
                                : `<div class="ar mon" style="font-weight:800;font-size:19px">${esc(p.name_en)}</div><div class="en" dir="rtl">${esc(p.name_ar)}</div>`;
-    return `<div class="card item">
+    const desc = pdesc(p) ? `<div class="desc">${esc(pdesc(p))}</div>` : '';
+    const isBowl = p.kind === 'bowl' || p.kind === 'build';
+    if (p.kind === 'build') {
+      const lines = [...cart.entries()].filter(([, l]) => l.pid === p.id);
+      return `<div class="card"><div class="item bowl">
+        <img src="assets/${esc(p.img || 'bowl-build.png')}" alt="">
+        <div class="info">${main}${desc}<div class="price">${L.from} <span class="mon">${money(p.price)}</span> ${L.omr}</div></div></div>
+        <div style="padding:0 14px 14px"><button type="button" class="btn orange build" data-build="${p.id}" style="width:100%">${L.build}</button></div>
+        ${lines.length ? `<div class="blines">${lines.map(([k, l]) => `<div class="bline"><div class="t">${esc(lineName(l))}<br><span class="mon">${money(lineUnit(l))}</span> ${L.omr}</div>${qtyBtns(k, l.qty, lineName(l))}</div>`).join('')}</div>` : ''}
+      </div>`;
+    }
+    const key = String(p.id), q = cart.get(key) ? cart.get(key).qty : 0;
+    return `<div class="card item${isBowl ? ' bowl' : ''}">
       <img src="assets/${esc(p.img || 'cup-smoothie.png')}" alt="">
-      <div class="info">${main}<div class="price"><span class="mon">${money(p.price)}</span> ${L.omr}</div></div>
-      <div class="qty">
-        ${q ? `<button type="button" data-id="${p.id}" data-d="-1" aria-label="${L.less} ${esc(pname(p))}">−</button><span aria-live="polite">${L.num(q)}</span>` : ''}
-        <button type="button" class="add" data-id="${p.id}" data-d="1" aria-label="${L.add} ${esc(pname(p))}">+</button>
-      </div></div>`;
+      <div class="info">${main}${desc}<div class="price"><span class="mon">${money(p.price)}</span> ${L.omr}</div></div>
+      ${qtyBtns(key, q, pname(p))}</div>`;
   }).join('');
-  let n = 0, tot = 0;
-  for (const p of products) { const q = cart.get(p.id) || 0; n += q; tot += q * p.price; }
+  let n = 0, tot = 0, bowls = false;
+  for (const l of cart.values()) { n += l.qty; tot += l.qty * lineUnit(l); const p = prod(l.pid); if (p && p.kind !== 'cup') bowls = true; }
   $('#total').textContent = money(tot);
-  $('#count').textContent = n ? L.cups(n) : L.none;
-  $('#next').disabled = n === 0 || !isOpen();
+  $('#count').textContent = n ? (bowls ? L.items(n) : L.cups(n)) : L.none;
+  $('#next').disabled = n === 0 || !isOpen() || PREVIEW;
+}
+
+// ---------- build your bowl ----------
+function openBuilder(pid) {
+  const p = prod(pid); if (!p) return;
+  const picked = new Set();
+  const bg = document.createElement('div');
+  bg.className = 'sheet-bg';
+  bg.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="bt">
+    <button type="button" class="x" aria-label="×">×</button>
+    <h2 id="bt" class="lal">${esc(pname(p))}</h2>
+    <div style="font-weight:700;opacity:.75">${L.tops}</div>
+    <div class="bowlbox">${bowlSVG([], { label: pname(p) })}</div>
+    <div class="chips">${toppings.map(t => `<button type="button" class="chip" data-t="${t.id}" aria-pressed="false"><span>${esc(lang === 'ar' ? t.name_ar : t.name_en)}</span>${t.price > 0 ? `<small class="mon">+${money(t.price)}</small>` : ''}</button>`).join('')}</div>
+    <div class="total"><span>${L.baseBowl} <span class="mon">${money(p.price)}</span></span><span><span class="mon" id="btot"></span> ${L.omr}</span></div>
+    <button type="button" class="btn" id="badd" style="width:100%"></button>
+  </div>`;
+  document.body.appendChild(bg);
+  document.body.style.overflow = 'hidden';
+  const sum = () => p.price + [...picked].reduce((a, id) => a + (topById(id) ? topById(id).price : 0), 0);
+  const upd = () => { bg.querySelector('#btot').textContent = money(sum()); bg.querySelector('#badd').textContent = L.addTo(money(sum()) + ' ' + L.omr); };
+  const close = () => { bg.remove(); document.body.style.overflow = ''; };
+  bg.querySelector('.x').onclick = close;
+  bg.addEventListener('click', e => { if (e.target === bg) close(); });
+  bg.querySelector('.chips').addEventListener('click', e => {
+    const c = e.target.closest('.chip'); if (!c) return;
+    const id = +c.dataset.t, t = topById(id); const on = !picked.has(id);
+    on ? picked.add(id) : picked.delete(id);
+    c.setAttribute('aria-pressed', String(on));
+    const layer = t && bg.querySelector('.tp-' + t.k); if (layer) layer.classList.toggle('on', [...picked].some(x => topById(x) && topById(x).k === t.k));
+    upd();
+  });
+  bg.querySelector('#badd').onclick = () => {
+    const tops = [...picked].sort((a, b) => a - b), key = `${pid}:${tops.join('.')}`;
+    const cur = cart.get(key); cart.set(key, { pid, qty: Math.min(20, (cur ? cur.qty : 0) + 1), tops });
+    close(); render();
+  };
+  upd();
 }
 
 function goStep(s, quiet) {
@@ -276,8 +364,8 @@ function goStep(s, quiet) {
   $('#htitle').textContent = s === 1 ? L.pick : L.details;
   if (!quiet) $('#err').textContent = '';
   if (s === 2) {
-    $('#summary').innerHTML = products.filter(p => cart.get(p.id)).map(p =>
-      `<div class="l"><span>${L.num(cart.get(p.id))}× ${esc(pname(p))}</span><span class="mon">${money(cart.get(p.id) * p.price)}</span></div>`).join('')
+    $('#summary').innerHTML = [...cart.values()].map(l =>
+      `<div class="l"><span>${L.num(l.qty)}× ${esc(lineName(l))}</span><span class="mon">${money(l.qty * lineUnit(l))}</span></div>`).join('')
       + `<button type="button" id="edit">${L.edit}</button>`;
     $('#edit').onclick = () => goStep(1);
     if (!quiet) {
@@ -290,15 +378,18 @@ function goStep(s, quiet) {
 }
 
 $('#menu').addEventListener('click', e => {
-  const b = e.target.closest('button[data-id]'); if (!b) return;
-  const id = +b.dataset.id, q = Math.max(0, Math.min(20, (cart.get(id) || 0) + +b.dataset.d));
-  q ? cart.set(id, q) : cart.delete(id);
+  const bb = e.target.closest('button[data-build]'); if (bb) return openBuilder(+bb.dataset.build);
+  const b = e.target.closest('button[data-key]'); if (!b) return;
+  const key = b.dataset.key, cur = cart.get(key) || { pid: +key.split(':')[0], qty: 0, tops: [] };
+  const q = Math.max(0, Math.min(20, cur.qty + +b.dataset.d));
+  q ? cart.set(key, { ...cur, qty: q }) : cart.delete(key);
   render();
 });
 $('#phone').addEventListener('input', e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 8); });
 $('#back').onclick = () => goStep(1);
 
 $('#next').addEventListener('click', async () => {
+  if (PREVIEW) { $('#err').textContent = L.previewNo; return; }
   if (step === 1) return goStep(2);
   const err = $('#err'); err.textContent = '';
   const car = $('#car').value.trim(), name = $('#name').value.trim(), phone = $('#phone').value.trim();
@@ -310,7 +401,7 @@ $('#next').addEventListener('click', async () => {
   try {
     const r = await api('place_order', {
       name, phone: '+968' + phone, car_plate: car.toUpperCase(), car_desc: $('#cardesc').value.trim(),
-      pickup: $('#time').value, notes: $('#notes').value, offers: $('#offers').checked, items: [...cart].map(([product_id, qty]) => ({ product_id, qty })),
+      pickup: $('#time').value, notes: $('#notes').value, offers: $('#offers').checked, items: [...cart.values()].map(l => ({ product_id: l.pid, qty: l.qty, toppings: l.tops })),
     });
     store.set('ad_name', name); store.set('ad_phone', phone); store.set('ad_car', car); store.set('ad_cardesc', $('#cardesc').value.trim());
     store.set('ad_track', r.token); if (r.card) store.set('ad_card', r.card); store.set('ad_offers', $('#offers').checked ? '1' : '');
@@ -395,7 +486,11 @@ function showTrack(token) {
   if (fromLink && /^[a-f0-9]{32}$/.test(fromLink)) { store.set('ad_track', fromLink); history.replaceState(null, '', location.pathname); }
   const saved = store.get('ad_track');
   if (saved && /^[a-f0-9]{32}$/.test(saved)) return showTrack(saved);
-  try { products = await api('menu'); }
+  if (PREVIEW) { const bar = document.createElement('div'); bar.className = 'preview'; bar.textContent = L.preview; document.body.prepend(bar); }
+  try {
+    const [m, t] = await Promise.all([api('menu', undefined, PREVIEW ? { preview: '1' } : {}), api('toppings').catch(() => [])]);
+    products = m; toppings = Array.isArray(t) ? t : [];
+  }
   catch { $('#menu').innerHTML = `<div class="card item">${L.eMenu}</div>`; return; }
   render();
 })();

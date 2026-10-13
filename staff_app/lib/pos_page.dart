@@ -19,7 +19,9 @@ class PosPage extends StatefulWidget {
 
 class _PosPageState extends State<PosPage> {
   List<Map<String, dynamic>> _products = [];
-  final Map<int, int> _cart = {};
+  /// Sale lines: key = product id, or "id:t1.t2" for a built bowl with its toppings; value = quantity.
+  final Map<String, int> _cart = {};
+  List<Map<String, dynamic>> _toppings = [];
   List<Map<String, dynamic>> _today = [];
   final _given = TextEditingController();
   final _phone = TextEditingController();
@@ -52,8 +54,13 @@ class _PosPageState extends State<PosPage> {
   Future<void> _loadMenu() async {
     try {
       final r = await Api.I.get('menu');
+      List<Map<String, dynamic>> tops = [];
+      try {
+        tops = ((await Api.I.get('toppings')) as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      } catch (_) {}
       setState(() {
         _products = (r as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        _toppings = tops;
         _menuErr = '';
       });
     } catch (e) {
@@ -74,25 +81,96 @@ class _PosPageState extends State<PosPage> {
   double _price(Map<String, dynamic> p) => (p['price'] as num).toDouble();
   int _id(Map<String, dynamic> p) => (p['id'] as num).toInt();
 
-  double get _subtotal => _products.fold(0.0, (s, p) => s + (_cart[_id(p)] ?? 0) * _price(p));
+  Map<String, dynamic>? _prod(int id) {
+    for (final p in _products) {
+      if (_id(p) == id) return p;
+    }
+    return null;
+  }
+
+  int _keyPid(String k) => int.parse(k.split(':').first);
+  List<int> _keyTops(String k) {
+    final parts = k.split(':');
+    if (parts.length < 2 || parts[1].isEmpty) return [];
+    return parts[1].split('.').map(int.parse).toList();
+  }
+
+  List<Map<String, dynamic>> _topsOf(String k) => [
+        for (final id in _keyTops(k))
+          for (final t in _toppings)
+            if ((t['id'] as num).toInt() == id) t
+      ];
+
+  double _unit(String k) {
+    final p = _prod(_keyPid(k));
+    if (p == null) return 0;
+    return _price(p) + _topsOf(k).fold(0.0, (s, t) => s + (t['price'] as num).toDouble());
+  }
+
+  String _lineName(String k, {bool ar = false}) {
+    final p = _prod(_keyPid(k));
+    if (p == null) return '';
+    final tops = _topsOf(k).map((t) => '${ar ? t['name_ar'] : t['name_en']}').toList();
+    final base = '${ar ? p['name_ar'] : p['name_en']}';
+    return tops.isEmpty ? base : '$base (${tops.join(ar ? '، ' : ', ')})';
+  }
+
+  int _qtyOf(int pid) => _cart.entries.where((e) => _keyPid(e.key) == pid).fold<int>(0, (s, e) => s + e.value);
+
+  double get _subtotal => _cart.entries.fold(0.0, (s, e) => s + e.value * _unit(e.key));
   bool get _freeOn => _useFree && _cust != null && ((_cust!['free'] as num?) ?? 0) > 0;
   double get _discount {
-    if (!_freeOn) return 0;
-    final inCart = _products.where((p) => (_cart[_id(p)] ?? 0) > 0).map(_price).toList();
-    return inCart.isEmpty ? 0 : inCart.reduce((a, b) => a > b ? a : b);
+    if (!_freeOn || _cart.isEmpty) return 0;
+    // The free cup covers the dearest item's base price; toppings stay paid
+    return _cart.keys.map((k) => _price(_prod(_keyPid(k)) ?? {'price': 0})).reduce((a, b) => a > b ? a : b);
   }
 
   double get _total => (_subtotal - _discount).clamp(0, double.infinity).toDouble();
 
-  void _add(int id, int d) {
+  void _add(String key, int d) {
     setState(() {
-      final q = (_cart[id] ?? 0) + d;
+      final q = (_cart[key] ?? 0) + d;
       if (q > 0) {
-        _cart[id] = q;
+        _cart[key] = q;
       } else {
-        _cart.remove(id);
+        _cart.remove(key);
       }
     });
+  }
+
+  /// Build-your-bowl: pick toppings, then the bowl goes into the sale.
+  Future<void> _buildBowl(Map<String, dynamic> p) async {
+    final picked = <int>{};
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => StatefulBuilder(
+        builder: (c, set) {
+          final sum = _price(p) + _toppings.where((t) => picked.contains((t['id'] as num).toInt())).fold(0.0, (s, t) => s + (t['price'] as num).toDouble());
+          return AlertDialog(
+            title: Text('${p['name_en']}'),
+            content: SizedBox(
+              width: 420,
+              child: Wrap(spacing: 8, runSpacing: 8, children: [
+                for (final t in _toppings)
+                  FilterChip(
+                    label: Text('${t['name_en']}${(t['price'] as num) > 0 ? '  +${money(t['price'])}' : ''}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                    selected: picked.contains((t['id'] as num).toInt()),
+                    selectedColor: kOrange,
+                    onSelected: (v) => set(() => v ? picked.add((t['id'] as num).toInt()) : picked.remove((t['id'] as num).toInt())),
+                  ),
+              ]),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+              FilledButton(onPressed: () => Navigator.pop(c, true), child: Text('Add · ${money(sum)} OMR')),
+            ],
+          );
+        },
+      ),
+    );
+    if (ok != true) return;
+    final ids = picked.toList()..sort();
+    _add('${_id(p)}:${ids.join('.')}', 1);
   }
 
   void _reset() {
@@ -131,7 +209,7 @@ class _PosPageState extends State<PosPage> {
       return;
     }
     final shop = payment == 'cash' || payment == 'card';
-    final items = _cart.entries.map((e) => {'product_id': e.key, 'qty': e.value}).toList();
+    final items = _cart.entries.map((e) => {'product_id': _keyPid(e.key), 'qty': e.value, 'toppings': _keyTops(e.key)}).toList();
     setState(() {
       _busy = true;
       _err = '';
@@ -149,9 +227,7 @@ class _PosPageState extends State<PosPage> {
         time: DateTime.now(),
         source: 'pos',
         items: [
-          for (final p in _products)
-            if ((_cart[_id(p)] ?? 0) > 0)
-              ReceiptItem(qty: _cart[_id(p)]!, nameEn: '${p['name_en'] ?? ''}', nameAr: '${p['name_ar'] ?? ''}', price: _price(p)),
+          for (final e in _cart.entries) ReceiptItem(qty: e.value, nameEn: _lineName(e.key), nameAr: _lineName(e.key, ar: true), price: _unit(e.key)),
         ],
         total: ((r['total'] as num?) ?? _total).toDouble(),
         discount: ((r['free_cups'] as num?) ?? 0) > 0 ? _discount : 0,
@@ -228,7 +304,7 @@ class _PosPageState extends State<PosPage> {
             borderRadius: BorderRadius.circular(18),
             child: InkWell(
               borderRadius: BorderRadius.circular(18),
-              onTap: () => _add(_id(p), 1),
+              onTap: () => p['kind'] == 'build' ? _buildBowl(p) : _add('${_id(p)}', 1),
               child: Padding(
                 padding: const EdgeInsets.all(10),
                 child: Column(children: [
@@ -238,14 +314,14 @@ class _PosPageState extends State<PosPage> {
                         child: Image.network('$kSite/assets/${p['img'] ?? 'cup-smoothie.png'}',
                             fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.local_drink, size: 64, color: kPurple)),
                       ),
-                      if ((_cart[_id(p)] ?? 0) > 0)
+                      if (_qtyOf(_id(p)) > 0)
                         Positioned(
                           top: 0,
                           right: 0,
                           child: CircleAvatar(
                             radius: 18,
                             backgroundColor: kOrange,
-                            child: Text('${_cart[_id(p)]}', style: const TextStyle(color: kPurple, fontWeight: FontWeight.w900, fontSize: 16)),
+                            child: Text('${_qtyOf(_id(p))}', style: const TextStyle(color: kPurple, fontWeight: FontWeight.w900, fontSize: 16)),
                           ),
                         ),
                     ]),
@@ -262,7 +338,7 @@ class _PosPageState extends State<PosPage> {
   }
 
   Widget _ticket() {
-    final rows = _products.where((p) => (_cart[_id(p)] ?? 0) > 0).toList();
+    final rows = _cart.keys.toList();
     final given = double.tryParse(_given.text);
     final t = _total;
     final can = t > 0 && !_busy;
@@ -278,15 +354,15 @@ class _PosPageState extends State<PosPage> {
             TextButton(onPressed: _reset, child: const Text('Clear')),
           ]),
           if (rows.isEmpty) const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Text('Tap a drink to add it', style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w700))),
-          for (final p in rows)
+          for (final k in rows)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 3),
               child: Row(children: [
-                Expanded(child: Text('${p['name_en']}', style: const TextStyle(fontWeight: FontWeight.w700))),
-                IconButton.outlined(onPressed: () => _add(_id(p), -1), icon: const Icon(Icons.remove)),
-                SizedBox(width: 30, child: Text('${_cart[_id(p)]}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17))),
-                IconButton.outlined(onPressed: () => _add(_id(p), 1), icon: const Icon(Icons.add)),
-                SizedBox(width: 70, child: Text(money((_cart[_id(p)] ?? 0) * _price(p)), textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w800))),
+                Expanded(child: Text(_lineName(k), style: const TextStyle(fontWeight: FontWeight.w700))),
+                IconButton.outlined(onPressed: () => _add(k, -1), icon: const Icon(Icons.remove)),
+                SizedBox(width: 30, child: Text('${_cart[k]}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17))),
+                IconButton.outlined(onPressed: () => _add(k, 1), icon: const Icon(Icons.add)),
+                SizedBox(width: 70, child: Text(money((_cart[k] ?? 0) * _unit(k)), textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w800))),
               ]),
             ),
           const Divider(height: 20),

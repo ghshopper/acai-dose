@@ -33,17 +33,37 @@ function order_row(array $o): array {
     unset($o['token']);
     return $o;
 }
-/** Validates [{product_id, qty}] against the menu; returns [lines, total]. */
+/** Validates [{product_id, qty, toppings?}] against the menu; returns [lines, total].
+ *  "Build your bowl" lines carry the chosen toppings; their names list them so every screen and receipt shows them. */
 function price_items($items): array {
     if (!is_array($items) || !count($items) || count($items) > 15) fail('invalid_items');
     $lines = []; $total = 0.0;
     foreach ($items as $it) {
         $pid = (int)($it['product_id'] ?? 0); $qty = (int)($it['qty'] ?? 0);
         if ($qty < 1 || $qty > 50) fail('invalid_qty');
-        $p = q('SELECT id, name_ar, name_en, price FROM products WHERE id = ? AND active = 1', [$pid])->fetch();
+        $p = q('SELECT id, name_ar, name_en, price, kind FROM products WHERE id = ? AND active = 1', [$pid])->fetch();
         if (!$p) fail('invalid_product');
-        $lines[] = ['product_id' => (int)$p['id'], 'name_ar' => $p['name_ar'], 'name_en' => $p['name_en'], 'price' => (float)$p['price'], 'qty' => $qty];
-        $total += (float)$p['price'] * $qty;
+        $line = ['product_id' => (int)$p['id'], 'name_ar' => $p['name_ar'], 'name_en' => $p['name_en'], 'price' => (float)$p['price'], 'qty' => $qty];
+        if (($p['kind'] ?? 'cup') === 'build') {
+            $ids = array_values(array_unique(array_map('intval', is_array($it['toppings'] ?? null) ? $it['toppings'] : [])));
+            if (count($ids) > 12) fail('invalid_items');
+            $tops = [];
+            foreach ($ids as $tid) {
+                $t = q('SELECT id, k, name_ar, name_en, price FROM toppings WHERE id = ? AND active = 1', [$tid])->fetch();
+                if (!$t) fail('invalid_topping');
+                $tops[] = $t;
+            }
+            usort($tops, fn($a, $b) => $a['id'] <=> $b['id']);
+            $line['base'] = $line['price'];
+            $line['toppings'] = array_map(fn($t) => ['id' => (int)$t['id'], 'k' => $t['k'], 'name_ar' => $t['name_ar'], 'name_en' => $t['name_en'], 'price' => (float)$t['price']], $tops);
+            $line['price'] = money($line['price'] + array_sum(array_map(fn($t) => (float)$t['price'], $tops)));
+            if ($tops) {
+                $line['name_ar'] .= ' (' . implode('، ', array_map(fn($t) => $t['name_ar'], $tops)) . ')';
+                $line['name_en'] .= ' (' . implode(', ', array_map(fn($t) => $t['name_en'], $tops)) . ')';
+            }
+        }
+        $lines[] = $line;
+        $total += $line['price'] * $qty;
     }
     return [$lines, money($total)];
 }
@@ -70,8 +90,16 @@ switch ($a) {
 // ---------------- public ----------------
 case 'menu':
     out(array_map(fn($p) => ['id' => (int)$p['id'], 'name_ar' => $p['name_ar'], 'name_en' => $p['name_en'],
-        'img' => $p['img'], 'price' => (float)$p['price']],
-        q('SELECT * FROM products WHERE active = 1 ORDER BY sort, id')->fetchAll()));
+        'img' => $p['img'], 'price' => (float)$p['price'], 'kind' => $p['kind'] ?? 'cup',
+        'desc_ar' => (string)($p['desc_ar'] ?? ''), 'desc_en' => (string)($p['desc_en'] ?? '')],
+        // ?preview=1: the menu as it will look with the bowls switched on (no Mini), for the owner's check before launch
+        !empty($_GET['preview'])
+            ? q("SELECT * FROM products WHERE (active = 1 OR kind IN ('bowl','build')) AND name_en NOT LIKE 'Mini %' ORDER BY sort, id")->fetchAll()
+            : q('SELECT * FROM products WHERE active = 1 ORDER BY sort, id')->fetchAll()));
+
+case 'toppings':   // public: what can go on a "build your bowl"
+    out(array_map(fn($t) => ['id' => (int)$t['id'], 'k' => $t['k'], 'name_ar' => $t['name_ar'], 'name_en' => $t['name_en'], 'price' => (float)$t['price']],
+        q('SELECT * FROM toppings WHERE active = 1 ORDER BY sort, id')->fetchAll()));
 
 case 'shop_info':    // public: how customers can reach the shop
     out(['whatsapp' => setting('shop_whatsapp')]);
@@ -95,7 +123,7 @@ case 'place_order':
     $free = 0; $discount = 0.0;
     $ls = loyalty_state($phone);
     if ($ls['on'] && $ls['free'] > 0) {
-        $free = 1; $discount = max(array_map(fn($l) => $l['price'], $lines)); $total = money($total - $discount);
+        $free = 1; $discount = max(array_map(fn($l) => $l['base'] ?? $l['price'], $lines)); $total = money($total - $discount);
     }
     $token = bin2hex(random_bytes(16));
     $no = insert_order([
@@ -197,7 +225,7 @@ case 'pos_sale':
         if (!empty($in['use_free'])) {
             $ls = loyalty_state($cphone);
             if (!$ls['on'] || $ls['free'] < 1) fail('no_free_cup');
-            $free = 1; $discount = max(array_map(fn($l) => $l['price'], $lines)); $total = money($total - $discount);
+            $free = 1; $discount = max(array_map(fn($l) => $l['base'] ?? $l['price'], $lines)); $total = money($total - $discount);
         }
     }
     $no = insert_order([
@@ -373,12 +401,15 @@ case 'customer_orders':  // owner: one customer's order history
 case 'settings':
     need('owner');
     $c = []; foreach (q('SELECT * FROM channel_commissions')->fetchAll() as $r) $c[$r['channel']] = (float)$r['pct'];
-    $p = array_map(fn($r) => ['id' => (int)$r['id'], 'name_ar' => $r['name_ar'], 'price' => (float)$r['price'], 'active' => (int)$r['active']],
+    $p = array_map(fn($r) => ['id' => (int)$r['id'], 'name_ar' => $r['name_ar'], 'name_en' => $r['name_en'], 'price' => (float)$r['price'], 'active' => (int)$r['active'],
+        'kind' => $r['kind'] ?? 'cup', 'desc_ar' => (string)($r['desc_ar'] ?? ''), 'desc_en' => (string)($r['desc_en'] ?? '')],
         q('SELECT * FROM products ORDER BY sort, id')->fetchAll());
+    $tp = array_map(fn($r) => ['id' => (int)$r['id'], 'k' => $r['k'], 'name_ar' => $r['name_ar'], 'name_en' => $r['name_en'], 'price' => (float)$r['price'], 'active' => (int)$r['active']],
+        q('SELECT * FROM toppings ORDER BY sort, id')->fetchAll());
     $u = array_map(fn($r) => ['id' => (int)$r['id'], 'username' => $r['username'], 'role' => $r['role'], 'active' => (int)$r['active']],
         q('SELECT id, username, role, active FROM users ORDER BY id')->fetchAll());
     require_once __DIR__ . '/gwallet_lib.php';
-    out(['commissions' => $c, 'products' => $p, 'users' => $u, 'loyalty' => loyalty_cfg(), 'wallet' => wallet_status(), 'gwallet' => gw_status(),
+    out(['commissions' => $c, 'products' => $p, 'toppings' => $tp, 'users' => $u, 'loyalty' => loyalty_cfg(), 'wallet' => wallet_status(), 'gwallet' => gw_status(),
          'whatsapp' => setting('shop_whatsapp'),
          'location' => ['coords' => setting('shop_lat') !== '' ? setting('shop_lat') . ', ' . setting('shop_lng') : '', 'text' => setting('nearby_text')]]);
 
@@ -450,6 +481,14 @@ case 'save_product':
     $price = (float)($in['price'] ?? -1); if ($price < 0) fail('bad_amount');
     if (!empty($in['active']) && $price <= 0) fail('need_price');   // never sell a cup for 0
     q('UPDATE products SET price = ?, active = ? WHERE id = ?', [money($price), !empty($in['active']) ? 1 : 0, (int)($in['id'] ?? 0)]);
+    if (array_key_exists('desc_ar', $in) || array_key_exists('desc_en', $in))
+        q('UPDATE products SET desc_ar = ?, desc_en = ? WHERE id = ?', [clean((string)($in['desc_ar'] ?? ''), 300) ?: null, clean((string)($in['desc_en'] ?? ''), 300) ?: null, (int)($in['id'] ?? 0)]);
+    out(['ok' => true]);
+
+case 'save_topping':
+    $post(); need('owner');
+    $price = (float)($in['price'] ?? -1); if ($price < 0) fail('bad_amount');
+    q('UPDATE toppings SET price = ?, active = ? WHERE id = ?', [money($price), !empty($in['active']) ? 1 : 0, (int)($in['id'] ?? 0)]);
     out(['ok' => true]);
 
 case 'add_user':

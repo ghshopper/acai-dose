@@ -94,7 +94,9 @@ class _SettingsPageState extends State<SettingsPage> {
                   onRefresh: _load,
                   child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 40), children: [
                     const SectionTitle('المنيو والأسعار', note: 'اللي تطفيه يختفي من الموقع والكاشير'),
-                    for (final p in (s['products'] as List)) _ProductRow(product: Map<String, dynamic>.from(p as Map), onSave: (body) => _post('save_product', body, 'انحفظ السعر')),
+                    for (final p in (s['products'] as List)) _ProductRow(product: Map<String, dynamic>.from(p as Map), onSave: (body) => _post('save_product', body, 'انحفظ')),
+                    const SectionTitle('إضافات اصنع أساي باولك', note: 'تنضاف على سعر الباول'),
+                    for (final t in ((s['toppings'] as List?) ?? [])) _ToppingRow(topping: Map<String, dynamic>.from(t as Map), onSave: (body) => _post('save_topping', body, 'انحفظت الإضافة')),
                     const SectionTitle('واتساب المحل', note: 'يطلع زر للزبائن في صفحة الطلب'),
                     Panel(
                       child: Row(children: [
@@ -287,6 +289,29 @@ class _ProductRowState extends State<_ProductRow> {
     super.dispose();
   }
 
+  Future<void> _editDesc() async {
+    final ar = TextEditingController(text: '${widget.product['desc_ar'] ?? ''}');
+    final en = TextEditingController(text: '${widget.product['desc_en'] ?? ''}');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (d) => AlertDialog(
+        title: Text('وصف ${widget.product['name_ar']}'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextField(controller: ar, maxLines: 3, decoration: const InputDecoration(labelText: 'بالعربي')),
+          const SizedBox(height: 10),
+          TextField(controller: en, maxLines: 3, textDirection: TextDirection.ltr, decoration: const InputDecoration(labelText: 'English')),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('إلغاء')),
+          FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('احفظ')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final p = double.tryParse(_price.text.trim()) ?? 0;
+    await widget.onSave({'id': widget.product['id'], 'price': p, 'active': _active, 'desc_ar': ar.text.trim(), 'desc_en': en.text.trim()});
+  }
+
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(bottom: 8),
@@ -295,8 +320,19 @@ class _ProductRowState extends State<_ProductRow> {
           child: Column(children: [
             Row(children: [
               Expanded(
-                child: Text('${widget.product['name_ar']}',
-                    style: TextStyle(fontWeight: FontWeight.w800, color: _active ? Colors.black87 : Colors.black38, decoration: _active ? null : TextDecoration.lineThrough)),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('${widget.product['name_ar']}',
+                      style: TextStyle(fontWeight: FontWeight.w800, color: _active ? Colors.black87 : Colors.black38, decoration: _active ? null : TextDecoration.lineThrough)),
+                  if (widget.product['kind'] == 'build') const Text('سعر الباول بدون الإضافات', style: TextStyle(fontSize: 11, color: Colors.black45, fontWeight: FontWeight.w700)),
+                  GestureDetector(
+                    onTap: _editDesc,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(('${widget.product['desc_ar'] ?? ''}').isEmpty ? '+ أضف وصف' : '${widget.product['desc_ar']}',
+                          maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: kPurple, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                ]),
               ),
               SizedBox(
                 width: 110,
@@ -329,6 +365,65 @@ class _ProductRowState extends State<_ProductRow> {
                   icon: const Icon(Icons.check),
                   label: const Text('احفظ'),
                 ),
+              ),
+          ]),
+        ),
+      );
+}
+
+class _ToppingRow extends StatefulWidget {
+  const _ToppingRow({required this.topping, required this.onSave});
+  final Map<String, dynamic> topping;
+  final Future<void> Function(Map<String, dynamic> body) onSave;
+  @override
+  State<_ToppingRow> createState() => _ToppingRowState();
+}
+
+class _ToppingRowState extends State<_ToppingRow> {
+  late final _price = TextEditingController(text: money(widget.topping['price']));
+  late bool _active = widget.topping['active'] == 1;
+  bool _dirty = false;
+
+  @override
+  void dispose() {
+    _price.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Panel(
+          padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+          child: Row(children: [
+            Expanded(child: Text('${widget.topping['name_ar']}', style: TextStyle(fontWeight: FontWeight.w800, color: _active ? Colors.black87 : Colors.black38))),
+            SizedBox(
+              width: 100,
+              child: TextField(
+                controller: _price,
+                textAlign: TextAlign.center,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(isDense: true, prefixText: '+'),
+                onChanged: (_) => setState(() => _dirty = true),
+              ),
+            ),
+            Switch(value: _active, onChanged: (v) => setState(() {
+                  _active = v;
+                  _dirty = true;
+                })),
+            if (_dirty)
+              IconButton(
+                tooltip: 'احفظ',
+                icon: const Icon(Icons.check_circle, color: kOk),
+                onPressed: () async {
+                  final p = double.tryParse(_price.text.trim());
+                  if (p == null || p < 0) {
+                    toast(context, 'السعر غلط', ok: false);
+                    return;
+                  }
+                  await widget.onSave({'id': widget.topping['id'], 'price': p, 'active': _active});
+                  if (mounted) setState(() => _dirty = false);
+                },
               ),
           ]),
         ),

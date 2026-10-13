@@ -51,6 +51,7 @@ class MorePage extends StatelessWidget {
           _item(context, Icons.wallet, 'المحفظة والموقع', 'إعداد Apple و Google Wallet وموقع المحل', () => _open('dashboard'), external: true),
           _item(context, Icons.upload_file, 'استيراد وتصفير', 'المبيعات القديمة من إكسل', () => _open('dashboard'), external: true),
           _item(context, Icons.storefront, 'صفحة الطلب', 'order.acaiee.com', () => _open(''), external: true),
+          _item(context, Icons.visibility_outlined, 'معاينة المنيو', 'المنيو مع الباول قبل لا تطلقه (الطلب مقفل فيها)', () => _open('index.html?preview=1'), external: true),
           const SizedBox(height: 10),
           _item(context, Icons.logout, 'خروج', 'تسجيل الخروج من التطبيق', () async {
             final ok = await showDialog<bool>(

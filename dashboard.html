@@ -273,7 +273,7 @@ function drawSum({ orders, apps, exps }) {
   const sales = sumT(valid) + manualGross, net = sales - comm - exp;
 
   const prod = {};
-  valid.forEach(o => o.items.forEach(i => { prod[i.name_ar] = (prod[i.name_ar] || 0) + i.qty; }));
+  valid.forEach(o => o.items.forEach(i => { const k = String(i.name_ar).split(' (')[0]; prod[k] = (prod[k] || 0) + i.qty; }));   // built bowls count together
   const prodRows = Object.entries(prod).sort((a, b) => b[1] - a[1]);
 
   const ds = days();
@@ -411,9 +411,11 @@ function drawOrders({ orders }) {
 }
 
 // ---------- settings ----------
+let lastSettings = null;
 async function drawSettings() {
   let st;
   try { st = await api('settings'); } catch (ex) { if (ex.message === 'login_required') location.reload(); return; }
+  lastSettings = st;
   $('[data-panel="set"]').innerHTML = `
     <h3 class="lal">نسبة عمولة التطبيقات</h3>
     <form class="card formrow" id="cf">
@@ -496,11 +498,22 @@ async function drawSettings() {
     <h3 class="lal">المنيو والأسعار</h3>
     <div class="tbl-wrap"><table>
       <thead><tr><th>الصنف</th><th>السعر (ر.ع)</th><th>متوفر</th><th></th></tr></thead>
-      <tbody>${st.products.map(x => `<tr data-pid="${x.id}"><td>${esc(x.name_ar)}</td>
+      <tbody>${st.products.map(x => `<tr data-pid="${x.id}"><td>${esc(x.name_ar)}${x.kind === 'build' ? ' <small style="opacity:.7">(سعر الباول بدون الإضافات)</small>' : ''}<br><button class="btn small ghost" data-desc="${x.id}" type="button" style="margin-top:4px">${x.desc_ar || x.desc_en ? 'عدّل الوصف' : 'أضف وصف'}</button></td>
         <td><input type="number" step="0.001" min="0" value="${x.price.toFixed(3)}" aria-label="سعر ${esc(x.name_ar)}" style="width:110px;min-height:42px;border:2px solid #e3d6bf;border-radius:12px;padding:4px 10px"></td>
         <td><input type="checkbox" ${x.active ? 'checked' : ''} aria-label="${esc(x.name_ar)} متوفر" style="width:24px;height:24px"></td>
         <td><button class="btn small" data-save-prod type="button">احفظ</button></td></tr>`).join('')}</tbody>
     </table></div>
+    <p style="margin:6px 4px 0;font-weight:700;opacity:.75">أي صنف مطفي ما يطلع للزبائن. تشوف المنيو مع الباول قبل لا تطلقه من <a href="index.html?preview=1" target="_blank" rel="noopener" style="color:var(--p);font-weight:800">صفحة المعاينة</a>.</p>
+
+    <h3 class="lal">إضافات «اصنع أساي باولك»</h3>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>الإضافة</th><th>السعر (ر.ع)</th><th>متوفرة</th><th></th></tr></thead>
+      <tbody>${(st.toppings || []).map(t => `<tr data-tid="${t.id}"><td>${esc(t.name_ar)} <small style="opacity:.6" dir="ltr">${esc(t.name_en)}</small></td>
+        <td><input type="number" step="0.001" min="0" value="${t.price.toFixed(3)}" aria-label="سعر ${esc(t.name_ar)}" style="width:110px;min-height:42px;border:2px solid #e3d6bf;border-radius:12px;padding:4px 10px"></td>
+        <td><input type="checkbox" ${t.active ? 'checked' : ''} aria-label="${esc(t.name_ar)} متوفرة" style="width:24px;height:24px"></td>
+        <td><button class="btn small" data-save-top type="button">احفظ</button></td></tr>`).join('')}</tbody>
+    </table></div>
+    <p style="margin:6px 4px 0;font-weight:700;opacity:.75">سعر الإضافة يننضاف على سعر الباول. خل السعر 0 إذا الإضافة مجانية.</p>
 
     <h3 class="lal">حسابات العمال</h3>
     <form class="card formrow" id="uf">
@@ -605,8 +618,25 @@ document.addEventListener('click', async e => {
   if (sp) {
     const tr = sp.closest('tr'); const [price, act] = tr.querySelectorAll('input');
     try { await api('save_product', { id: +tr.dataset.pid, price: +price.value, active: act.checked }); sp.textContent = 'انحفظ ✓'; }
-    catch { sp.textContent = 'خطأ'; }
+    catch (ex) { sp.textContent = 'خطأ'; alert(msg(ex)); }
     setTimeout(() => sp.textContent = 'احفظ', 1500); return;
+  }
+  const stp = e.target.closest('[data-save-top]');
+  if (stp) {
+    const tr = stp.closest('tr'); const [price, act] = tr.querySelectorAll('input');
+    try { await api('save_topping', { id: +tr.dataset.tid, price: +price.value, active: act.checked }); stp.textContent = 'انحفظ ✓'; }
+    catch (ex) { stp.textContent = 'خطأ'; alert(msg(ex)); }
+    setTimeout(() => stp.textContent = 'احفظ', 1500); return;
+  }
+  const dsc = e.target.closest('[data-desc]');
+  if (dsc) {
+    const tr = dsc.closest('tr'); const [price, act] = tr.querySelectorAll('input');
+    const pr = (lastSettings && lastSettings.products || []).find(x => x.id === +dsc.dataset.desc) || {};
+    const ar = prompt('الوصف بالعربي (يطلع تحت اسم الصنف):', pr.desc_ar || ''); if (ar === null) return;
+    const en = prompt('Description in English:', pr.desc_en || ''); if (en === null) return;
+    try { await api('save_product', { id: +tr.dataset.pid, price: +price.value, active: act.checked, desc_ar: ar, desc_en: en }); pr.desc_ar = ar; pr.desc_en = en; dsc.textContent = 'عدّل الوصف'; }
+    catch (ex) { alert(msg(ex)); }
+    return;
   }
   const rs = e.target.closest('[data-reset]');
   if (rs) {

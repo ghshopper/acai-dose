@@ -69,7 +69,7 @@ class Stats {
     for (final o in valid) {
       for (final i in (o['items'] as List? ?? [])) {
         final m = i as Map;
-        final name = '${m['name_ar'] ?? m['name_en'] ?? ''}';
+        final name = '${m['name_ar'] ?? m['name_en'] ?? ''}'.split(' (').first;   // built bowls count together
         prod[name] = (prod[name] ?? 0) + (m['qty'] as num).toInt();
       }
     }

@@ -91,7 +91,13 @@ function create_schema(): void {
             q('INSERT INTO products (name_ar, name_en, img, price, sort, active) VALUES (?,?,?,?,?,0)',
               ['ميني ' . $r['name_ar'], 'Mini ' . $r['name_en'], $r['img'], 2.4, (int)$r['sort'] + 10]);
     }
-    q("UPDATE products SET price = 2.4 WHERE name_en LIKE 'Mini %' AND price = 0");   // owner's Mini price: 2.400
+    // Owner's Mini prices, applied once (later changes are made in Settings)
+    if (!q("SELECT 1 FROM settings WHERE k = 'mini_prices_set'")->fetch()) {
+        q("UPDATE products SET price = 2.4 WHERE name_en = 'Mini Açaí Smoothie' AND price IN (0, 2.4)");
+        q("UPDATE products SET price = 2.5 WHERE name_en IN ('Mini Açaí Smoothie Signature', 'Mini Açaí Smoothie with Peanut Butter') AND price IN (0, 2.4)");
+        q("UPDATE products SET price = 2.4 WHERE name_en LIKE 'Mini %' AND price = 0");
+        q("INSERT INTO settings (k, v) VALUES ('mini_prices_set', '1')");
+    }
     foreach (['talabat', 'snoonu', 'khedmah'] as $c) {
         if (!q('SELECT 1 FROM channel_commissions WHERE channel = ?', [$c])->fetch())
             q('INSERT INTO channel_commissions (channel, pct) VALUES (?, 0)', [$c]);

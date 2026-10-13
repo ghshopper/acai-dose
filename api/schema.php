@@ -26,6 +26,17 @@ function create_schema(): void {
             id $id, expense_date DATE NOT NULL, category VARCHAR(60) NOT NULL, amount DECIMAL(10,3) NOT NULL,
             note VARCHAR(120), created_at DATETIME NOT NULL)$eng",
         "CREATE TABLE IF NOT EXISTS hits (k VARCHAR(120) NOT NULL, at DATETIME NOT NULL)$eng",
+        "CREATE TABLE IF NOT EXISTS ingredients (
+            id $id, k VARCHAR(20) NOT NULL DEFAULT '', name_ar VARCHAR(60) NOT NULL, name_en VARCHAR(60) NOT NULL,
+            unit VARCHAR(4) NOT NULL DEFAULT 'g', pack_price DECIMAL(10,3) NOT NULL DEFAULT 0, pack_qty DECIMAL(12,3) NOT NULL DEFAULT 0,
+            unit_cost DECIMAL(14,6) NOT NULL DEFAULT 0, sort INT NOT NULL DEFAULT 0, active TINYINT NOT NULL DEFAULT 1)$eng",
+        "CREATE TABLE IF NOT EXISTS recipe_items (
+            id $id, product_id INT NOT NULL, ingredient_id INT NOT NULL, qty DECIMAL(10,3) NOT NULL)$eng",
+        "CREATE TABLE IF NOT EXISTS purchases (
+            id $id, purchase_date DATE NOT NULL, ingredient_id INT NOT NULL, qty DECIMAL(12,3) NOT NULL, price DECIMAL(10,3) NOT NULL,
+            note VARCHAR(120) NULL, expense_id INT NULL, created_at DATETIME NOT NULL)$eng",
+        "CREATE TABLE IF NOT EXISTS stock_counts (
+            id $id, counted_at DATETIME NOT NULL, ingredient_id INT NOT NULL, qty DECIMAL(12,3) NOT NULL, expected DECIMAL(12,3) NULL)$eng",
         "CREATE TABLE IF NOT EXISTS toppings (
             id $id, k VARCHAR(20) NOT NULL, name_ar VARCHAR(60) NOT NULL, name_en VARCHAR(60) NOT NULL,
             price DECIMAL(10,3) NOT NULL DEFAULT 0, sort INT NOT NULL DEFAULT 0, active TINYINT NOT NULL DEFAULT 1)$eng",
@@ -110,7 +121,7 @@ function create_schema(): void {
 
     // v6: Mini (8oz) version of each cup, hidden until the owner sets a price and switches it on
     if (!q("SELECT 1 FROM products WHERE name_en LIKE 'Mini %' LIMIT 1")->fetch()) {
-        foreach (q("SELECT * FROM products WHERE name_en NOT LIKE 'Mini %' ORDER BY sort, id")->fetchAll() as $r)
+        foreach (q("SELECT * FROM products WHERE name_en NOT LIKE 'Mini %' AND kind = 'cup' ORDER BY sort, id")->fetchAll() as $r)
             q('INSERT INTO products (name_ar, name_en, img, price, sort, active) VALUES (?,?,?,?,?,0)',
               ['ميني ' . $r['name_ar'], 'Mini ' . $r['name_en'], $r['img'], 2.4, (int)$r['sort'] + 10]);
     }
@@ -121,6 +132,33 @@ function create_schema(): void {
         q("UPDATE products SET price = 2.4 WHERE name_en LIKE 'Mini %' AND price = 0");
         q("INSERT INTO settings (k, v) VALUES ('mini_prices_set', '1')");
     }
+    // v8: ingredients and recipes (grams per cup), so the dashboard can work out what each drink costs
+    if (!q("SELECT 1 FROM settings WHERE k = 'costing_added'")->fetch()) {
+        $ing = [['acai', 'كريمة الأساي', 'Açaí cream', 'g'], ['straw', 'فراولة', 'Strawberry', 'g'], ['rasp', 'توت أحمر', 'Raspberry', 'g'],
+                ['blue', 'توت أزرق', 'Blueberry', 'g'], ['milk', 'حليب اللوز', 'Almond milk', 'g'], ['pb', 'زبدة الفول السوداني', 'Peanut butter', 'g'],
+                ['granola', 'جرانولا', 'Granola', 'g'], ['banana', 'موز', 'Banana', 'g'],
+                ['cup12', 'كوب 12oz', 'Cup 12oz', 'pc'], ['lid12', 'غطا 12oz', 'Lid 12oz', 'pc'], ['cup8', 'كوب 8oz', 'Cup 8oz', 'pc'], ['lid8', 'غطا 8oz', 'Lid 8oz', 'pc'],
+                ['straw_pc', 'مصاصة', 'Straw', 'pc']];
+        $id = [];
+        foreach ($ing as $i => $r) { q('INSERT INTO ingredients (k, name_ar, name_en, unit, sort) VALUES (?,?,?,?,?)', [$r[0], $r[1], $r[2], $r[3], $i + 1]); $id[$r[0]] = (int)db()->lastInsertId(); }
+        // The owner's recipes (12oz) and the Mini (8oz) at two thirds; garnish is added to the same ingredient
+        $pack12 = ['cup12' => 1, 'lid12' => 1, 'straw_pc' => 1]; $pack8 = ['cup8' => 1, 'lid8' => 1, 'straw_pc' => 1];
+        $rec = [
+            'Açaí Smoothie' => ['straw' => 30, 'rasp' => 30, 'blue' => 20, 'milk' => 80, 'acai' => 180] + $pack12,
+            'Açaí Smoothie with Peanut Butter' => ['pb' => 30, 'straw' => 20, 'rasp' => 20, 'blue' => 10, 'milk' => 70, 'acai' => 170] + $pack12,
+            'Açaí Smoothie Signature' => ['blue' => 10, 'straw' => 20, 'rasp' => 20, 'granola' => 30, 'milk' => 50, 'pb' => 15, 'banana' => 70, 'acai' => 150] + $pack12,
+            'Mini Açaí Smoothie' => ['straw' => 20, 'rasp' => 20, 'blue' => 15, 'milk' => 55, 'acai' => 120] + $pack8,
+            'Mini Açaí Smoothie with Peanut Butter' => ['pb' => 18, 'straw' => 15, 'rasp' => 15, 'blue' => 7, 'milk' => 45, 'acai' => 115] + $pack8,
+            'Mini Açaí Smoothie Signature' => ['blue' => 7, 'straw' => 15, 'rasp' => 15, 'granola' => 22, 'milk' => 35, 'pb' => 10, 'banana' => 45, 'acai' => 100] + $pack8,
+        ];
+        foreach ($rec as $name => $items) {
+            $p = q('SELECT id FROM products WHERE name_en = ?', [$name])->fetch(); if (!$p) continue;
+            if (q('SELECT 1 FROM recipe_items WHERE product_id = ?', [(int)$p['id']])->fetch()) continue;
+            foreach ($items as $k => $g) q('INSERT INTO recipe_items (product_id, ingredient_id, qty) VALUES (?,?,?)', [(int)$p['id'], $id[$k], $g]);
+        }
+        q("INSERT INTO settings (k, v) VALUES ('costing_added', '1')");
+    }
+
     foreach (['talabat', 'snoonu', 'khedmah'] as $c) {
         if (!q('SELECT 1 FROM channel_commissions WHERE channel = ?', [$c])->fetch())
             q('INSERT INTO channel_commissions (channel, pct) VALUES (?, 0)', [$c]);

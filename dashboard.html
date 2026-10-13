@@ -156,6 +156,7 @@ app.innerHTML = `
     <button role="tab" aria-selected="true" data-t="sum"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>الملخص</span></button>
     <button role="tab" aria-selected="false" data-t="apps"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg><span>إدخال يدوي للتطبيقات</span></button>
     <button role="tab" aria-selected="false" data-t="exp"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span>المصاريف</span></button>
+    <button role="tab" aria-selected="false" data-t="cost"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h18M6 7v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7M9 7V4h6v3M10 11v6M14 11v6"/></svg><span>التكلفة والمخزون</span></button>
     <button role="tab" aria-selected="false" data-t="orders"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg><span>كل الطلبات</span></button>
     <button role="tab" aria-selected="false" data-t="cust"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M16 4a4 4 0 0 1 0 8M22 21c0-3-2-5-4-5.5"/></svg><span>العملاء</span></button>
     <button role="tab" aria-selected="false" data-t="data"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg><span>استيراد وتصفير</span></button>
@@ -187,6 +188,7 @@ app.innerHTML = `
   <section data-panel="apps" class="hidden"></section>
   <section data-panel="exp" class="hidden"></section>
   <section data-panel="orders" class="hidden"></section>
+  <section data-panel="cost" class="hidden"></section>
   <section data-panel="cust" class="hidden"></section>
   <section data-panel="data" class="hidden"></section>
   <section data-panel="set" class="hidden"></section>
@@ -238,6 +240,7 @@ async function refresh() {
   if (tab === 'set') return drawSettings();
   if (tab === 'data') return drawData();
   if (tab === 'cust') return drawCustomers();
+  if (tab === 'cost') return drawCost();
   const d = await fetchAll();
   ({ sum: drawSum, apps: drawApps, exp: drawExp, orders: drawOrders })[tab](d);
 }
@@ -735,6 +738,169 @@ document.addEventListener('click', async e => {
   const v = prompt('ملاحظة عن العميل (مثلاً: يحب بدون ثلج)', c.note || ''); if (v === null) return;
   try { await api('customer_update', { id: c.id, note: v }); c.note = v.trim() || null; drawCustList(); } catch (ex) { alert(msg(ex)); }
 });
+
+
+// ---------- cost & stock ----------
+const qfmt = (q, unit) => unit === 'pc' ? `${Math.round(q * 10) / 10} حبة` : (Math.abs(q) >= 1000 ? `${(q / 1000).toFixed(2).replace(/\.?0+$/, '')} كغ` : `${Math.round(q)} غ`);
+const perUnit = i => i.unit === 'pc' ? `${money(i.unit_cost)} / حبة` : `${money(i.unit_cost * 1000)} / كغ`;
+let costData = null;
+
+async function drawCost() {
+  const box = $('[data-panel="cost"]');
+  let c, st, us;
+  try { [c, st, us] = await Promise.all([api('costing'), api('stock'), api('usage', undefined, { from, to })]); }
+  catch (ex) { if (ex.message === 'login_required') location.reload(); box.innerHTML = `<div class="card empty">${esc(msg(ex))}</div>`; return; }
+  costData = c;
+  const ingById = Object.fromEntries(c.ingredients.map(i => [i.id, i]));
+  const noPrice = c.ingredients.filter(i => i.active && !i.unit_cost);
+  const counted = st.counts.length > 0;
+  const margin = us.revenue > 0 ? Math.round((us.revenue - us.cogs) / us.revenue * 100) : 0;
+
+  box.innerHTML = `
+    ${noPrice.length ? `<div class="card" style="padding:14px 16px;background:#fff3e0;font-weight:800;line-height:1.6">باقي تحط سعر: ${noPrice.map(i => esc(i.name_ar)).join('، ')}. بدون السعر تكلفة الأكواب تطلع أقل من الحقيقة.</div>` : ''}
+
+    <h3 class="lal">تكلفة كل كوب</h3>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>الصنف</th><th>سعر البيع</th><th>التكلفة</th><th>الربح</th><th>النسبة</th><th></th></tr></thead>
+      <tbody>${c.products.filter(p => p.kind !== 'build' || p.recipe.length).map(p => {
+        const prof = p.price - p.cost, pct = p.price > 0 ? Math.round(prof / p.price * 100) : 0;
+        return `<tr><td>${esc(p.name_ar)}${p.active ? '' : ' <span class="pill">مخفي</span>'}</td><td class="num">${money(p.price)}</td><td class="num">${p.recipe.length ? money(p.cost) : '-'}</td>
+          <td class="num">${p.recipe.length ? money(prof) : '-'}</td><td>${p.recipe.length ? `<span class="pill" style="background:${pct >= 60 ? '#DDF0E3' : pct >= 45 ? '#FDE9C8' : '#F6D6D6'}">${pct}%</span>` : '<span class="pill">ما فيه وصفة</span>'}</td>
+          <td><button class="btn small ghost" type="button" data-recipe="${p.id}">الوصفة</button></td></tr>
+          <tr class="hidden" data-recipe-row="${p.id}"><td colspan="6"></td></tr>`;
+      }).join('')}</tbody>
+    </table></div>
+
+    <h3 class="lal">المخزون</h3>
+    <div class="card" style="padding:16px;display:grid;gap:12px">
+      <div style="font-weight:700;line-height:1.7;opacity:.85">${counted
+        ? `آخر جرد: <b dir="ltr">${esc(st.counts[0].at.slice(0, 16))}</b>. «المفروض عندك» = الجرد + اللي اشتريته بعده − اللي انستخدم في الأكواب المباعة. سوّ جرد كل أسبوع وشوف الفرق.`
+        : 'ما سويت جرد للحين. سوّ أول جرد (اكتب اللي عندك من كل شي)، ومن بعده النظام يحسب اللي المفروض يكون عندك.'}</div>
+      ${counted ? `<div class="tbl-wrap"><table>
+        <thead><tr><th>المكوّن</th><th>آخر جرد</th><th>اشتريت بعده</th><th>انستخدم</th><th>المفروض عندك</th></tr></thead>
+        <tbody>${st.ingredients.map(r => `<tr><td>${esc(r.name_ar)}</td><td class="num">${r.last_qty == null ? '-' : qfmt(r.last_qty, r.unit)}</td><td class="num">${r.last_at ? qfmt(r.bought, r.unit) : '-'}</td><td class="num">${r.last_at ? qfmt(r.used, r.unit) : '-'}</td><td class="num"><b>${r.expected == null ? '-' : qfmt(r.expected, r.unit)}</b></td></tr>`).join('')}</tbody>
+      </table></div>` : ''}
+      <div><button class="btn" type="button" id="newcount">${counted ? 'سوّ جرد جديد' : 'سوّ أول جرد'}</button></div>
+      <form id="countf" class="hidden" style="display:grid;gap:10px">
+        <div style="font-weight:800">اكتب الموجود عندك الحين (بالغرام، والأكواب والأغطية بالحبة). اللي ما عديته خلّه فاضي.</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px">
+          ${st.ingredients.map(r => `<div class="field"><label for="cnt${r.id}">${esc(r.name_ar)} <small style="opacity:.6">(${r.unit === 'pc' ? 'حبة' : 'غ'})${r.expected != null ? ` · المفروض ${qfmt(r.expected, r.unit)}` : ''}</small></label><input id="cnt${r.id}" data-cnt="${r.id}" type="number" min="0" step="any" inputmode="decimal"></div>`).join('')}
+        </div>
+        <div><button class="btn" type="submit">احفظ الجرد</button></div>
+        <div class="err" id="cnterr" role="alert"></div>
+      </form>
+      <div id="cntres"></div>
+    </div>
+
+    <h3 class="lal">شراء</h3>
+    <form class="card formrow" id="purf">
+      <div class="field"><label for="pud">التاريخ</label><input type="date" id="pud" value="${ymd(new Date())}" required></div>
+      <div class="field"><label for="pui">الصنف</label><select id="pui">${c.ingredients.filter(i => i.active).map(i => `<option value="${i.id}">${esc(i.name_ar)}</option>`).join('')}</select></div>
+      <div class="field"><label for="puq" id="puql">الكمية (غرام)</label><input type="number" id="puq" min="0" step="any" inputmode="decimal" required></div>
+      <div class="field"><label for="pup">المبلغ (ر.ع)</label><input type="number" id="pup" min="0" step="0.001" inputmode="decimal" required></div>
+      <div class="field"><label for="pun">ملاحظة</label><input id="pun" maxlength="120" placeholder="مثلاً: المورد"></div>
+      <label style="display:flex;gap:8px;align-items:center;font-weight:700"><input type="checkbox" id="pux" checked style="width:22px;height:22px"> سجّلها في المصاريف</label>
+      <button class="btn" type="submit">أضف</button>
+      <div class="err" id="puerr" role="alert"></div>
+    </form>
+    <p style="margin:6px 4px 0;font-weight:700;opacity:.75">كل شراء يحدّث سعر الغرام للصنف، فتكلفة الأكواب تتحدث لحالها. مثال: ٥ كيلو أساي بـ ٢٠ ريال ← اكتب 5000 و 20.</p>
+    ${c.purchases.length ? `<div class="tbl-wrap" style="margin-top:10px"><table>
+      <thead><tr><th>التاريخ</th><th>الصنف</th><th>الكمية</th><th>المبلغ</th><th>سعر الكيلو / الحبة</th><th>ملاحظة</th><th></th></tr></thead>
+      <tbody>${c.purchases.map(pu => { const i = ingById[pu.ingredient_id] || { name_ar: '?', unit: 'g' };
+        return `<tr><td class="num">${pu.date}</td><td>${esc(i.name_ar)}</td><td class="num">${qfmt(pu.qty, i.unit)}</td><td class="num">${money(pu.price)}</td><td class="num">${i.unit === 'pc' ? money(pu.price / pu.qty) : money(pu.price / pu.qty * 1000)}</td><td>${esc(pu.note)}${pu.expense ? ' <span class="pill">في المصاريف</span>' : ''}</td><td><button class="del" type="button" data-pudel="${pu.id}">حذف</button></td></tr>`; }).join('')}</tbody>
+    </table></div>` : ''}
+
+    <h3 class="lal">أسعار المكونات</h3>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>المكوّن</th><th>اشتريت</th><th>بـ (ر.ع)</th><th>السعر</th><th></th></tr></thead>
+      <tbody>${c.ingredients.map(i => `<tr data-ing="${i.id}"><td>${esc(i.name_ar)}</td>
+        <td><input type="number" min="0" step="any" value="${i.pack_qty || ''}" aria-label="الكمية" style="width:110px;min-height:42px;border:2px solid #e3d6bf;border-radius:12px;padding:4px 10px"> ${i.unit === 'pc' ? 'حبة' : 'غ'}</td>
+        <td><input type="number" min="0" step="0.001" value="${i.pack_price ? i.pack_price.toFixed(3) : ''}" aria-label="المبلغ" style="width:110px;min-height:42px;border:2px solid #e3d6bf;border-radius:12px;padding:4px 10px"></td>
+        <td class="num">${i.unit_cost ? perUnit(i) : '-'}</td>
+        <td><button class="btn small" type="button" data-ingsave>احفظ</button></td></tr>`).join('')}</tbody>
+    </table></div>
+    <form class="card formrow" id="ingf" style="margin-top:10px">
+      <div class="field"><label for="ina">مكوّن جديد</label><input id="ina" maxlength="60" placeholder="مثلاً: مانجو"></div>
+      <div class="field"><label for="inu">يتحسب بـ</label><select id="inu"><option value="g">الغرام</option><option value="pc">الحبة</option></select></div>
+      <button class="btn" type="submit">أضف</button>
+      <div class="err" id="inerr" role="alert"></div>
+    </form>
+
+    <h3 class="lal">الفترة المختارة</h3>
+    <div class="grid4">
+      <div class="card stat"><div class="l">المبيعات</div><div class="v">${money(us.revenue)}</div><div class="s">طلبات الموقع والمحل</div></div>
+      <div class="card stat"><div class="l">تكلفة اللي انباع</div><div class="v">${money(us.cogs)}</div><div class="s">من الوصفات وأسعار المكونات</div></div>
+      <div class="card stat"><div class="l">الربح قبل المصاريف</div><div class="v">${money(us.revenue - us.cogs)}</div><div class="s">${margin}% من المبيعات</div></div>
+      <div class="card stat"><div class="l">اشتريت في الفترة</div><div class="v">${money(us.ingredients.reduce((a, r) => a + r.bought_cost, 0))}</div><div class="s">من سجل الشراء</div></div>
+    </div>
+    ${us.no_recipe.length ? `<p style="font-weight:700;opacity:.8">ما انحسبت تكلفتها لأن ما لها وصفة: ${us.no_recipe.map(r => `${esc(r.name_ar)} (${r.qty})`).join('، ')}</p>` : ''}`;
+
+  // recipe editor
+  box.querySelectorAll('[data-recipe]').forEach(b => b.onclick = () => {
+    const pid = +b.dataset.recipe, row = box.querySelector(`[data-recipe-row="${pid}"]`), p = c.products.find(x => x.id === pid);
+    if (!row.classList.contains('hidden')) { row.classList.add('hidden'); return; }
+    const line = (l = {}) => `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px" data-rl>
+      <select style="min-height:42px;border:2px solid #e3d6bf;border-radius:12px;padding:4px 8px">${c.ingredients.map(i => `<option value="${i.id}" ${i.id === l.ingredient_id ? 'selected' : ''}>${esc(i.name_ar)}</option>`).join('')}</select>
+      <input type="number" min="0" step="any" value="${l.qty || ''}" style="width:100px;min-height:42px;border:2px solid #e3d6bf;border-radius:12px;padding:4px 10px" aria-label="الكمية">
+      <button type="button" class="del" data-rldel>حذف</button></div>`;
+    row.firstElementChild.innerHTML = `<div style="padding:8px 4px"><div style="font-weight:800;margin-bottom:8px">وصفة ${esc(p.name_ar)} (غرام، والأكواب بالحبة)</div>
+      <div data-rls>${(p.recipe.length ? p.recipe : [{}]).map(line).join('')}</div>
+      <button type="button" class="btn small ghost" data-rladd>+ مكوّن</button> <button type="button" class="btn small" data-rlsave>احفظ الوصفة</button> <span class="err" data-rlerr></span></div>`;
+    row.classList.remove('hidden');
+    row.querySelector('[data-rladd]').onclick = () => row.querySelector('[data-rls]').insertAdjacentHTML('beforeend', line());
+    row.addEventListener('click', e => { const d = e.target.closest('[data-rldel]'); if (d) d.closest('[data-rl]').remove(); });
+    row.querySelector('[data-rlsave]').onclick = async () => {
+      const items = [...row.querySelectorAll('[data-rl]')].map(r => ({ ingredient_id: +r.querySelector('select').value, qty: +r.querySelector('input').value })).filter(x => x.qty > 0);
+      try { await api('recipe_save', { product_id: pid, items }); drawCost(); } catch (ex) { row.querySelector('[data-rlerr]').textContent = msg(ex); }
+    };
+  });
+
+  // stocktake
+  $('#newcount').onclick = () => { $('#countf').classList.toggle('hidden'); $('#cntres').innerHTML = ''; };
+  $('#countf').onsubmit = async e => {
+    e.preventDefault();
+    const items = [...$('#countf').querySelectorAll('[data-cnt]')].filter(i => i.value !== '').map(i => ({ ingredient_id: +i.dataset.cnt, qty: +i.value }));
+    if (!items.length) { $('#cnterr').textContent = 'اكتب كمية واحدة على الأقل'; return; }
+    try {
+      const r = await api('stock_count', { items });
+      const res = r.diff.length ? `<div style="font-weight:800;margin:6px 0">الفرق بين الجرد والمفروض:</div><div class="tbl-wrap"><table>
+        <thead><tr><th>المكوّن</th><th>المفروض</th><th>لقيت</th><th>الفرق</th><th>قيمته</th></tr></thead>
+        <tbody>${r.diff.map(d => `<tr><td>${esc(d.name_ar)}</td><td class="num">${qfmt(d.expected, d.unit)}</td><td class="num">${qfmt(d.counted, d.unit)}</td>
+          <td class="num" style="color:${d.diff < 0 ? 'var(--bad,#B23A3A)' : 'inherit'}"><b>${d.diff > 0 ? '+' : ''}${qfmt(d.diff, d.unit)}</b></td><td class="num">${money(d.value)}</td></tr>`).join('')}</tbody></table></div>
+        <p style="font-weight:700;opacity:.8">بالسالب يعني ناقص عن المفروض (هدر، أو زيادة في الكميات، أو بيع ما انسجل). الفرق البسيط طبيعي.</p>`
+        : '<div style="font-weight:800">انحفظ الجرد ✓ من الحين النظام يحسب المخزون.</div>';
+      await drawCost();
+      $('#cntres').innerHTML = res;
+    } catch (ex) { $('#cnterr').textContent = msg(ex); }
+  };
+
+  // purchases
+  const unitLbl = () => { const i = ingById[+$('#pui').value]; $('#puql').textContent = i && i.unit === 'pc' ? 'الكمية (حبة)' : 'الكمية (غرام)'; };
+  $('#pui').onchange = unitLbl; unitLbl();
+  $('#purf').onsubmit = async e => {
+    e.preventDefault();
+    try {
+      await api('purchase_add', { date: $('#pud').value, ingredient_id: +$('#pui').value, qty: +$('#puq').value, price: +$('#pup').value, note: $('#pun').value.trim(), as_expense: $('#pux').checked });
+      drawCost();
+    } catch (ex) { $('#puerr').textContent = msg(ex); }
+  };
+  box.querySelectorAll('[data-pudel]').forEach(b => b.onclick = async () => {
+    if (!confirm('تحذف هذا الشراء؟ (ينحذف من المصاريف بعد إذا كان مسجل فيها)')) return;
+    try { await api('purchase_delete', { id: +b.dataset.pudel }); drawCost(); } catch (ex) { alert(msg(ex)); }
+  });
+
+  // ingredient prices
+  box.querySelectorAll('[data-ingsave]').forEach(b => b.onclick = async () => {
+    const tr = b.closest('tr'), i = ingById[+tr.dataset.ing], [q, pr] = tr.querySelectorAll('input');
+    try { await api('ingredient_save', { id: i.id, name_ar: i.name_ar, name_en: i.name_en, unit: i.unit, pack_qty: +q.value, pack_price: +pr.value }); drawCost(); }
+    catch (ex) { alert(msg(ex)); }
+  });
+  $('#ingf').onsubmit = async e => {
+    e.preventDefault();
+    const n = $('#ina').value.trim(); if (!n) { $('#inerr').textContent = 'اكتب الاسم'; return; }
+    try { await api('ingredient_save', { name_ar: n, name_en: n, unit: $('#inu').value }); drawCost(); } catch (ex) { $('#inerr').textContent = msg(ex); }
+  };
+}
 
 // ---------- import old sales + reset ----------
 const PAY_WORDS = { cash: ['نقد', 'نقدي', 'كاش', 'cash'], card: ['بطاقة', 'بطاقه', 'كارد', 'فيزا', 'شبكة', 'card', 'visa'],

@@ -72,6 +72,38 @@ function price_items($items): array {
     }
     return [$lines, money($total)];
 }
+/** Stock per ingredient: last stocktake + bought since − used by sold cups since = expected on the shelf. */
+function stock_now(): array {
+    $rec = [];
+    foreach (q('SELECT * FROM recipe_items')->fetchAll() as $r) $rec[(int)$r['product_id']][] = [(int)$r['ingredient_id'], (float)$r['qty']];
+    $rows = [];
+    foreach (q('SELECT * FROM ingredients WHERE active = 1 ORDER BY sort, id')->fetchAll() as $i) {
+        $iid = (int)$i['id'];
+        $last = q('SELECT counted_at, qty FROM stock_counts WHERE ingredient_id = ? ORDER BY counted_at DESC, id DESC LIMIT 1', [$iid])->fetch();
+        $since = $last ? $last['counted_at'] : null;
+        $bought = $since ? (float)q('SELECT COALESCE(SUM(qty), 0) s FROM purchases WHERE ingredient_id = ? AND created_at >= ?', [$iid, $since])->fetch()['s'] : 0.0;
+        $rows[$iid] = ['id' => $iid, 'name_ar' => $i['name_ar'], 'unit' => $i['unit'], 'unit_cost' => (float)$i['unit_cost'],
+            'last_at' => $since, 'last_qty' => $last ? (float)$last['qty'] : null, 'bought' => round($bought, 1), 'used' => 0.0, 'expected' => null];
+    }
+    // Cups sold since each ingredient's last count
+    $oldest = null; foreach ($rows as $r) if ($r['last_at'] && (!$oldest || $r['last_at'] < $oldest)) $oldest = $r['last_at'];
+    if ($oldest) {
+        foreach (q("SELECT created_at, items FROM orders WHERE created_at >= ? AND status <> 'cancelled'", [$oldest])->fetchAll() as $o) {
+            foreach (json_decode($o['items'], true) ?: [] as $it) {
+                foreach ($rec[(int)($it['product_id'] ?? 0)] ?? [] as [$iid, $g]) {
+                    if (isset($rows[$iid]) && $rows[$iid]['last_at'] && $o['created_at'] >= $rows[$iid]['last_at']) $rows[$iid]['used'] += $g * (int)($it['qty'] ?? 0);
+                }
+            }
+        }
+    }
+    foreach ($rows as &$r) {
+        $r['used'] = round($r['used'], 1);
+        if ($r['last_at']) $r['expected'] = round($r['last_qty'] + $r['bought'] - $r['used'], 1);
+    }
+    $hist = q('SELECT counted_at, COUNT(*) n FROM stock_counts GROUP BY counted_at ORDER BY counted_at DESC LIMIT 10')->fetchAll();
+    return ['ingredients' => array_values($rows), 'counts' => array_map(fn($h) => ['at' => $h['counted_at'], 'n' => (int)$h['n']], $hist)];
+}
+
 /** Inserts an order with the next daily number; returns that number. */
 function insert_order(array $f, ?string $day = null): int {
     $day = $day ?: date('Y-m-d');
@@ -489,6 +521,138 @@ case 'save_product':
     if (array_key_exists('desc_ar', $in) || array_key_exists('desc_en', $in))
         q('UPDATE products SET desc_ar = ?, desc_en = ? WHERE id = ?', [clean((string)($in['desc_ar'] ?? ''), 300) ?: null, clean((string)($in['desc_en'] ?? ''), 300) ?: null, (int)($in['id'] ?? 0)]);
     out(['ok' => true]);
+
+case 'costing':   // owner: ingredients with their price per gram, and every product's recipe and cost
+    need('owner');
+    $ings = array_map(fn($r) => ['id' => (int)$r['id'], 'name_ar' => $r['name_ar'], 'name_en' => $r['name_en'], 'unit' => $r['unit'],
+        'pack_price' => (float)$r['pack_price'], 'pack_qty' => (float)$r['pack_qty'], 'unit_cost' => (float)$r['unit_cost'], 'active' => (int)$r['active']],
+        q('SELECT * FROM ingredients ORDER BY sort, id')->fetchAll());
+    $cost = []; foreach ($ings as $i) $cost[$i['id']] = $i['unit_cost'];
+    $rec = [];
+    foreach (q('SELECT * FROM recipe_items ORDER BY id')->fetchAll() as $r) $rec[(int)$r['product_id']][] = ['ingredient_id' => (int)$r['ingredient_id'], 'qty' => (float)$r['qty']];
+    $prods = [];
+    foreach (q('SELECT * FROM products ORDER BY sort, id')->fetchAll() as $p) {
+        $lines = $rec[(int)$p['id']] ?? [];
+        $c = 0.0; foreach ($lines as $l) $c += $l['qty'] * ($cost[$l['ingredient_id']] ?? 0);
+        $prods[] = ['id' => (int)$p['id'], 'name_ar' => $p['name_ar'], 'name_en' => $p['name_en'], 'price' => (float)$p['price'],
+            'active' => (int)$p['active'], 'kind' => $p['kind'] ?? 'cup', 'recipe' => $lines, 'cost' => round($c, 3)];
+    }
+    $pur = array_map(fn($r) => ['id' => (int)$r['id'], 'date' => $r['purchase_date'], 'ingredient_id' => (int)$r['ingredient_id'], 'qty' => (float)$r['qty'],
+        'price' => (float)$r['price'], 'note' => (string)($r['note'] ?? ''), 'expense' => $r['expense_id'] !== null],
+        q('SELECT * FROM purchases ORDER BY purchase_date DESC, id DESC LIMIT 60')->fetchAll());
+    out(['ingredients' => $ings, 'products' => $prods, 'purchases' => $pur]);
+
+case 'ingredient_save':   // owner: add an ingredient, or change its name or what a pack costs
+    $post(); need('owner');
+    $id = (int)($in['id'] ?? 0);
+    $nameAr = clean((string)($in['name_ar'] ?? ''), 60); $nameEn = clean((string)($in['name_en'] ?? ''), 60) ?: $nameAr;
+    if ($nameAr === '') fail('bad_name');
+    $unit = in_array($in['unit'] ?? 'g', ['g', 'pc'], true) ? $in['unit'] : 'g';
+    $pp = (float)($in['pack_price'] ?? 0); $pq = (float)($in['pack_qty'] ?? 0);
+    if ($pp < 0 || $pq < 0) fail('bad_amount');
+    $uc = $pq > 0 ? $pp / $pq : 0;
+    if ($id) q('UPDATE ingredients SET name_ar = ?, name_en = ?, unit = ?, pack_price = ?, pack_qty = ?, unit_cost = ?, active = ? WHERE id = ?',
+        [$nameAr, $nameEn, $unit, money($pp), $pq, $uc, isset($in['active']) && !$in['active'] ? 0 : 1, $id]);
+    else q('INSERT INTO ingredients (name_ar, name_en, unit, pack_price, pack_qty, unit_cost, sort) VALUES (?,?,?,?,?,?,?)',
+        [$nameAr, $nameEn, $unit, money($pp), $pq, $uc, 100]);
+    out(['ok' => true]);
+
+case 'recipe_save':   // owner: grams of each ingredient in one product
+    $post(); need('owner');
+    $pid = (int)($in['product_id'] ?? 0);
+    if (!q('SELECT 1 FROM products WHERE id = ?', [$pid])->fetch()) fail('not_found', 404);
+    $items = is_array($in['items'] ?? null) ? $in['items'] : [];
+    if (count($items) > 30) fail('invalid_items');
+    $pdo = db(); $pdo->beginTransaction();
+    try {
+        q('DELETE FROM recipe_items WHERE product_id = ?', [$pid]);
+        foreach ($items as $it) {
+            $iid = (int)($it['ingredient_id'] ?? 0); $qty = (float)($it['qty'] ?? 0);
+            if ($qty <= 0) continue;
+            if (!q('SELECT 1 FROM ingredients WHERE id = ?', [$iid])->fetch()) fail('invalid_items');
+            q('INSERT INTO recipe_items (product_id, ingredient_id, qty) VALUES (?,?,?)', [$pid, $iid, $qty]);
+        }
+        $pdo->commit();
+    } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
+    out(['ok' => true]);
+
+case 'purchase_add':   // owner: bought stock; updates the ingredient's price and (optionally) adds it to expenses
+    $post(); need('owner');
+    $ing = q('SELECT * FROM ingredients WHERE id = ?', [(int)($in['ingredient_id'] ?? 0)])->fetch() ?: fail('not_found', 404);
+    $qty = (float)($in['qty'] ?? 0); $price = (float)($in['price'] ?? -1);
+    if ($qty <= 0 || $price < 0) fail('bad_amount');
+    $date = valid_date($in['date'] ?? date('Y-m-d'));
+    $note = clean((string)($in['note'] ?? ''), 120);
+    $expId = null;
+    if (!empty($in['as_expense'])) {
+        $cat = $ing['unit'] === 'pc' ? 'أكواب وتغليف' : 'مواد خام (آساي وفواكه)';
+        q('INSERT INTO expenses (expense_date, category, amount, note, created_at) VALUES (?,?,?,?,?)',
+          [$date, $cat, money($price), clean($ing['name_ar'] . ' ' . rtrim(rtrim(number_format($qty, 3, '.', ''), '0'), '.') . ($ing['unit'] === 'pc' ? ' حبة' : ' غ') . ($note ? ' · ' . $note : ''), 120), now()]);
+        $expId = (int)db()->lastInsertId();
+    }
+    q('INSERT INTO purchases (purchase_date, ingredient_id, qty, price, note, expense_id, created_at) VALUES (?,?,?,?,?,?,?)',
+      [$date, (int)$ing['id'], $qty, money($price), $note ?: null, $expId, now()]);
+    q('UPDATE ingredients SET pack_price = ?, pack_qty = ?, unit_cost = ? WHERE id = ?', [money($price), $qty, $price / $qty, (int)$ing['id']]);
+    out(['ok' => true]);
+
+case 'purchase_delete':
+    $post(); need('owner');
+    $pr = q('SELECT * FROM purchases WHERE id = ?', [(int)($in['id'] ?? 0)])->fetch() ?: fail('not_found', 404);
+    if ($pr['expense_id'] !== null) q('DELETE FROM expenses WHERE id = ?', [(int)$pr['expense_id']]);
+    q('DELETE FROM purchases WHERE id = ?', [(int)$pr['id']]);
+    out(['ok' => true]);
+
+case 'usage':   // owner: for a period, what the sold cups used of each ingredient vs what was bought
+    need('owner');
+    $from = valid_date($_GET['from'] ?? ''); $to = valid_date($_GET['to'] ?? '');
+    $rec = [];
+    foreach (q('SELECT * FROM recipe_items')->fetchAll() as $r) $rec[(int)$r['product_id']][] = [(int)$r['ingredient_id'], (float)$r['qty']];
+    $used = []; $sold = []; $revenue = 0.0; $noRecipe = [];
+    foreach (q("SELECT items, total FROM orders WHERE day BETWEEN ? AND ? AND status <> 'cancelled'", [$from, $to])->fetchAll() as $o) {
+        $revenue += (float)$o['total'];
+        foreach (json_decode($o['items'], true) ?: [] as $it) {
+            $pid = (int)($it['product_id'] ?? 0); $n = (int)($it['qty'] ?? 0);
+            $sold[$pid] = ($sold[$pid] ?? 0) + $n;
+            if (empty($rec[$pid])) { $noRecipe[$pid] = ($noRecipe[$pid] ?? 0) + $n; continue; }
+            foreach ($rec[$pid] as [$iid, $g]) $used[$iid] = ($used[$iid] ?? 0) + $g * $n;
+        }
+    }
+    $bought = [];
+    foreach (q('SELECT ingredient_id, SUM(qty) q, SUM(price) p FROM purchases WHERE purchase_date BETWEEN ? AND ? GROUP BY ingredient_id', [$from, $to])->fetchAll() as $r)
+        $bought[(int)$r['ingredient_id']] = [(float)$r['q'], (float)$r['p']];
+    $rows = []; $cogs = 0.0;
+    foreach (q('SELECT * FROM ingredients ORDER BY sort, id')->fetchAll() as $i) {
+        $iid = (int)$i['id']; $u = $used[$iid] ?? 0; $b = $bought[$iid] ?? [0, 0];
+        if (!$u && !$b[0]) continue;
+        $cogs += $u * (float)$i['unit_cost'];
+        $rows[] = ['id' => $iid, 'name_ar' => $i['name_ar'], 'unit' => $i['unit'], 'used' => round($u, 1), 'used_cost' => round($u * (float)$i['unit_cost'], 3),
+                   'bought' => round($b[0], 1), 'bought_cost' => round($b[1], 3)];
+    }
+    $names = []; foreach (q('SELECT id, name_ar FROM products')->fetchAll() as $p) $names[(int)$p['id']] = $p['name_ar'];
+    out(['ingredients' => $rows, 'revenue' => round($revenue, 3), 'cogs' => round($cogs, 3),
+         'sold' => array_map(fn($pid, $n) => ['product_id' => $pid, 'name_ar' => $names[$pid] ?? '?', 'qty' => $n], array_keys($sold), $sold),
+         'no_recipe' => array_map(fn($pid, $n) => ['name_ar' => $names[$pid] ?? '?', 'qty' => $n], array_keys($noRecipe), $noRecipe)]);
+
+case 'stock':   // owner: for each ingredient, the last count, what was bought and used since, and what should be on the shelf now
+    need('owner');
+    out(stock_now());
+
+case 'stock_count':   // owner: a stocktake; returns how far each count is from what the system expected
+    $post(); need('owner');
+    $items = is_array($in['items'] ?? null) ? $in['items'] : [];
+    if (!$items) fail('invalid_items');
+    $now = stock_now(); $exp = []; foreach ($now['ingredients'] as $r) $exp[$r['id']] = $r;
+    $at = now(); $diff = [];
+    foreach ($items as $it) {
+        $iid = (int)($it['ingredient_id'] ?? 0); if (!isset($exp[$iid])) continue;
+        if (!isset($it['qty']) || $it['qty'] === '' || $it['qty'] === null) continue;
+        $qty = (float)$it['qty']; if ($qty < 0) fail('bad_amount');
+        $e = $exp[$iid]['last_at'] ? $exp[$iid]['expected'] : null;   // nothing to compare on the first count
+        q('INSERT INTO stock_counts (counted_at, ingredient_id, qty, expected) VALUES (?,?,?,?)', [$at, $iid, $qty, $e]);
+        if ($e !== null) $diff[] = ['name_ar' => $exp[$iid]['name_ar'], 'unit' => $exp[$iid]['unit'], 'counted' => $qty, 'expected' => $e,
+            'diff' => round($qty - $e, 1), 'value' => round(($qty - $e) * $exp[$iid]['unit_cost'], 3)];
+    }
+    out(['ok' => true, 'diff' => $diff, 'at' => $at]);
 
 case 'save_topping':
     $post(); need('owner');

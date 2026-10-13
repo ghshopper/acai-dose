@@ -448,6 +448,7 @@ case 'save_commissions':
 case 'save_product':
     $post(); need('owner');
     $price = (float)($in['price'] ?? -1); if ($price < 0) fail('bad_amount');
+    if (!empty($in['active']) && $price <= 0) fail('need_price');   // never sell a cup for 0
     q('UPDATE products SET price = ?, active = ? WHERE id = ?', [money($price), !empty($in['active']) ? 1 : 0, (int)($in['id'] ?? 0)]);
     out(['ok' => true]);
 

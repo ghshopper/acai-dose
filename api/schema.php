@@ -85,6 +85,12 @@ function create_schema(): void {
               ['آساي سموذي مع الفول السوداني', 'Açaí Smoothie with Peanut Butter', 'cup-peanut.png', 3.4, 3]];
         foreach ($p as $r) q('INSERT INTO products (name_ar, name_en, img, price, sort) VALUES (?,?,?,?,?)', $r);
     }
+    // v6: Mini (8oz) version of each cup, hidden until the owner sets a price and switches it on
+    if (!q("SELECT 1 FROM products WHERE name_en LIKE 'Mini %' LIMIT 1")->fetch()) {
+        foreach (q("SELECT * FROM products WHERE name_en NOT LIKE 'Mini %' ORDER BY sort, id")->fetchAll() as $r)
+            q('INSERT INTO products (name_ar, name_en, img, price, sort, active) VALUES (?,?,?,?,?,0)',
+              ['ميني ' . $r['name_ar'], 'Mini ' . $r['name_en'], $r['img'], 0, (int)$r['sort'] + 10]);
+    }
     foreach (['talabat', 'snoonu', 'khedmah'] as $c) {
         if (!q('SELECT 1 FROM channel_commissions WHERE channel = ?', [$c])->fetch())
             q('INSERT INTO channel_commissions (channel, pct) VALUES (?, 0)', [$c]);

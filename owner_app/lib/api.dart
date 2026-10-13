@@ -94,6 +94,7 @@ const Map<String, String> kErrors = {
   'forbidden': 'هذا الحساب مب حساب صاحب المحل',
   'invalid_phone': 'رقم الجوال غلط',
   'customer_exists': 'هذا الرقم مسجل من قبل',
+  'need_price': 'حط السعر قبل لا تشغل الصنف',
   'no_stamps': 'ما يمدي تنقص أكثر، الأختام صفر',
   'bad_delta': 'عدد الأختام غلط',
   'bad_amount': 'المبلغ غلط',

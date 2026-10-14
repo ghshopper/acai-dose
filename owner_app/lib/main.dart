@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -81,7 +82,7 @@ class _GateState extends State<Gate> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Scaffold(backgroundColor: kPurple, body: Center(child: CircularProgressIndicator(color: kCream)));
+    if (_loading) return const Scaffold(backgroundColor: kPurple, body: Center(child: CupertinoActivityIndicator(color: kCream, radius: 14)));
     if (_error != null) {
       return Scaffold(
         backgroundColor: kPurple,
@@ -89,7 +90,7 @@ class _GateState extends State<Gate> {
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             Text(_error!, style: const TextStyle(color: kCream, fontSize: 20, fontWeight: FontWeight.w700)),
             const SizedBox(height: 16),
-            FilledButton(style: bigButton(kOrange, kPurple), onPressed: _check, child: const Text('حاول مرة ثانية')),
+            FilledButton(style: bigButton(kOrange, kPurple), onPressed: _check, child: const Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: Text('حاول مرة ثانية'))),
           ]),
         ),
       );
@@ -127,22 +128,22 @@ class _HomePageState extends State<HomePage> {
     ];
     return Scaffold(
       body: IndexedStack(index: _tab, children: pages),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _tab,
-        onDestinationSelected: (i) {
+      bottomNavigationBar: CupertinoTabBar(
+        currentIndex: _tab,
+        onTap: (i) {
           HapticFeedback.selectionClick();
           setState(() => _tab = i);
         },
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        indicatorColor: kOrange.withAlpha(70),
-        height: 68,
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.insights_outlined), selectedIcon: Icon(Icons.insights), label: 'الملخص'),
-          NavigationDestination(icon: Icon(Icons.receipt_long_outlined), selectedIcon: Icon(Icons.receipt_long), label: 'الطلبات'),
-          NavigationDestination(icon: Icon(Icons.people_outline), selectedIcon: Icon(Icons.people), label: 'العملاء'),
-          NavigationDestination(icon: Icon(Icons.payments_outlined), selectedIcon: Icon(Icons.payments), label: 'المصاريف'),
-          NavigationDestination(icon: Icon(Icons.more_horiz), label: 'المزيد'),
+        activeColor: kPurple,
+        inactiveColor: const Color(0xFF8E8E93),
+        backgroundColor: const Color(0xF7FBFAF8),
+        iconSize: 26,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(CupertinoIcons.chart_pie), activeIcon: Icon(CupertinoIcons.chart_pie_fill), label: 'الملخص'),
+          BottomNavigationBarItem(icon: Icon(CupertinoIcons.doc_text), activeIcon: Icon(CupertinoIcons.doc_text_fill), label: 'الطلبات'),
+          BottomNavigationBarItem(icon: Icon(CupertinoIcons.person_2), activeIcon: Icon(CupertinoIcons.person_2_fill), label: 'العملاء'),
+          BottomNavigationBarItem(icon: Icon(CupertinoIcons.creditcard), activeIcon: Icon(CupertinoIcons.creditcard_fill), label: 'المصاريف'),
+          BottomNavigationBarItem(icon: Icon(CupertinoIcons.ellipsis_circle), activeIcon: Icon(CupertinoIcons.ellipsis_circle_fill), label: 'المزيد'),
         ],
       ),
     );

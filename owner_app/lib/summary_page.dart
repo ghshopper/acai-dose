@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'api.dart';
@@ -92,10 +93,9 @@ class _SummaryPageState extends State<SummaryPage> {
   Widget build(BuildContext context) {
     final s = _s;
     return Column(children: [
-      PageHead(title: 'الملخص', subtitle: _greeting, period: widget.period),
-      if (_loading) const LinearProgressIndicator(minHeight: 3, color: kOrange, backgroundColor: kCream2),
+      PageHead(title: 'الملخص', subtitle: _greeting, period: widget.period, loading: _loading, trailing: Padding(padding: const EdgeInsets.only(bottom: 8), child: Image.asset('assets/logo-purple.png', height: 22))),
       Expanded(
-        child: RefreshIndicator(
+        child: RefreshIndicator.adaptive(
           onRefresh: _load,
           child: s == null
               ? ListView(children: [Padding(padding: const EdgeInsets.all(40), child: Center(child: Text(_err ?? '')))])
@@ -104,20 +104,20 @@ class _SummaryPageState extends State<SummaryPage> {
                   _hero(s),
                   const SizedBox(height: 12),
                   Row(children: [
-                    _quickBtn(Icons.add_card, 'مصروف', () => _quick(const AddExpenseSheet(), 'انحفظ المصروف')),
+                    _quickBtn(CupertinoIcons.creditcard, 'مصروف', () => _quick(const AddExpenseSheet(), 'انحفظ المصروف')),
                     const SizedBox(width: 8),
-                    _quickBtn(Icons.delivery_dining, 'مبيعات تطبيق', () => _quick(const AppSaleSheet(), 'انحفظت المبيعات')),
+                    _quickBtn(CupertinoIcons.bag, 'مبيعات تطبيق', () => _quick(const AppSaleSheet(), 'انحفظت المبيعات')),
                     const SizedBox(width: 8),
-                    _quickBtn(Icons.person_add_alt_1, 'عميل جديد', () => _quick(const AddCustomerSheet(), 'انضاف العميل')),
+                    _quickBtn(CupertinoIcons.person_badge_plus, 'عميل جديد', () => _quick(const AddCustomerSheet(), 'انضاف العميل')),
                   ]),
                   const SizedBox(height: 12),
                   _grid([
-                    _stat(Icons.trending_up, 'إجمالي المبيعات', s.sales, '${s.orderCount} طلب · متوسط ${money(s.avg)}', before: _prev?.sales),
-                    _stat(Icons.payments_outlined, 'المصاريف', s.exp, '${s.expCount} مصروف', before: _prev?.exp, lowerIsBetter: true),
-                    _stat(Icons.public, 'الموقع', s.site, '${s.siteOrders} طلب · ${s.siteCups} كوب', share: s.pct(s.site)),
-                    _stat(Icons.storefront, 'المحل', s.shop, '${s.shopOrders} عملية · ${s.shopCups} كوب', share: s.pct(s.shop)),
-                    _stat(Icons.delivery_dining, 'التطبيقات', s.appGross, 'طلبات وسنونو وخدمة', share: s.pct(s.appGross)),
-                    _stat(Icons.percent, 'العمولات', s.comm, 'تخصمها التطبيقات'),
+                    _stat(CupertinoIcons.chart_bar, 'إجمالي المبيعات', s.sales, '${s.orderCount} طلب · متوسط ${money(s.avg)}', before: _prev?.sales),
+                    _stat(CupertinoIcons.creditcard, 'المصاريف', s.exp, '${s.expCount} مصروف', before: _prev?.exp, lowerIsBetter: true),
+                    _stat(CupertinoIcons.globe, 'الموقع', s.site, '${s.siteOrders} طلب · ${s.siteCups} كوب', share: s.pct(s.site)),
+                    _stat(CupertinoIcons.house, 'المحل', s.shop, '${s.shopOrders} عملية · ${s.shopCups} كوب', share: s.pct(s.shop)),
+                    _stat(CupertinoIcons.bag, 'التطبيقات', s.appGross, 'طلبات وسنونو وخدمة', share: s.pct(s.appGross)),
+                    _stat(CupertinoIcons.percent, 'العمولات', s.comm, 'تخصمها التطبيقات'),
                   ]),
                   _sec('طرق الدفع والحسابات', 'المفروض يوصلك = المبيعات − العمولة'),
                   _grid([
@@ -140,11 +140,11 @@ class _SummaryPageState extends State<SummaryPage> {
           child: Column(children: [
             Container(
               padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: kCream2, borderRadius: BorderRadius.circular(12)),
-              child: Icon(icon, color: kPurple, size: 22),
+              decoration: BoxDecoration(color: kPurple, borderRadius: BorderRadius.circular(10)),
+              child: Icon(icon, color: Colors.white, size: 20),
             ),
             const SizedBox(height: 6),
-            Text(label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+            Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: kInk)),
           ]),
         ),
       );
@@ -156,18 +156,17 @@ class _SummaryPageState extends State<SummaryPage> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(colors: [kPurple, kPurple2], begin: Alignment.topRight, end: Alignment.bottomLeft),
-        borderRadius: BorderRadius.circular(26),
-        boxShadow: const [BoxShadow(color: Color(0x33470D43), blurRadius: 24, offset: Offset(0, 10))],
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          const Text('صافي الربح', style: TextStyle(color: kLilac, fontWeight: FontWeight.w800, fontSize: 16)),
+          const Text('صافي الربح', style: TextStyle(color: kLilac, fontWeight: FontWeight.w600, fontSize: 16)),
           const Spacer(),
           if (_prev != null) DeltaBadge(now: s.net, before: _prev!.net, onDark: true),
         ]),
         const SizedBox(height: 6),
         Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
-          Text(money(s.net), textDirection: TextDirection.ltr, style: TextStyle(color: s.net < 0 ? const Color(0xFFFFB4B4) : kCream, fontSize: 42, fontWeight: FontWeight.w900)),
+          Text(money(s.net), textDirection: TextDirection.ltr, style: TextStyle(color: s.net < 0 ? const Color(0xFFFFB4B4) : kCream, fontSize: 42, fontWeight: FontWeight.w700)),
           const SizedBox(width: 8),
           const Text('ر.ع', style: TextStyle(color: kLilac, fontWeight: FontWeight.w700)),
         ]),
@@ -214,53 +213,50 @@ class _SummaryPageState extends State<SummaryPage> {
 
   Widget _stat(IconData icon, String label, double v, String sub, {int? share, double? before, bool lowerIsBetter = false}) => _box(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Icon(icon, size: 16, color: Colors.black45),
+          Icon(icon, size: 16, color: kPurple),
           const SizedBox(width: 6),
-          Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.black54, fontSize: 13))),
+          Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600, color: kInk2, fontSize: 13))),
           if (before != null) DeltaBadge(now: v, before: before, lowerIsBetter: lowerIsBetter),
         ]),
         const SizedBox(height: 6),
-        Text(money(v), textDirection: TextDirection.ltr, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: kPurple)),
+        Text(money(v), textDirection: TextDirection.ltr, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: kPurple)),
         const SizedBox(height: 2),
-        Text(share == null ? sub : '$sub · $share%', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.black45)),
+        Text(share == null ? sub : '$sub · $share%', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: kInk2)),
         if (share != null) ...[
           const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(99),
-            child: LinearProgressIndicator(value: share / 100, minHeight: 6, color: kOrange, backgroundColor: kCream2),
-          ),
+          Bar(value: share / 100, height: 6, color: kOrange, bg: kCream2),
         ],
       ]));
 
   Widget _pay(Method m) => _box(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Expanded(child: Text(m.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
+          Expanded(child: Text(m.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16))),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(color: m.isApp ? const Color(0xFFFDE9C8) : kCream2, borderRadius: BorderRadius.circular(99)),
-            child: Text(m.isApp ? 'تحويل' : 'بالدرج', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+            child: Text(m.isApp ? 'تحويل' : 'بالدرج', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
           ),
         ]),
         const SizedBox(height: 6),
-        Text(money(m.net), textDirection: TextDirection.ltr, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: kPurple)),
+        Text(money(m.net), textDirection: TextDirection.ltr, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: kPurple)),
         _row('المبيعات', money(m.gross)),
         if (m.isApp) _row('العمولة', money(m.comm)),
         _row('الطلبات', '${m.n}'),
       ]));
 
   Widget _unpaid(Stats s) => _box(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('طلبات موقع غير مستلمة', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+        const Text('طلبات موقع غير مستلمة', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
         const SizedBox(height: 6),
-        Text(money(s.unpaidTotal), textDirection: TextDirection.ltr, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: kPurple)),
+        Text(money(s.unpaidTotal), textDirection: TextDirection.ltr, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: kPurple)),
         _row('الطلبات', '${s.unpaidCount}'),
       ]));
 
   Widget _row(String a, String b) => Padding(
         padding: const EdgeInsets.only(top: 3),
         child: Row(children: [
-          Text(a, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.black45)),
+          Text(a, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kInk2)),
           const Spacer(),
-          Text(b, textDirection: TextDirection.ltr, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.black54)),
+          Text(b, textDirection: TextDirection.ltr, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kInk2)),
         ]),
       );
 
@@ -278,7 +274,7 @@ class _SummaryPageState extends State<SummaryPage> {
               padding: const EdgeInsets.symmetric(horizontal: 2),
               child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
                 if (e.value > 0 && s.daily.length <= 10)
-                  FittedBox(child: Text(e.value.toStringAsFixed(1), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.black54))),
+                  FittedBox(child: Text(e.value.toStringAsFixed(1), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: kInk2))),
                 const SizedBox(height: 2),
                 Container(
                   height: max > 0 ? (e.value / max * 140).clamp(2, 140).toDouble() : 2,
@@ -288,7 +284,7 @@ class _SummaryPageState extends State<SummaryPage> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                FittedBox(child: Text('${e.key.day}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.black45))),
+                FittedBox(child: Text('${e.key.day}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: kInk2))),
               ]),
             ),
           ),
@@ -297,22 +293,19 @@ class _SummaryPageState extends State<SummaryPage> {
   }
 
   Widget _products(Stats s) {
-    if (s.products.isEmpty) return _box(const EmptyNote('ما فيه طلبات في هالفترة', icon: Icons.local_drink_outlined));
+    if (s.products.isEmpty) return _box(const EmptyNote('ما فيه طلبات في هالفترة', icon: CupertinoIcons.tray));
     final top = s.products.first.value;
     return _box(Column(children: [
       for (final p in s.products)
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: Row(children: [
-            Expanded(flex: 5, child: Text(p.key, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13))),
+            Expanded(flex: 5, child: Text(p.key, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
             Expanded(
               flex: 4,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(99),
-                child: LinearProgressIndicator(value: top > 0 ? p.value / top : 0, minHeight: 10, color: kPurple, backgroundColor: kCream2),
-              ),
+              child: Bar(value: top > 0 ? p.value / top : 0.0, height: 10, color: kPurple, bg: kCream2),
             ),
-            SizedBox(width: 40, child: Text('${p.value}', textAlign: TextAlign.end, style: const TextStyle(fontWeight: FontWeight.w900))),
+            SizedBox(width: 40, child: Text('${p.value}', textAlign: TextAlign.end, style: const TextStyle(fontWeight: FontWeight.w700))),
           ]),
         ),
     ]));

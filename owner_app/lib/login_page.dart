@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'api.dart';
@@ -52,38 +53,40 @@ class _LoginPageState extends State<LoginPage> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Column(children: [
-              Image.asset('assets/logo-cream.png', height: 80),
-              const SizedBox(height: 28),
-              Card(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: AutofillGroup(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                      const Text('الداش بورد', textAlign: TextAlign.center, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: kPurple)),
-                      const SizedBox(height: 18),
-                      TextField(
-                        controller: _user,
-                        autocorrect: false,
-                        textDirection: TextDirection.ltr,
-                        autofillHints: const [AutofillHints.username],
-                        decoration: const InputDecoration(labelText: 'اسم المستخدم'),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _pass,
-                        obscureText: true,
-                        autofillHints: const [AutofillHints.password],
-                        decoration: const InputDecoration(labelText: 'كلمة السر'),
-                        onSubmitted: (_) => _busy ? null : _go(),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(_err, style: const TextStyle(color: kBad, fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 8),
-                      FilledButton(onPressed: _busy ? null : _go, child: Text(_busy ? 'لحظة…' : 'دخول')),
-                    ]),
-                  ),
+              Image.asset('assets/logo-cream.png', height: 72),
+              const SizedBox(height: 26),
+              const Text('الداش بورد', textAlign: TextAlign.center, style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: kCream)),
+              const SizedBox(height: 4),
+              const Text('سجّل دخول بحساب صاحب المحل', textAlign: TextAlign.center, style: TextStyle(fontSize: 15, color: kLilac)),
+              const SizedBox(height: 24),
+              AutofillGroup(
+                child: Container(
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
+                  child: Column(children: [
+                    TextField(
+                      controller: _user,
+                      autocorrect: false,
+                      textDirection: TextDirection.ltr,
+                      autofillHints: const [AutofillHints.username],
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(hintText: 'اسم المستخدم', floatingLabelBehavior: FloatingLabelBehavior.never),
+                    ),
+                    const Divider(indent: 16),
+                    TextField(
+                      controller: _pass,
+                      obscureText: true,
+                      autofillHints: const [AutofillHints.password],
+                      decoration: const InputDecoration(hintText: 'كلمة السر', floatingLabelBehavior: FloatingLabelBehavior.never),
+                      onSubmitted: (_) => _busy ? null : _go(),
+                    ),
+                  ]),
                 ),
+              ),
+              if (_err.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_err, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFFFFB4B4), fontWeight: FontWeight.w600))),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(style: bigButton(kOrange, kPurple), onPressed: _busy ? null : _go, child: _busy ? const CupertinoActivityIndicator(color: kPurple) : const Text('دخول')),
               ),
             ]),
           ),

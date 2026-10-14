@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -26,9 +27,9 @@ class _FormSheet extends StatelessWidget {
             SheetTop(title),
             const SizedBox(height: 16),
             ...children,
-            if (err.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: Text(err, style: const TextStyle(color: kBad, fontWeight: FontWeight.w800))),
+            if (err.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: Text(err, style: const TextStyle(color: kBad, fontWeight: FontWeight.w600))),
             const SizedBox(height: 16),
-            FilledButton(onPressed: busy ? null : onSave, child: Text(busy ? 'لحظة…' : saveText)),
+            FilledButton(onPressed: busy ? null : onSave, child: busy ? const CupertinoActivityIndicator(color: Colors.white) : Text(saveText)),
           ]),
         ),
       );
@@ -87,27 +88,18 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
         err: _err,
         onSave: _save,
         children: [
-          _DateButton(date: _date, onPick: (d) => setState(() => _date = d)),
+          DateField(date: _date, onPick: (d) => setState(() => _date = d)),
           _gap(),
           Wrap(spacing: 6, runSpacing: 6, children: [
             for (final c in kCats)
-              ChoiceChip(
-                label: Text(c),
-                selected: _cat == c,
-                showCheckmark: false,
-                selectedColor: kPurple,
-                backgroundColor: Colors.white,
-                side: BorderSide.none,
-                labelStyle: TextStyle(color: _cat == c ? kCream : kPurple, fontWeight: FontWeight.w800, fontSize: 13),
-                onSelected: (_) => setState(() => _cat = c),
-              ),
+              Capsule(c, selected: _cat == c, onTap: () => setState(() => _cat = c)),
           ]),
           _gap(),
           TextField(
             controller: _amount,
             autofocus: true,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
             decoration: const InputDecoration(labelText: 'المبلغ', suffixText: 'ر.ع'),
           ),
           _gap(),
@@ -203,24 +195,23 @@ class _AppSaleSheetState extends State<AppSaleSheet> {
       err: _err,
       onSave: _save,
       children: [
-        const Text('من كشف طلبات أو سنونو أو خدمة، لليوم كامل', style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w700)),
+        const Text('من كشف طلبات أو سنونو أو خدمة، لليوم كامل', style: TextStyle(color: kInk2, fontSize: 14)),
         _gap(),
-        SegmentedButton<String>(
-          segments: [for (final e in kChannelNames.entries) ButtonSegment(value: e.key, label: Text(e.value))],
-          selected: {_ch},
-          showSelectedIcon: false,
-          onSelectionChanged: (v) => setState(() {
-            _ch = v.first;
+        Seg<String>(
+          value: _ch,
+          items: kChannelNames,
+          onChanged: (v) => setState(() {
+            _ch = v;
             _pct.text = _fmtPct(_pcts[_ch]);
           }),
         ),
         _gap(),
-        _DateButton(date: _date, onPick: (d) => setState(() => _date = d)),
+        DateField(date: _date, onPick: (d) => setState(() => _date = d)),
         _gap(),
         TextField(
           controller: _gross,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
           decoration: const InputDecoration(labelText: 'المبيعات', suffixText: 'ر.ع'),
           onChanged: (_) => setState(() {}),
         ),
@@ -249,9 +240,9 @@ class _AppSaleSheetState extends State<AppSaleSheet> {
             child: Panel(
               padding: const EdgeInsets.all(12),
               child: Row(children: [
-                const Text('يوصلك تقريباً', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.black54)),
+                const Text('يوصلك تقريباً', style: TextStyle(fontWeight: FontWeight.w600, color: kInk2)),
                 const Spacer(),
-                Text('${money(g - g * p / 100)} ر.ع', textDirection: TextDirection.rtl, style: const TextStyle(fontWeight: FontWeight.w900, color: kPurple, fontSize: 17)),
+                Text('${money(g - g * p / 100)} ر.ع', textDirection: TextDirection.rtl, style: const TextStyle(fontWeight: FontWeight.w700, color: kPurple, fontSize: 17)),
               ]),
             ),
           ),
@@ -318,40 +309,16 @@ class _AddCustomerSheetState extends State<AddCustomerSheet> {
             keyboardType: TextInputType.phone,
             textDirection: TextDirection.ltr,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(8)],
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: 1),
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, letterSpacing: 1),
             decoration: const InputDecoration(labelText: 'رقم الجوال', hintText: '9XXXXXXX', prefixText: '+968  '),
           ),
           _gap(),
           TextField(controller: _name, decoration: const InputDecoration(labelText: 'الاسم (اختياري)')),
           _gap(),
           Panel(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: SwitchListTile(
-              value: _offers,
-              onChanged: (v) => setState(() => _offers = v),
-              title: const Text('يبي يوصله العروض', style: TextStyle(fontWeight: FontWeight.w800)),
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: SwitchRow(title: 'يبي يوصله العروض', value: _offers, onChanged: (v) => setState(() => _offers = v)),
           ),
         ],
       );
-}
-
-class _DateButton extends StatelessWidget {
-  const _DateButton({required this.date, required this.onPick});
-  final DateTime date;
-  final ValueChanged<DateTime> onPick;
-
-  @override
-  Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final today = date.year == now.year && date.month == now.month && date.day == now.day;
-    return OutlinedButton.icon(
-      icon: const Icon(Icons.event),
-      label: Text(today ? 'اليوم · ${ymd(date)}' : ymd(date)),
-      onPressed: () async {
-        final d = await showDatePicker(context: context, firstDate: DateTime(2024), lastDate: now, initialDate: date);
-        if (d != null) onPick(d);
-      },
-    );
-  }
 }

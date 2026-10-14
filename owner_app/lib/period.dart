@@ -1,7 +1,8 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'api.dart';
-import 'theme.dart';
+import 'widgets.dart';
 
 /// The date range the summary, orders and expenses tabs show. Shared by all tabs.
 class PeriodController extends ChangeNotifier {
@@ -55,7 +56,7 @@ class PeriodController extends ChangeNotifier {
   }
 }
 
-/// Chips for the period plus a custom range picker.
+/// Period capsules plus a custom range picker.
 class PeriodBar extends StatelessWidget {
   const PeriodBar({super.key, required this.period});
   final PeriodController period;
@@ -73,36 +74,19 @@ class PeriodBar extends StatelessWidget {
     return ListenableBuilder(
       listenable: period,
       builder: (context, _) => SizedBox(
-        height: 46,
+        height: 40,
         child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 16), children: [
           for (final o in _opts)
             Padding(
               padding: const EdgeInsetsDirectional.only(end: 8),
-              child: ChoiceChip(
-                label: Text(o[1]),
-                selected: period.key == o[0],
-                onSelected: (_) => period.set(o[0]),
-                selectedColor: kPurple,
-                labelStyle: TextStyle(color: period.key == o[0] ? kCream : kPurple, fontWeight: FontWeight.w800),
-                backgroundColor: Colors.white,
-                side: BorderSide.none,
-                showCheckmark: false,
-              ),
+              child: Capsule(o[1], selected: period.key == o[0], onTap: () => period.set(o[0])),
             ),
-          ActionChip(
-            avatar: Icon(Icons.date_range, size: 18, color: period.key == 'custom' ? kCream : kPurple),
-            label: Text(period.key == 'custom' ? '${period.fromStr.substring(5)} ← ${period.toStr.substring(5)}' : 'تاريخ'),
-            labelStyle: TextStyle(color: period.key == 'custom' ? kCream : kPurple, fontWeight: FontWeight.w800),
-            backgroundColor: period.key == 'custom' ? kPurple : Colors.white,
-            side: BorderSide.none,
-            onPressed: () async {
-              final now = DateTime.now();
-              final r = await showDateRangePicker(
-                context: context,
-                firstDate: DateTime(2024),
-                lastDate: DateTime(now.year, now.month, now.day),
-                initialDateRange: DateTimeRange(start: period.from, end: period.to),
-              );
+          Capsule(
+            period.key == 'custom' ? '${period.fromStr.substring(5)} ← ${period.toStr.substring(5)}' : 'تاريخ',
+            icon: CupertinoIcons.calendar,
+            selected: period.key == 'custom',
+            onTap: () async {
+              final r = await pickRange(context, period.from, period.to);
               if (r != null) period.custom(r);
             },
           ),

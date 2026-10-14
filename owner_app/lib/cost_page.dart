@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -59,40 +60,32 @@ class _CostPageState extends State<CostPage> {
   Widget build(BuildContext context) {
     final ready = _c != null && _st != null;
     return Scaffold(
-      backgroundColor: kCream2,
-      floatingActionButton: ready
-          ? FloatingActionButton.extended(
-              onPressed: _buy,
-              backgroundColor: kOrange,
-              foregroundColor: kPurple,
-              icon: const Icon(Icons.add_shopping_cart),
-              label: const Text('شراء', style: TextStyle(fontWeight: FontWeight.w800)),
-            )
-          : null,
+      backgroundColor: kBg,
       body: Column(children: [
         PageHead(
           title: 'التكلفة والمخزون',
-          trailing: IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close, color: kCream)),
+          trailing: ready
+              ? CupertinoButton(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  onPressed: _buy,
+                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(CupertinoIcons.cart_badge_plus, color: kPurple, size: 24),
+                    SizedBox(width: 4),
+                    Text('شراء', style: TextStyle(color: kPurple, fontWeight: FontWeight.w600, fontSize: 17)),
+                  ]),
+                )
+              : null,
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: SegmentedButton<int>(
-            segments: const [
-              ButtonSegment(value: 0, label: Text('الأكواب')),
-              ButtonSegment(value: 1, label: Text('المخزون')),
-              ButtonSegment(value: 2, label: Text('الأسعار')),
-            ],
-            selected: {_tab},
-            showSelectedIcon: false,
-            onSelectionChanged: (v) => setState(() => _tab = v.first),
-          ),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          child: Seg<int>(value: _tab, items: const {0: 'الأكواب', 1: 'المخزون', 2: 'الأسعار'}, onChanged: (v) => setState(() => _tab = v)),
         ),
         Expanded(
           child: !ready
-              ? Center(child: _err == null ? const CircularProgressIndicator() : Text(_err!))
-              : RefreshIndicator(
+              ? Center(child: _err == null ? const CupertinoActivityIndicator() : Text(_err!))
+              : RefreshIndicator.adaptive(
                   onRefresh: _load,
-                  child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 100), children: [
+                  child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 40), children: [
                     if (_tab == 0) ..._cups(),
                     if (_tab == 1) ..._stock(),
                     if (_tab == 2) ..._prices(),
@@ -111,7 +104,7 @@ class _CostPageState extends State<CostPage> {
       if (noPrice.isNotEmpty)
         Panel(
           color: const Color(0xFFFDE9C8),
-          child: Text('باقي تحط سعر: ${noPrice.join('، ')}. بدون السعر التكلفة تطلع أقل من الحقيقة.', style: const TextStyle(fontWeight: FontWeight.w800, height: 1.5)),
+          child: Text('باقي تحط سعر: ${noPrice.join('، ')}. بدون السعر التكلفة تطلع أقل من الحقيقة.', style: const TextStyle(fontWeight: FontWeight.w600, height: 1.5)),
         ),
       const SizedBox(height: 4),
       for (final p in prods) _cupTile(p),
@@ -132,21 +125,21 @@ class _CostPageState extends State<CostPage> {
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
-                Flexible(child: Text('${p['name_ar']}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15))),
+                Flexible(child: Text('${p['name_ar']}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15))),
                 if (p['active'] != 1) ...[const SizedBox(width: 6), const Pill('مخفي')],
               ]),
               const SizedBox(height: 4),
               Text(hasRecipe ? 'البيع ${money(price)} · التكلفة ${money(cost)} · الربح ${money(prof)}' : 'ما فيه وصفة · اضغط وأضفها',
-                  style: const TextStyle(color: Colors.black54, fontSize: 12, fontWeight: FontWeight.w700)),
+                  style: const TextStyle(color: kInk2, fontSize: 12, fontWeight: FontWeight.w700)),
             ]),
           ),
           if (hasRecipe)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(12)),
-              child: Text('$pct%', textDirection: TextDirection.ltr, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: kPurple)),
+              child: Text('$pct%', textDirection: TextDirection.ltr, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: kPurple)),
             ),
-          const Icon(Icons.chevron_left, color: Colors.black26),
+          const Icon(CupertinoIcons.forward, color: kInk3),
         ]),
       ),
     );
@@ -175,7 +168,7 @@ class _CostPageState extends State<CostPage> {
             style: const TextStyle(fontWeight: FontWeight.w700, height: 1.6),
           ),
           const SizedBox(height: 12),
-          FilledButton.icon(onPressed: _count, icon: const Icon(Icons.inventory_2_outlined), label: Text(counted ? 'سوّ جرد جديد' : 'سوّ أول جرد')),
+          FilledButton.icon(onPressed: _count, icon: const Icon(CupertinoIcons.checkmark_seal, size: 20), label: Text(counted ? 'سوّ جرد جديد' : 'سوّ أول جرد')),
         ]),
       ),
       if (counted) ...[
@@ -188,13 +181,13 @@ class _CostPageState extends State<CostPage> {
               child: Row(children: [
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('${r['name_ar']}', style: const TextStyle(fontWeight: FontWeight.w800)),
+                    Text('${r['name_ar']}', style: const TextStyle(fontWeight: FontWeight.w600)),
                     if (r['last_at'] != null)
                       Text('جرد ${qfmt(r['last_qty'], '${r['unit']}')} · اشتريت ${qfmt(r['bought'], '${r['unit']}')} · انستخدم ${qfmt(r['used'], '${r['unit']}')}',
-                          style: const TextStyle(fontSize: 11, color: Colors.black45, fontWeight: FontWeight.w700)),
+                          style: const TextStyle(fontSize: 11, color: kInk2, fontWeight: FontWeight.w700)),
                   ]),
                 ),
-                Text(r['expected'] == null ? '-' : qfmt(r['expected'], '${r['unit']}'), style: const TextStyle(fontWeight: FontWeight.w900, color: kPurple, fontSize: 16)),
+                Text(r['expected'] == null ? '-' : qfmt(r['expected'], '${r['unit']}'), style: const TextStyle(fontWeight: FontWeight.w700, color: kPurple, fontSize: 16)),
               ]),
             ),
           ),
@@ -211,33 +204,27 @@ class _CostPageState extends State<CostPage> {
       toast(context, 'انحفظ الجرد، ومن الحين النظام يحسب المخزون');
       return;
     }
-    showDialog(
-      context: context,
-      builder: (d) => AlertDialog(
-        title: const Text('الفرق بين الجرد والمفروض'),
-        content: SizedBox(
-          width: 400,
-          child: SingleChildScrollView(
-            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              for (final r in res)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Row(children: [
-                    Expanded(child: Text('${r['name_ar']}', style: const TextStyle(fontWeight: FontWeight.w800))),
-                    Text('${_n(r['diff']) > 0 ? '+' : ''}${qfmt(r['diff'], '${r['unit']}')}',
-                        style: TextStyle(fontWeight: FontWeight.w900, color: _n(r['diff']) < 0 ? kBad : kOk)),
-                    const SizedBox(width: 8),
-                    Text(money(r['value']), textDirection: TextDirection.ltr, style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w700)),
-                  ]),
-                ),
-              const SizedBox(height: 8),
-              const Text('بالسالب يعني ناقص عن المفروض: هدر، أو زيادة في الكميات، أو بيع ما انسجل. الفرق البسيط طبيعي.',
-                  style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600, height: 1.5)),
+    showIos<void>(
+      context,
+      title: 'الفرق بين الجرد والمفروض',
+      body: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const SizedBox(height: 8),
+        for (final r in res)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 5),
+            child: Row(children: [
+              Expanded(child: Text('${r['name_ar']}', textAlign: TextAlign.start, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: kInk))),
+              Text('${_n(r['diff']) > 0 ? '+' : ''}${qfmt(r['diff'], '${r['unit']}')}',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: _n(r['diff']) < 0 ? kBad : kOk)),
+              const SizedBox(width: 8),
+              Text(money(r['value']), textDirection: TextDirection.ltr, style: const TextStyle(color: kInk2, fontSize: 13)),
             ]),
           ),
-        ),
-        actions: [FilledButton(onPressed: () => Navigator.pop(d), child: const Text('تمام'))],
-      ),
+        const SizedBox(height: 8),
+        const Text('بالسالب يعني ناقص عن المفروض: هدر، أو زيادة في الكميات، أو بيع ما انسجل. الفرق البسيط طبيعي.',
+            style: TextStyle(color: kInk2, fontSize: 12, height: 1.4)),
+      ]),
+      actions: const [IosAct('تمام', main: true)],
     );
   }
 
@@ -256,19 +243,19 @@ class _CostPageState extends State<CostPage> {
             child: Row(children: [
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('${i['name_ar']}', style: const TextStyle(fontWeight: FontWeight.w800)),
+                  Text('${i['name_ar']}', style: const TextStyle(fontWeight: FontWeight.w600)),
                   Text(_n(i['pack_qty']) > 0 ? '${qfmt(i['pack_qty'], '${i['unit']}')} بـ ${money(i['pack_price'])} ر.ع' : 'ما فيه سعر',
-                      style: const TextStyle(fontSize: 12, color: Colors.black45, fontWeight: FontWeight.w700)),
+                      style: const TextStyle(fontSize: 12, color: kInk2, fontWeight: FontWeight.w700)),
                 ]),
               ),
               Text(
                 _n(i['unit_cost']) == 0 ? '-' : (i['unit'] == 'pc' ? '${money(i['unit_cost'])} / حبة' : '${money(_n(i['unit_cost']) * 1000)} / كغ'),
-                style: const TextStyle(fontWeight: FontWeight.w900, color: kPurple),
+                style: const TextStyle(fontWeight: FontWeight.w700, color: kPurple),
               ),
             ]),
           ),
         ),
-      OutlinedButton.icon(onPressed: _addIngredient, icon: const Icon(Icons.add), label: const Text('مكوّن جديد')),
+      OutlinedButton.icon(onPressed: _addIngredient, icon: const Icon(CupertinoIcons.add), label: const Text('مكوّن جديد')),
       if (pur.isNotEmpty) ...[
         const SectionTitle('آخر المشتريات'),
         for (final p in pur)
@@ -280,13 +267,13 @@ class _CostPageState extends State<CostPage> {
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('${byId[(p['ingredient_id'] as num).toInt()]?['name_ar'] ?? '?'} · ${qfmt(p['qty'], '${byId[(p['ingredient_id'] as num).toInt()]?['unit'] ?? 'g'}')}',
-                        style: const TextStyle(fontWeight: FontWeight.w800)),
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
                     Text('${p['date']}${'${p['note']}'.isNotEmpty ? ' · ${p['note']}' : ''}${p['expense'] == true ? ' · في المصاريف' : ''}',
-                        style: const TextStyle(fontSize: 11, color: Colors.black45, fontWeight: FontWeight.w700)),
+                        style: const TextStyle(fontSize: 11, color: kInk2, fontWeight: FontWeight.w700)),
                   ]),
                 ),
-                Text(money(p['price']), textDirection: TextDirection.ltr, style: const TextStyle(fontWeight: FontWeight.w900)),
-                IconButton(onPressed: () => _deletePurchase(p), icon: const Icon(Icons.delete_outline, color: kBad)),
+                Text(money(p['price']), textDirection: TextDirection.ltr, style: const TextStyle(fontWeight: FontWeight.w700)),
+                BarButton(icon: CupertinoIcons.trash, color: kBad, size: 20, onPressed: () => _deletePurchase(p)),
               ]),
             ),
           ),
@@ -298,21 +285,14 @@ class _CostPageState extends State<CostPage> {
     final q = TextEditingController(text: _n(i['pack_qty']) > 0 ? '${_n(i['pack_qty']).round()}' : '');
     final p = TextEditingController(text: _n(i['pack_price']) > 0 ? money(i['pack_price']) : '');
     final unit = i['unit'] == 'pc' ? 'حبة' : 'غرام';
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (d) => AlertDialog(
-        title: Text('${i['name_ar']}'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: q, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: 'اشتريت كم ($unit)')),
-          const SizedBox(height: 10),
-          TextField(controller: p, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'بكم', suffixText: 'ر.ع')),
+    final ok = await showIos<bool>(context,
+        title: '${i['name_ar']}',
+        message: 'اكتب آخر مرة اشتريت: الكمية وبكم',
+        body: Column(children: [
+          alertField(q, placeholder: 'الكمية ($unit)', keyboard: const TextInputType.numberWithOptions(decimal: true), autofocus: true),
+          alertField(p, placeholder: 'المبلغ', suffix: 'ر.ع', keyboard: const TextInputType.numberWithOptions(decimal: true)),
         ]),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('إلغاء')),
-          FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('احفظ')),
-        ],
-      ),
-    );
+        actions: const [IosAct('إلغاء', value: false), IosAct('احفظ', value: true, main: true)]);
     if (ok != true) return;
     try {
       await Api.I.post('ingredient_save', {
@@ -333,28 +313,16 @@ class _CostPageState extends State<CostPage> {
   Future<void> _addIngredient() async {
     final n = TextEditingController();
     var unit = 'g';
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (d) => StatefulBuilder(
-        builder: (d, set) => AlertDialog(
-          title: const Text('مكوّن جديد'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextField(controller: n, autofocus: true, decoration: const InputDecoration(labelText: 'الاسم', hintText: 'مثلاً: مانجو')),
+    final ok = await showIos<bool>(context,
+        title: 'مكوّن جديد',
+        body: StatefulBuilder(
+          builder: (d, set) => Column(children: [
+            alertField(n, placeholder: 'الاسم، مثلاً: مانجو', autofocus: true),
             const SizedBox(height: 10),
-            SegmentedButton<String>(
-              segments: const [ButtonSegment(value: 'g', label: Text('بالغرام')), ButtonSegment(value: 'pc', label: Text('بالحبة'))],
-              selected: {unit},
-              showSelectedIcon: false,
-              onSelectionChanged: (v) => set(() => unit = v.first),
-            ),
+            Seg<String>(value: unit, items: const {'g': 'بالغرام', 'pc': 'بالحبة'}, onChanged: (v) => set(() => unit = v)),
           ]),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('إلغاء')),
-            FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('أضف')),
-          ],
         ),
-      ),
-    );
+        actions: const [IosAct('إلغاء', value: false), IosAct('أضف', value: true, main: true)]);
     if (ok != true || n.text.trim().isEmpty) return;
     try {
       await Api.I.post('ingredient_save', {'name_ar': n.text.trim(), 'name_en': n.text.trim(), 'unit': unit});
@@ -365,17 +333,7 @@ class _CostPageState extends State<CostPage> {
   }
 
   Future<void> _deletePurchase(Map<String, dynamic> p) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (d) => AlertDialog(
-        title: const Text('تحذف هذا الشراء؟'),
-        content: const Text('إذا كان مسجل في المصاريف ينحذف منها بعد.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('لا')),
-          FilledButton(style: FilledButton.styleFrom(backgroundColor: kBad), onPressed: () => Navigator.pop(d, true), child: const Text('احذف')),
-        ],
-      ),
-    );
+    final ok = await confirm(context, 'تحذف هذا الشراء؟', message: 'إذا كان مسجل في المصاريف ينحذف منها بعد.', yes: 'احذف');
     if (ok != true) return;
     try {
       await Api.I.post('purchase_delete', {'id': p['id']});
@@ -453,11 +411,11 @@ class _BuySheetState extends State<_BuySheet> {
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           const SheetTop('شراء'),
           const SizedBox(height: 14),
-          DropdownButtonFormField<int>(
-            initialValue: _ing,
-            decoration: const InputDecoration(labelText: 'الصنف'),
-            items: [for (final i in widget.ingredients) DropdownMenuItem(value: (i['id'] as num).toInt(), child: Text('${i['name_ar']}'))],
-            onChanged: (v) => setState(() => _ing = v ?? _ing),
+          PickField<int>(
+            label: 'الصنف',
+            value: _ing,
+            items: {for (final i in widget.ingredients) (i['id'] as num).toInt(): '${i['name_ar']}'},
+            onChanged: (v) => setState(() => _ing = v),
           ),
           const SizedBox(height: 10),
           Row(children: [
@@ -480,10 +438,15 @@ class _BuySheetState extends State<_BuySheet> {
           const SizedBox(height: 10),
           TextField(controller: _note, decoration: const InputDecoration(labelText: 'ملاحظة (اختياري)', hintText: 'مثلاً: المورد')),
           const SizedBox(height: 6),
-          SwitchListTile(contentPadding: EdgeInsets.zero, value: _expense, onChanged: (v) => setState(() => _expense = v), title: const Text('سجّلها في المصاريف', style: TextStyle(fontWeight: FontWeight.w800))),
-          if (_err.isNotEmpty) Text(_err, style: const TextStyle(color: kBad, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          Panel(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: SwitchRow(title: 'سجّلها في المصاريف', value: _expense, onChanged: (v) => setState(() => _expense = v)),
+          ),
+          const SizedBox(height: 6),
+          if (_err.isNotEmpty) Text(_err, style: const TextStyle(color: kBad, fontWeight: FontWeight.w600)),
           const SizedBox(height: 10),
-          FilledButton(onPressed: _busy ? null : _save, child: Text(_busy ? 'لحظة…' : 'احفظ')),
+          FilledButton(onPressed: _busy ? null : _save, child: _busy ? const CupertinoActivityIndicator(color: Colors.white) : const Text('احفظ')),
         ]),
       ),
     );
@@ -544,7 +507,7 @@ class _CountSheetState extends State<_CountSheet> {
           const SheetTop('الجرد'),
           const SizedBox(height: 6),
           const Text('اكتب الموجود عندك الحين: بالغرام، والأكواب والأغطية بالحبة. اللي ما عديته خلّه فاضي.',
-              style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w700, height: 1.5)),
+              style: TextStyle(color: kInk2, fontWeight: FontWeight.w700, height: 1.5)),
           const SizedBox(height: 12),
           for (final r in widget.rows)
             Padding(
@@ -559,9 +522,9 @@ class _CountSheetState extends State<_CountSheet> {
                 ),
               ),
             ),
-          if (_err.isNotEmpty) Text(_err, style: const TextStyle(color: kBad, fontWeight: FontWeight.w800)),
+          if (_err.isNotEmpty) Text(_err, style: const TextStyle(color: kBad, fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
-          FilledButton(onPressed: _busy ? null : _save, child: Text(_busy ? 'لحظة…' : 'احفظ الجرد')),
+          FilledButton(onPressed: _busy ? null : _save, child: _busy ? const CupertinoActivityIndicator(color: Colors.white) : const Text('احفظ الجرد')),
         ]),
       );
 }
@@ -636,8 +599,8 @@ class _RecipeSheetState extends State<_RecipeSheet> {
         Panel(
           color: kPurple,
           child: Row(children: [
-            Expanded(child: Text('التكلفة ${money(cost)}\nالبيع ${money(price)}', style: const TextStyle(color: kCream, fontWeight: FontWeight.w800, height: 1.5))),
-            Text(price > 0 ? '${((price - cost) / price * 100).round()}%' : '-', textDirection: TextDirection.ltr, style: const TextStyle(color: kOrange, fontWeight: FontWeight.w900, fontSize: 28)),
+            Expanded(child: Text('التكلفة ${money(cost)}\nالبيع ${money(price)}', style: const TextStyle(color: kCream, fontWeight: FontWeight.w600, height: 1.5))),
+            Text(price > 0 ? '${((price - cost) / price * 100).round()}%' : '-', textDirection: TextDirection.ltr, style: const TextStyle(color: kOrange, fontWeight: FontWeight.w700, fontSize: 28)),
           ]),
         ),
         const SizedBox(height: 12),
@@ -645,14 +608,20 @@ class _RecipeSheetState extends State<_RecipeSheet> {
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Row(children: [
+              CupertinoButton(
+                padding: const EdgeInsetsDirectional.only(end: 8),
+                minimumSize: const Size(30, 44),
+                onPressed: () => setState(() => _lines.remove(l)),
+                child: const Icon(CupertinoIcons.minus_circle_fill, color: kBad, size: 24),
+              ),
               Expanded(
                 flex: 3,
-                child: DropdownButtonFormField<int>(
-                  initialValue: l.ing,
-                  isExpanded: true,
-                  decoration: const InputDecoration(isDense: true),
-                  items: [for (final i in widget.ingredients) DropdownMenuItem(value: (i['id'] as num).toInt(), child: Text('${i['name_ar']}', overflow: TextOverflow.ellipsis))],
-                  onChanged: (v) => setState(() => l.ing = v ?? l.ing),
+                child: PickField<int>(
+                  dense: true,
+                  label: 'المكوّن',
+                  value: l.ing,
+                  items: {for (final i in widget.ingredients) (i['id'] as num).toInt(): '${i['name_ar']}'},
+                  onChanged: (v) => setState(() => l.ing = v),
                 ),
               ),
               const SizedBox(width: 8),
@@ -665,17 +634,16 @@ class _RecipeSheetState extends State<_RecipeSheet> {
                   onChanged: (_) => setState(() {}),
                 ),
               ),
-              IconButton(onPressed: () => setState(() => _lines.remove(l)), icon: const Icon(Icons.remove_circle_outline, color: kBad)),
             ]),
           ),
         OutlinedButton.icon(
           onPressed: () => setState(() => _lines.add(_Line((widget.ingredients.first['id'] as num).toInt(), TextEditingController()))),
-          icon: const Icon(Icons.add),
+          icon: const Icon(CupertinoIcons.add),
           label: const Text('مكوّن'),
         ),
-        if (_err.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_err, style: const TextStyle(color: kBad, fontWeight: FontWeight.w800))),
+        if (_err.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_err, style: const TextStyle(color: kBad, fontWeight: FontWeight.w600))),
         const SizedBox(height: 12),
-        FilledButton(onPressed: _busy ? null : _save, child: Text(_busy ? 'لحظة…' : 'احفظ الوصفة')),
+        FilledButton(onPressed: _busy ? null : _save, child: _busy ? const CupertinoActivityIndicator(color: Colors.white) : const Text('احفظ الوصفة')),
       ]),
     );
   }

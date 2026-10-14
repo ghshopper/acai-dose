@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -78,23 +79,20 @@ class _CustomersPageState extends State<CustomersPage> {
     final repeat = _all.where((c) => ((c['orders'] as num?) ?? 0) > 1).length;
 
     return Scaffold(
-      backgroundColor: kCream2,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
+      backgroundColor: kBg,
+      body: Column(children: [
+      PageHead(
+        title: 'العملاء',
+        subtitle: 'الولاء والعروض',
+        loading: _loading,
+        trailing: BarButton(icon: CupertinoIcons.person_badge_plus, onPressed: () async {
           final ok = await openSheet<bool>(context, const AddCustomerSheet());
           if (ok == true) {
             _load();
-            if (mounted) toast(context, 'انضاف العميل وصارت له بطاقة');
+            if (context.mounted) toast(context, 'انضاف العميل وصارت له بطاقة');
           }
-        },
-        backgroundColor: kOrange,
-        foregroundColor: kPurple,
-        icon: const Icon(Icons.person_add_alt_1),
-        label: const Text('عميل جديد', style: TextStyle(fontWeight: FontWeight.w800)),
+        }),
       ),
-      body: Column(children: [
-      const PageHead(title: 'العملاء', subtitle: 'الولاء والعروض'),
-      if (_loading) const LinearProgressIndicator(minHeight: 3, color: kOrange, backgroundColor: kCream2),
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
         child: Row(children: [
@@ -107,42 +105,28 @@ class _CustomersPageState extends State<CustomersPage> {
       ),
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-        child: TextField(
-          decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'بحث بالاسم أو الرقم أو السيارة'),
+        child: CupertinoSearchTextField(
+          placeholder: 'بحث بالاسم أو الرقم أو السيارة',
+          backgroundColor: kFill,
           onChanged: (v) => setState(() => _q = v),
         ),
       ),
       SizedBox(
-        height: 46,
-        child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4), children: [
+        height: 44,
+        child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5), children: [
           for (final o in const [['last', 'آخر زيارة'], ['orders', 'الأكثر طلبات'], ['spent', 'الأكثر صرف'], ['away', 'غايبين من زمان']])
             Padding(
               padding: const EdgeInsetsDirectional.only(end: 6),
-              child: ChoiceChip(
-                label: Text(o[1]),
-                selected: _sort == o[0],
-                showCheckmark: false,
-                selectedColor: kPurple,
-                labelStyle: TextStyle(color: _sort == o[0] ? kCream : kPurple, fontWeight: FontWeight.w800, fontSize: 13),
-                backgroundColor: Colors.white,
-                side: BorderSide.none,
-                onSelected: (_) => setState(() => _sort = o[0]),
-              ),
+              child: Capsule(o[1], selected: _sort == o[0], onTap: () => setState(() => _sort = o[0])),
             ),
-          FilterChip(
-            label: const Text('يبون العروض'),
-            selected: _offersOnly,
-            onSelected: (v) => setState(() => _offersOnly = v),
-            backgroundColor: Colors.white,
-            side: BorderSide.none,
-          ),
+          Capsule('يبون العروض', icon: CupertinoIcons.checkmark_alt, selected: _offersOnly, onTap: () => setState(() => _offersOnly = !_offersOnly)),
         ]),
       ),
       Expanded(
-        child: RefreshIndicator(
+        child: RefreshIndicator.adaptive(
           onRefresh: _load,
           child: list.isEmpty
-              ? ListView(children: const [EmptyNote('ما فيه عملاء', icon: Icons.people_outline)])
+              ? ListView(children: const [EmptyNote('ما فيه عملاء', icon: CupertinoIcons.person_2)])
               : ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
                   itemCount: list.length,
@@ -159,8 +143,8 @@ class _CustomersPageState extends State<CustomersPage> {
         child: Panel(
           padding: const EdgeInsets.symmetric(vertical: 10),
           child: Column(children: [
-            Text(v, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: kPurple)),
-            Text(l, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.black45)),
+            Text(v, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: kPurple)),
+            Text(l, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kInk2)),
           ]),
         ),
       );
@@ -180,43 +164,41 @@ class _CustomersPageState extends State<CustomersPage> {
       child: Row(children: [
         CircleAvatar(
           radius: 22,
-          backgroundColor: kCream2,
-          child: Text(name.isEmpty ? '؟' : name.characters.first, style: const TextStyle(fontWeight: FontWeight.w900, color: kPurple, fontSize: 18)),
+          backgroundColor: kBg,
+          child: Text(name.isEmpty ? '؟' : name.characters.first, style: const TextStyle(fontWeight: FontWeight.w700, color: kPurple, fontSize: 18)),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              Flexible(child: Text(name.isEmpty ? 'بدون اسم' : name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16))),
+              Flexible(child: Text(name.isEmpty ? 'بدون اسم' : name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16))),
               if (((c['orders'] as num?) ?? 0) >= 5) ...[const SizedBox(width: 6), _chip('دائم', kCream2)],
               if (free > 0) ...[const SizedBox(width: 6), _chip('$free مجاني', kOrange)],
             ]),
             const SizedBox(height: 2),
-            Text(phone, textDirection: TextDirection.ltr, style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+            Text(phone, textDirection: TextDirection.ltr, style: const TextStyle(color: kInk2, fontWeight: FontWeight.w600)),
             const SizedBox(height: 4),
             Text(
               '${c['orders']} طلب · ${money(c['spent'])} ر.ع · ${_ago(c['last_at'])}',
-              style: const TextStyle(color: Colors.black45, fontSize: 12, fontWeight: FontWeight.w700),
+              style: const TextStyle(color: kInk2, fontSize: 12, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 6),
             Row(children: [
               Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(99),
-                  child: LinearProgressIndicator(value: need > 0 ? stamps / need : 0, minHeight: 6, color: kOrange, backgroundColor: kCream2),
-                ),
+                child: Bar(value: need > 0 ? stamps / need : 0.0, height: 6, color: kOrange, bg: kCream2),
               ),
               const SizedBox(width: 8),
-              Text('$stamps/$need', textDirection: TextDirection.ltr, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: kPurple)),
+              Text('$stamps/$need', textDirection: TextDirection.ltr, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: kPurple)),
             ]),
           ]),
         ),
-        IconButton(
-          tooltip: 'واتساب',
-          icon: const Icon(Icons.chat, color: kOk),
+        BarButton(
+          icon: CupertinoIcons.chat_bubble_fill,
+          color: kOk,
+          size: 22,
           onPressed: phone.isEmpty ? null : () => launchUrl(Uri.parse('https://wa.me/${phone.replaceAll('+', '')}'), mode: LaunchMode.externalApplication),
         ),
-        const Icon(Icons.chevron_left, color: Colors.black26),
+        const Icon(CupertinoIcons.forward, color: kInk3, size: 18),
       ]),
     );
   }
@@ -224,6 +206,6 @@ class _CustomersPageState extends State<CustomersPage> {
   Widget _chip(String t, Color bg) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(99)),
-        child: Text(t, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: kPurple)),
+        child: Text(t, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: kPurple)),
       );
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'api.dart';
@@ -55,21 +56,12 @@ class _ExpensesPageState extends State<ExpensesPage> {
   }
 
   Future<void> _delete(Map<String, dynamic> r) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('تحذف هذا المصروف؟'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('لا')),
-          FilledButton(style: FilledButton.styleFrom(backgroundColor: kBad), onPressed: () => Navigator.pop(c, true), child: const Text('احذف')),
-        ],
-      ),
-    );
+    final ok = await confirm(context, 'تحذف هذا المصروف؟', yes: 'احذف');
     if (ok != true) return;
     try {
       await Api.I.post('delete', {'type': 'expense', 'id': (r['id'] as num).toInt()});
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errText(e))));
+      if (mounted) toast(context, errText(e), ok: false);
     }
     _load();
   }
@@ -83,47 +75,36 @@ class _ExpensesPageState extends State<ExpensesPage> {
     }
     final cats = byCat.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
     return Scaffold(
-      backgroundColor: kCream2,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _add,
-        backgroundColor: kOrange,
-        foregroundColor: kPurple,
-        icon: const Icon(Icons.add),
-        label: const Text('مصروف جديد', style: TextStyle(fontWeight: FontWeight.w800)),
-      ),
+      backgroundColor: kBg,
       body: Column(children: [
-        PageHead(title: 'المصاريف', period: widget.period),
-        if (_loading) const LinearProgressIndicator(minHeight: 3, color: kOrange, backgroundColor: kCream2),
+        PageHead(title: 'المصاريف', period: widget.period, loading: _loading, trailing: BarButton(icon: CupertinoIcons.add_circled_solid, size: 30, onPressed: _add)),
         Expanded(
-          child: RefreshIndicator(
+          child: RefreshIndicator.adaptive(
             onRefresh: _load,
             child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 100), children: [
               Container(
                 padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(color: kPurple, borderRadius: BorderRadius.circular(22)),
+                decoration: BoxDecoration(color: kPurple, borderRadius: BorderRadius.circular(20)),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('مصاريف الفترة', style: TextStyle(color: kLilac, fontWeight: FontWeight.w800)),
-                  Text(money(total), textDirection: TextDirection.ltr, style: const TextStyle(color: kCream, fontSize: 36, fontWeight: FontWeight.w900)),
+                  const Text('مصاريف الفترة', style: TextStyle(color: kLilac, fontWeight: FontWeight.w600)),
+                  Text(money(total), textDirection: TextDirection.ltr, style: const TextStyle(color: kCream, fontSize: 36, fontWeight: FontWeight.w700)),
                   for (final c in cats)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                         Row(children: [
                           Expanded(child: Text(c.key, style: const TextStyle(color: kCream, fontWeight: FontWeight.w600, fontSize: 13))),
-                          Text(money(c.value), textDirection: TextDirection.ltr, style: const TextStyle(color: kCream, fontWeight: FontWeight.w800)),
+                          Text(money(c.value), textDirection: TextDirection.ltr, style: const TextStyle(color: kCream, fontWeight: FontWeight.w600)),
                         ]),
                         const SizedBox(height: 4),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(99),
-                          child: LinearProgressIndicator(value: total > 0 ? c.value / total : 0, minHeight: 5, color: kOrange, backgroundColor: kPurple2),
-                        ),
+                        Bar(value: total > 0 ? c.value / total : 0.0, height: 5, color: kOrange, bg: kPurple2),
                       ]),
                     ),
                 ]),
               ),
               const SizedBox(height: 12),
               if (_exps.isEmpty)
-                const EmptyNote('ما فيه مصاريف في هالفترة', icon: Icons.payments_outlined),
+                const EmptyNote('ما فيه مصاريف في هالفترة', icon: CupertinoIcons.creditcard),
               for (final r in _exps)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
@@ -132,13 +113,13 @@ class _ExpensesPageState extends State<ExpensesPage> {
                   child: Row(children: [
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text('${r['category']}', style: const TextStyle(fontWeight: FontWeight.w800)),
+                        Text('${r['category']}', style: const TextStyle(fontWeight: FontWeight.w600)),
                         Text('${r['expense_date']}${(r['note'] ?? '') != '' ? ' · ${r['note']}' : ''}',
-                            style: const TextStyle(color: Colors.black45, fontSize: 12, fontWeight: FontWeight.w600)),
+                            style: const TextStyle(color: kInk2, fontSize: 12, fontWeight: FontWeight.w600)),
                       ]),
                     ),
-                    Text(money(r['amount']), textDirection: TextDirection.ltr, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-                    IconButton(onPressed: () => _delete(r), icon: const Icon(Icons.delete_outline, color: kBad)),
+                    Text(money(r['amount']), textDirection: TextDirection.ltr, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                    BarButton(icon: CupertinoIcons.trash, color: kBad, size: 20, onPressed: () => _delete(r)),
                   ]),
                   ),
                 ),

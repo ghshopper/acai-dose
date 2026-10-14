@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -81,16 +82,13 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     final s = _s;
     return Scaffold(
-      backgroundColor: kCream2,
+      backgroundColor: kBg,
       body: Column(children: [
-        PageHead(
-          title: 'الإعدادات',
-          trailing: IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close, color: kCream)),
-        ),
+        const PageHead(title: 'الإعدادات'),
         Expanded(
           child: s == null
-              ? Center(child: _err == null ? const CircularProgressIndicator() : Text(_err!))
-              : RefreshIndicator(
+              ? Center(child: _err == null ? const CupertinoActivityIndicator() : Text(_err!))
+              : RefreshIndicator.adaptive(
                   onRefresh: _load,
                   child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 40), children: [
                     const SectionTitle('المنيو والأسعار', note: 'اللي تطفيه يختفي من الموقع والكاشير'),
@@ -105,7 +103,7 @@ class _SettingsPageState extends State<SettingsPage> {
                             controller: _wa,
                             keyboardType: TextInputType.phone,
                             textDirection: TextDirection.ltr,
-                            decoration: const InputDecoration(prefixText: '+968  ', hintText: '9XXXXXXX', isDense: true),
+                            decoration: const InputDecoration(prefixText: '+968  ', hintText: '9XXXXXXX', isDense: true, fillColor: kField),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -130,41 +128,46 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _loyalty() => Panel(
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
+          SwitchRow(
+            title: 'نظام الولاء شغال',
             value: _loyOn,
             onChanged: (v) => setState(() {
               _loyOn = v;
               _loyDirty = true;
             }),
-            title: const Text('نظام الولاء شغال', style: TextStyle(fontWeight: FontWeight.w800)),
           ),
+          const Divider(height: 20),
           const SizedBox(height: 4),
           Row(children: [
-            const Expanded(child: Text('عدد الأختام', style: TextStyle(fontWeight: FontWeight.w800))),
-            IconButton.filledTonal(onPressed: _need > 2 ? () => setState(() {
-                  _need--;
-                  _loyDirty = true;
-                }) : null, icon: const Icon(Icons.remove)),
-            SizedBox(width: 44, child: Text('$_need', textAlign: TextAlign.center, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: kPurple))),
-            IconButton.filledTonal(onPressed: _need < 30 ? () => setState(() {
-                  _need++;
-                  _loyDirty = true;
-                }) : null, icon: const Icon(Icons.add)),
+            const Expanded(child: Text('عدد الأختام', style: TextStyle(fontWeight: FontWeight.w600))),
+            SizedBox(width: 44, child: Text('$_need', textAlign: TextAlign.center, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: kPurple))),
+            IosStepper(
+              onMinus: _need > 2
+                  ? () => setState(() {
+                        _need--;
+                        _loyDirty = true;
+                      })
+                  : null,
+              onPlus: _need < 30
+                  ? () => setState(() {
+                        _need++;
+                        _loyDirty = true;
+                      })
+                  : null,
+            ),
           ]),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Text('$_need ${_unit == 'cup' ? 'أكواب' : 'طلبات'} والي بعده مجاناً (الـ ${_need + 1} علينا)',
-                style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w700)),
+                style: const TextStyle(color: kInk2, fontWeight: FontWeight.w700)),
           ),
           StampRow(filled: (_need / 2).floor(), need: _need, size: _need > 8 ? 22 : 28),
           const SizedBox(height: 12),
-          SegmentedButton<String>(
-            segments: const [ButtonSegment(value: 'cup', label: Text('ختم لكل كوب')), ButtonSegment(value: 'order', label: Text('ختم لكل طلب'))],
-            selected: {_unit},
-            showSelectedIcon: false,
-            onSelectionChanged: (v) => setState(() {
-              _unit = v.first;
+          Seg<String>(
+            value: _unit,
+            items: const {'cup': 'ختم لكل كوب', 'order': 'ختم لكل طلب'},
+            onChanged: (v) => setState(() {
+              _unit = v;
               _loyDirty = true;
             }),
           ),
@@ -184,14 +187,14 @@ class _SettingsPageState extends State<SettingsPage> {
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: Row(children: [
-                Expanded(child: Text(e.value, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
+                Expanded(child: Text(e.value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16))),
                 SizedBox(
                   width: 120,
                   child: TextField(
                     controller: _comm[e.key],
                     textAlign: TextAlign.center,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(suffixText: '%', isDense: true),
+                    decoration: const InputDecoration(suffixText: '%', isDense: true, fillColor: kField),
                   ),
                 ),
               ]),
@@ -212,60 +215,52 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget _staff(List<Map<String, dynamic>> users) => Panel(
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           for (final u in users)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: CircleAvatar(
-                backgroundColor: u['role'] == 'owner' ? kPurple : kCream2,
-                child: Icon(u['role'] == 'owner' ? Icons.star : Icons.person, color: u['role'] == 'owner' ? kCream : kPurple),
-              ),
-              title: Text('${u['username']}', textDirection: TextDirection.ltr, textAlign: TextAlign.start, style: const TextStyle(fontWeight: FontWeight.w800)),
-              subtitle: Text(u['role'] == 'owner' ? 'صاحب المحل' : (u['active'] == 1 ? 'عامل · شغال' : 'عامل · موقوف')),
-              trailing: u['role'] == 'owner'
-                  ? null
-                  : Row(mainAxisSize: MainAxisSize.min, children: [
-                      IconButton(tooltip: 'كلمة سر جديدة', onPressed: () => _password(u), icon: const Icon(Icons.key, color: kPurple)),
-                      Switch(value: u['active'] == 1, onChanged: (v) => _post('user_update', {'id': u['id'], 'active': v}, v ? 'رجع الحساب يشتغل' : 'انوقف الحساب')),
-                    ]),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(color: u['role'] == 'owner' ? kPurple : kCream2, shape: BoxShape.circle),
+                  child: Icon(u['role'] == 'owner' ? CupertinoIcons.star_fill : CupertinoIcons.person_fill, size: 18, color: u['role'] == 'owner' ? kCream : kPurple),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('${u['username']}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: kInk)),
+                    Text(u['role'] == 'owner' ? 'صاحب المحل' : (u['active'] == 1 ? 'عامل · شغال' : 'عامل · موقوف'), style: const TextStyle(color: kInk2, fontSize: 13)),
+                  ]),
+                ),
+                if (u['role'] != 'owner') ...[
+                  BarButton(icon: CupertinoIcons.lock_fill, size: 20, onPressed: () => _password(u)),
+                  IosSwitch(value: u['active'] == 1, onChanged: (v) => _post('user_update', {'id': u['id'], 'active': v}, v ? 'رجع الحساب يشتغل' : 'انوقف الحساب')),
+                ],
+              ]),
             ),
           const SizedBox(height: 6),
-          OutlinedButton.icon(onPressed: _addUser, icon: const Icon(Icons.person_add_alt_1), label: const Text('حساب عامل جديد')),
+          OutlinedButton.icon(onPressed: _addUser, icon: const Icon(CupertinoIcons.person_badge_plus), label: const Text('حساب عامل جديد')),
         ]),
       );
 
   Future<void> _password(Map<String, dynamic> u) async {
     final ctl = TextEditingController();
-    final v = await showDialog<String>(
-      context: context,
-      builder: (d) => AlertDialog(
-        title: Text('كلمة سر جديدة لـ ${u['username']}'),
-        content: TextField(controller: ctl, autofocus: true, decoration: const InputDecoration(hintText: '٦ حروف أو أكثر')),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(d), child: const Text('إلغاء')),
-          FilledButton(onPressed: () => Navigator.pop(d, ctl.text), child: const Text('احفظ')),
-        ],
-      ),
-    );
+    final v = await showIos<String>(context, title: 'كلمة سر جديدة لـ ${u['username']}', body: alertField(ctl, placeholder: '٦ حروف أو أكثر', autofocus: true, ltr: true), actions: [
+      const IosAct('إلغاء'),
+      IosAct('احفظ', get: () => ctl.text, main: true),
+    ]);
     if (v != null && v.isNotEmpty) _post('user_update', {'id': u['id'], 'password': v}, 'تغيرت كلمة السر');
   }
 
   Future<void> _addUser() async {
     final un = TextEditingController();
     final pw = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (d) => AlertDialog(
-        title: const Text('حساب عامل جديد'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: un, autofocus: true, textDirection: TextDirection.ltr, autocorrect: false, decoration: const InputDecoration(labelText: 'اسم المستخدم (إنجليزي)')),
-          const SizedBox(height: 10),
-          TextField(controller: pw, decoration: const InputDecoration(labelText: 'كلمة السر')),
+    final ok = await showIos<bool>(context,
+        title: 'حساب عامل جديد',
+        body: Column(children: [
+          alertField(un, placeholder: 'اسم المستخدم (إنجليزي)', autofocus: true, ltr: true),
+          alertField(pw, placeholder: 'كلمة السر', ltr: true),
         ]),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('إلغاء')),
-          FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('أضف')),
-        ],
-      ),
-    );
+        actions: const [IosAct('إلغاء', value: false), IosAct('أضف', value: true, main: true)]);
     if (ok == true) _post('add_user', {'username': un.text.trim(), 'password': pw.text}, 'انضاف الحساب');
   }
 }
@@ -292,21 +287,13 @@ class _ProductRowState extends State<_ProductRow> {
   Future<void> _editDesc() async {
     final ar = TextEditingController(text: '${widget.product['desc_ar'] ?? ''}');
     final en = TextEditingController(text: '${widget.product['desc_en'] ?? ''}');
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (d) => AlertDialog(
-        title: Text('وصف ${widget.product['name_ar']}'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: ar, maxLines: 3, decoration: const InputDecoration(labelText: 'بالعربي')),
-          const SizedBox(height: 10),
-          TextField(controller: en, maxLines: 3, textDirection: TextDirection.ltr, decoration: const InputDecoration(labelText: 'English')),
+    final ok = await showIos<bool>(context,
+        title: 'وصف ${widget.product['name_ar']}',
+        body: Column(children: [
+          alertField(ar, placeholder: 'بالعربي', maxLines: 3),
+          alertField(en, placeholder: 'English', maxLines: 3, ltr: true),
         ]),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('إلغاء')),
-          FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('احفظ')),
-        ],
-      ),
-    );
+        actions: const [IosAct('إلغاء', value: false), IosAct('احفظ', value: true, main: true)]);
     if (ok != true) return;
     final p = double.tryParse(_price.text.trim()) ?? 0;
     await widget.onSave({'id': widget.product['id'], 'price': p, 'active': _active, 'desc_ar': ar.text.trim(), 'desc_en': en.text.trim()});
@@ -316,14 +303,14 @@ class _ProductRowState extends State<_ProductRow> {
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(bottom: 8),
         child: Panel(
-          padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+          padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
           child: Column(children: [
             Row(children: [
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('${widget.product['name_ar']}',
-                      style: TextStyle(fontWeight: FontWeight.w800, color: _active ? Colors.black87 : Colors.black38, decoration: _active ? null : TextDecoration.lineThrough)),
-                  if (widget.product['kind'] == 'build') const Text('سعر الباول بدون الإضافات', style: TextStyle(fontSize: 11, color: Colors.black45, fontWeight: FontWeight.w700)),
+                      style: TextStyle(fontWeight: FontWeight.w600, color: _active ? kInk : kInk3, decoration: _active ? null : TextDecoration.lineThrough)),
+                  if (widget.product['kind'] == 'build') const Text('سعر الباول بدون الإضافات', style: TextStyle(fontSize: 11, color: kInk2, fontWeight: FontWeight.w700)),
                   GestureDetector(
                     onTap: _editDesc,
                     child: Padding(
@@ -340,11 +327,12 @@ class _ProductRowState extends State<_ProductRow> {
                   controller: _price,
                   textAlign: TextAlign.center,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(isDense: true, suffixText: 'ر.ع'),
+                  decoration: const InputDecoration(isDense: true, suffixText: 'ر.ع', fillColor: kField),
                   onChanged: (_) => setState(() => _dirty = true),
                 ),
               ),
-              Switch(value: _active, onChanged: (v) => setState(() {
+              const SizedBox(width: 8),
+              IosSwitch(value: _active, onChanged: (v) => setState(() {
                     _active = v;
                     _dirty = true;
                   })),
@@ -362,7 +350,7 @@ class _ProductRowState extends State<_ProductRow> {
                     await widget.onSave({'id': widget.product['id'], 'price': p, 'active': _active});
                     if (mounted) setState(() => _dirty = false);
                   },
-                  icon: const Icon(Icons.check),
+                  icon: const Icon(CupertinoIcons.checkmark),
                   label: const Text('احفظ'),
                 ),
               ),
@@ -394,27 +382,28 @@ class _ToppingRowState extends State<_ToppingRow> {
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(bottom: 8),
         child: Panel(
-          padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+          padding: const EdgeInsets.fromLTRB(14, 8, 10, 8),
           child: Row(children: [
-            Expanded(child: Text('${widget.topping['name_ar']}', style: TextStyle(fontWeight: FontWeight.w800, color: _active ? Colors.black87 : Colors.black38))),
+            Expanded(child: Text('${widget.topping['name_ar']}', style: TextStyle(fontWeight: FontWeight.w600, color: _active ? kInk : kInk3))),
             SizedBox(
               width: 100,
               child: TextField(
                 controller: _price,
                 textAlign: TextAlign.center,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(isDense: true, prefixText: '+'),
+                decoration: const InputDecoration(isDense: true, prefixText: '+', fillColor: kField),
                 onChanged: (_) => setState(() => _dirty = true),
               ),
             ),
-            Switch(value: _active, onChanged: (v) => setState(() {
+            const SizedBox(width: 8),
+            IosSwitch(value: _active, onChanged: (v) => setState(() {
                   _active = v;
                   _dirty = true;
                 })),
             if (_dirty)
-              IconButton(
-                tooltip: 'احفظ',
-                icon: const Icon(Icons.check_circle, color: kOk),
+              BarButton(
+                icon: CupertinoIcons.checkmark_alt_circle_fill,
+                color: kOk,
                 onPressed: () async {
                   final p = double.tryParse(_price.text.trim());
                   if (p == null || p < 0) {

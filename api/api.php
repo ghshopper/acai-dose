@@ -44,15 +44,15 @@ function promo(): ?array {
     return $p;
 }
 /** Price after the day offer, rounded to 5 baisa so cash works. */
-function promo_price(float $v): float {
-    $p = promo();
+function promo_price(float $v, bool $offer = true): float {
+    $p = $offer ? promo() : null;
     if (!$p || $v <= 0) return $v;
     return round(round($v * (100 - (float)$p['pct']) / 100 / 0.005) * 0.005, 3);
 }
 
 /** Validates [{product_id, qty, toppings?}] against the menu; returns [lines, total].
  *  "Build your bowl" lines carry the chosen toppings; their names list them so every screen and receipt shows them. */
-function price_items($items): array {
+function price_items($items, bool $offer = true): array {
     if (!is_array($items) || !count($items) || count($items) > 15) fail('invalid_items');
     $lines = []; $total = 0.0;
     foreach ($items as $it) {
@@ -60,8 +60,8 @@ function price_items($items): array {
         if ($qty < 1 || $qty > 50) fail('invalid_qty');
         $p = q('SELECT id, name_ar, name_en, price, kind FROM products WHERE id = ? AND active = 1', [$pid])->fetch();
         if (!$p) fail('invalid_product');
-        $line = ['product_id' => (int)$p['id'], 'name_ar' => $p['name_ar'], 'name_en' => $p['name_en'], 'price' => promo_price((float)$p['price']), 'qty' => $qty];
-        if (promo()) $line['was'] = (float)$p['price'];
+        $line = ['product_id' => (int)$p['id'], 'name_ar' => $p['name_ar'], 'name_en' => $p['name_en'], 'price' => promo_price((float)$p['price'], $offer), 'qty' => $qty];
+        if ($offer && promo()) $line['was'] = (float)$p['price'];
         if (($p['kind'] ?? 'cup') === 'build') {
             // Toppings as a list of ids; an id can repeat (double banana = the id twice), up to 3 times each
             $ids = array_map('intval', is_array($it['toppings'] ?? null) ? $it['toppings'] : []);
@@ -72,7 +72,7 @@ function price_items($items): array {
                 if ($n > 3) fail('invalid_items');
                 $t = q('SELECT id, k, name_ar, name_en, price FROM toppings WHERE id = ? AND active = 1', [$tid])->fetch();
                 if (!$t) fail('invalid_topping');
-                $tp = promo_price((float)$t['price']);
+                $tp = promo_price((float)$t['price'], $offer);
                 $tops[] = ['id' => (int)$t['id'], 'k' => $t['k'], 'name_ar' => $t['name_ar'], 'name_en' => $t['name_en'], 'price' => $tp, 'n' => $n];
                 $extra += $tp * $n;
                 $namesAr[] = $t['name_ar'] . ($n > 1 ? " ×$n" : '');
@@ -268,7 +268,8 @@ case 'pos_sale':
     $post(); $u = need('staff');
     $pay = $in['payment'] ?? '';
     if (!in_array($pay, PAYMENTS, true)) fail('bad_payment');
-    [$lines, $total] = price_items($in['items'] ?? null);
+    // Delivery-app orders (Talabat, Snoonu, Khedmah) always go in at full price: the day offer is for our own customers
+    [$lines, $total] = price_items($in['items'] ?? null, !in_array($pay, CHANNELS, true));
     // App orders: snapshot today's commission so later rate changes don't rewrite history
     $commission = 0.0;
     if (in_array($pay, CHANNELS, true)) {

@@ -33,6 +33,23 @@ function order_row(array $o): array {
     unset($o['token']);
     return $o;
 }
+/** A day offer (Omani Women's Day: 17% off on 17 Oct). Stored in settings as JSON so it can change without code.
+ *  Every price the menu, the till and the order page see is cut on those days only. */
+function promo(): ?array {
+    static $p = false;
+    if ($p !== false) return $p;
+    $v = json_decode(setting('promo', '{"pct":17,"from":"2026-10-17","to":"2026-10-17","ar":"خصم يوم المرأة العُمانية ١٧٪","en":"Omani Women\'s Day · 17% off"}'), true);
+    $d = date('Y-m-d');
+    $p = (is_array($v) && (float)($v['pct'] ?? 0) > 0 && $d >= ($v['from'] ?? '9') && $d <= ($v['to'] ?? '0')) ? $v : null;
+    return $p;
+}
+/** Price after the day offer, rounded to 5 baisa so cash works. */
+function promo_price(float $v): float {
+    $p = promo();
+    if (!$p || $v <= 0) return $v;
+    return round(round($v * (100 - (float)$p['pct']) / 100 / 0.005) * 0.005, 3);
+}
+
 /** Validates [{product_id, qty, toppings?}] against the menu; returns [lines, total].
  *  "Build your bowl" lines carry the chosen toppings; their names list them so every screen and receipt shows them. */
 function price_items($items): array {
@@ -43,7 +60,8 @@ function price_items($items): array {
         if ($qty < 1 || $qty > 50) fail('invalid_qty');
         $p = q('SELECT id, name_ar, name_en, price, kind FROM products WHERE id = ? AND active = 1', [$pid])->fetch();
         if (!$p) fail('invalid_product');
-        $line = ['product_id' => (int)$p['id'], 'name_ar' => $p['name_ar'], 'name_en' => $p['name_en'], 'price' => (float)$p['price'], 'qty' => $qty];
+        $line = ['product_id' => (int)$p['id'], 'name_ar' => $p['name_ar'], 'name_en' => $p['name_en'], 'price' => promo_price((float)$p['price']), 'qty' => $qty];
+        if (promo()) $line['was'] = (float)$p['price'];
         if (($p['kind'] ?? 'cup') === 'build') {
             // Toppings as a list of ids; an id can repeat (double banana = the id twice), up to 3 times each
             $ids = array_map('intval', is_array($it['toppings'] ?? null) ? $it['toppings'] : []);
@@ -54,8 +72,9 @@ function price_items($items): array {
                 if ($n > 3) fail('invalid_items');
                 $t = q('SELECT id, k, name_ar, name_en, price FROM toppings WHERE id = ? AND active = 1', [$tid])->fetch();
                 if (!$t) fail('invalid_topping');
-                $tops[] = ['id' => (int)$t['id'], 'k' => $t['k'], 'name_ar' => $t['name_ar'], 'name_en' => $t['name_en'], 'price' => (float)$t['price'], 'n' => $n];
-                $extra += (float)$t['price'] * $n;
+                $tp = promo_price((float)$t['price']);
+                $tops[] = ['id' => (int)$t['id'], 'k' => $t['k'], 'name_ar' => $t['name_ar'], 'name_en' => $t['name_en'], 'price' => $tp, 'n' => $n];
+                $extra += $tp * $n;
                 $namesAr[] = $t['name_ar'] . ($n > 1 ? " ×$n" : '');
                 $namesEn[] = $t['name_en'] . ($n > 1 ? " x$n" : '');
             }
@@ -127,7 +146,7 @@ switch ($a) {
 // ---------------- public ----------------
 case 'menu':
     out(array_map(fn($p) => ['id' => (int)$p['id'], 'name_ar' => $p['name_ar'], 'name_en' => $p['name_en'],
-        'img' => $p['img'], 'price' => (float)$p['price'], 'kind' => $p['kind'] ?? 'cup',
+        'img' => $p['img'], 'price' => promo_price((float)$p['price']), 'was' => promo() ? (float)$p['price'] : null, 'kind' => $p['kind'] ?? 'cup',
         'desc_ar' => (string)($p['desc_ar'] ?? ''), 'desc_en' => (string)($p['desc_en'] ?? '')],
         // ?preview=1: the menu as it will look with the bowls switched on (no Mini), for the owner's check before launch
         !empty($_GET['preview'])
@@ -135,11 +154,12 @@ case 'menu':
             : q('SELECT * FROM products WHERE active = 1 ORDER BY sort, id')->fetchAll()));
 
 case 'toppings':   // public: what can go on a "build your bowl"
-    out(array_map(fn($t) => ['id' => (int)$t['id'], 'k' => $t['k'], 'name_ar' => $t['name_ar'], 'name_en' => $t['name_en'], 'price' => (float)$t['price']],
+    out(array_map(fn($t) => ['id' => (int)$t['id'], 'k' => $t['k'], 'name_ar' => $t['name_ar'], 'name_en' => $t['name_en'], 'price' => promo_price((float)$t['price'])],
         q('SELECT * FROM toppings WHERE active = 1 ORDER BY sort, id')->fetchAll()));
 
 case 'shop_info':    // public: how customers can reach the shop
-    out(['whatsapp' => setting('shop_whatsapp')]);
+    $pr = promo();
+    out(['whatsapp' => setting('shop_whatsapp'), 'promo' => $pr ? ['pct' => (float)$pr['pct'], 'ar' => (string)($pr['ar'] ?? ''), 'en' => (string)($pr['en'] ?? '')] : null]);
 
 case 'place_order':
     $post();

@@ -94,6 +94,8 @@ main{position:relative;z-index:1;max-width:520px;margin:-40px auto 0;padding:0 1
 .chip[aria-pressed="true"]{background:var(--p);color:var(--c);border-color:var(--p)}
 .sheet .total{display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:18px;margin:14px 2px 10px}
 .preview{background:var(--o);color:var(--p);text-align:center;font-weight:800;padding:10px 14px}
+.best{display:inline-block;background:var(--o);color:var(--p);border-radius:99px;padding:3px 10px;font-size:12px;font-weight:800;margin-bottom:6px}
+.card.top{outline:3px solid var(--o)}
 .was{text-decoration:line-through;opacity:.5;font-weight:600;font-size:14px;margin-inline-start:6px}
 .promo{background:var(--p);color:var(--o);border-radius:18px;padding:12px 16px;text-align:center;font-weight:800;font-size:17px;margin-bottom:12px}
 .freebox{background:var(--o);color:var(--p);border-radius:14px;padding:10px 16px;font-weight:800}
@@ -181,7 +183,7 @@ const T = {
     howto: 'توقف قدام المحل في القرم ٢٩ واضغط "وصلت"، ونجيب لك الطلب لين سيارتك.', map: 'الموقع في الخريطة',
     back: 'رجوع', next: 'التالي', send: 'أرسل الطلب', sending: 'يرسل…', omr: 'ر.ع', edit: 'عدّل الطلب',
     build: 'اصنع باولك', from: 'يبدأ من', tops: 'اختار الإضافات', baseBowl: 'باول أساي', addTo: t => `أضف للطلب · ${t}`, items: n => `${arNum(n)} ${n === 1 ? 'صنف' : 'أصناف'}`,
-    preview: 'صفحة معاينة · الطلب مقفل هني', previewNo: 'هذي صفحة معاينة بس، الطلب منها مقفل',
+    preview: 'صفحة معاينة · الطلب مقفل هني', previewNo: 'هذي صفحة معاينة بس، الطلب منها مقفل', best: 'الأكثر مبيعاً',
     none: 'ما اخترت شي', cups: n => `${arNum(n)} ${n === 1 ? 'كوب' : n === 2 ? 'كوبين' : 'أكواب'}`,
     asap: 'بأسرع وقت (١٥ – ٢٠ دقيقة)', am: 'ص', pm: 'م', add: 'أضف', less: 'نقّص',
     eCar: 'اكتب رقم السيارة', eName: 'اكتب اسمك', ePhone: 'اكتب رقم جوال عماني من ٨ أرقام', eClosed: 'المحل مسكر الحين',
@@ -204,7 +206,7 @@ const T = {
     howto: 'Park in front of our shop in Al Qurum 29 and tap "I\'m here". We\'ll bring your order to your car.', map: 'Open in Maps',
     back: 'Back', next: 'Next', send: 'Place order', sending: 'Sending…', omr: 'OMR', edit: 'Edit order',
     build: 'Build yours', from: 'From', tops: 'Pick your toppings', baseBowl: 'Açaí bowl', addTo: t => `Add to order · ${t}`, items: n => `${n} ${n === 1 ? 'item' : 'items'}`,
-    preview: 'Preview page · ordering is off here', previewNo: 'This is only a preview, ordering is off here',
+    preview: 'Preview page · ordering is off here', previewNo: 'This is only a preview, ordering is off here', best: 'Best seller',
     none: 'Nothing selected', cups: n => `${n} ${n === 1 ? 'cup' : 'cups'}`,
     asap: 'As soon as possible (15 – 20 min)', am: 'AM', pm: 'PM', add: 'Add', less: 'Remove one',
     eCar: 'Enter your car plate number', eName: 'Enter your name', ePhone: 'Enter an 8-digit Omani mobile number', eClosed: 'We are closed now',
@@ -308,9 +310,9 @@ function render() {
       </div>`;
     }
     const key = String(p.id), q = cart.get(key) ? cart.get(key).qty : 0;
-    return `<div class="card item${isBowl ? ' bowl' : ''}">
+    return `<div class="card item${isBowl ? ' bowl' : ''}${p.best ? ' top' : ''}">
       ${isBowl && (!p.img || /^bowl/.test(p.img)) ? '' : `<img src="assets/${esc(p.img || 'cup-smoothie.png')}" alt="">`}
-      <div class="info">${main}${desc}<div class="price"><span class="mon">${money(p.price)}</span> ${L.omr}${p.was ? ` <span class="was mon">${money(p.was)}</span>` : ''}</div></div>
+      <div class="info">${p.best ? `<div class="best">★ ${L.best}</div>` : ''}${main}${desc}<div class="price"><span class="mon">${money(p.price)}</span> ${L.omr}${p.was ? ` <span class="was mon">${money(p.was)}</span>` : ''}</div></div>
       ${qtyBtns(key, q, pname(p))}</div>`;
   }).join('');
   let n = 0, tot = 0, bowls = false;
@@ -506,7 +508,7 @@ function showTrack(token) {
   if (PREVIEW) { const bar = document.createElement('div'); bar.className = 'preview'; bar.textContent = L.preview; document.body.prepend(bar); }
   try {
     const [m, t] = await Promise.all([api('menu', undefined, PREVIEW ? { preview: '1' } : {}), api('toppings').catch(() => [])]);
-    products = m; toppings = Array.isArray(t) ? t : [];
+    products = [...m.filter(p => p.best), ...m.filter(p => !p.best)]; toppings = Array.isArray(t) ? t : [];
   }
   catch { $('#menu').innerHTML = `<div class="card item">${L.eMenu}</div>`; return; }
   render();

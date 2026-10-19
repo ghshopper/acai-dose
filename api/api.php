@@ -145,7 +145,9 @@ switch ($a) {
 
 // ---------------- public ----------------
 case 'menu':
-    out(array_map(fn($p) => ['id' => (int)$p['id'], 'name_ar' => $p['name_ar'], 'name_en' => $p['name_en'],
+    // The best seller shows first on the order page with a badge (settings key best_seller, else the large Peanut Butter cup)
+    $best = (int)setting('best_seller', '0') ?: (int)(q("SELECT id FROM products WHERE name_en = 'Açaí Smoothie with Peanut Butter'")->fetch()['id'] ?? 0);
+    out(array_map(fn($p) => ['id' => (int)$p['id'], 'best' => (int)$p['id'] === $best, 'name_ar' => $p['name_ar'], 'name_en' => $p['name_en'],
         'img' => $p['img'], 'price' => promo_price((float)$p['price']), 'was' => promo() ? (float)$p['price'] : null, 'kind' => $p['kind'] ?? 'cup',
         'desc_ar' => (string)($p['desc_ar'] ?? ''), 'desc_en' => (string)($p['desc_en'] ?? '')],
         // ?preview=1: the menu as it will look with the bowls switched on (no Mini), for the owner's check before launch

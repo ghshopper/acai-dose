@@ -43,11 +43,11 @@ h1{margin:8px 0 0;font-size:34px;font-weight:800;line-height:1.15;letter-spacing
 .promo{margin-top:16px;background:#FDF0DA;color:var(--ink);border-radius:18px;padding:12px 16px;font-weight:600;font-size:14px;display:flex;align-items:center;gap:10px}
 .promo b{background:var(--o);border-radius:99px;padding:2px 10px;font-family:var(--f-en)}
 
-.feat{position:relative;margin-top:18px;min-height:250px;border-radius:28px;background:var(--card);overflow:hidden;display:flex;align-items:flex-end}
-.feat .disc{position:absolute;width:240px;height:240px;border-radius:50%;background:var(--tile);inset-inline-end:-40px;top:-30px}
-.feat img{position:absolute;inset-inline-end:10px;bottom:-8px;height:236px;width:auto;transform:rotate(-6deg);filter:drop-shadow(0 18px 20px rgba(71,13,67,.18))}
-[dir=ltr] .feat img{transform:rotate(6deg)}
-.feat .in{position:relative;padding:20px;max-width:58%}
+.feat{position:relative;margin-top:18px;min-height:240px;border-radius:28px;background:var(--card);overflow:hidden;display:flex;align-items:flex-end}
+.feat .disc{position:absolute;width:200px;height:200px;border-radius:50%;background:var(--tile);inset-inline-end:-6px;top:50%;margin-top:-100px}
+.feat img{position:absolute;inset-inline-end:22px;top:50%;height:180px;width:auto;transform:translateY(-50%) rotate(-6deg);filter:drop-shadow(0 18px 20px rgba(71,13,67,.18))}
+[dir=ltr] .feat img{transform:translateY(-50%) rotate(6deg)}
+.feat .in{position:relative;padding:20px;max-width:56%}
 .badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--ink);background:var(--o);border-radius:99px;padding:4px 10px}
 .feat .name{font-size:21px;font-weight:800;line-height:1.3;margin-top:10px}
 .feat .desc{font-size:13px;color:var(--sub);margin-top:4px;line-height:1.5}
@@ -195,7 +195,7 @@ const arNum = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
 const T = {
   ar: {
     demo: 'نسخة تجريبية للتصميم الجديد · الطلب منها ما يوصل للمحل', en: 'EN', card: 'بطاقتي',
-    eyebrow: 'CURBSIDE PICKUP · AL QURUM 29', pick: 'اختار دوزك', lead: 'اطلب من هني واستلم وانت في سيارتك. الدفع عند الاستلام.',
+    eyebrow: 'CURBSIDE PICKUP · AL QURUM 29', pick: 'اختار دوزك', lead: 'اطلب من هنا واستلم وانت في سيارتك. الدفع عند الاستلام.',
     best: 'الأكثر مبيعاً', add: 'أضف', menu: 'المنيو', all: 'ALL DRINKS', fAll: 'الكل', fBig: 'كبير', fMini: 'ميني', fBowl: 'باول',
     omr: 'ر.ع', from: 'يبدأ من', build: 'اصنع باولك', view: 'عرض الطلب', yours: 'طلبك', cont: 'أكمل الطلب', more: 'أضف شي ثاني',
     total: 'المجموع', free: 'كوب مجاني', tops: 'اختار إضافاتك', topsSub: 'كل إضافة لين ٣ مرات', base: 'سعر الباول', addTo: t => `أضف للطلب · ${t}`,

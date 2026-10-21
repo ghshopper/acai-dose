@@ -61,7 +61,7 @@ body{background:#FAF3E0;min-height:100vh}
 .hours .big{font-family:var(--f-ar);font-weight:800;font-size:46px;line-height:1}
 .hours .lbl{font-size:14px;font-weight:600;opacity:.9}
 .hours .line{flex:1;height:1.5px;background:rgba(250,243,224,.4)}
-.hours .foot{display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid rgba(250,243,224,.25);margin-top:12px;padding-top:10px;font-size:13px}
+.hours .hfoot{display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid rgba(250,243,224,.25);margin-top:12px;padding-top:10px;font-size:13px}
 main{max-width:560px;margin:0 auto;padding:18px 16px 150px;display:flex;flex-direction:column;gap:14px}
 .steps{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .steps span{display:block;text-align:center;font-weight:600;font-size:13px;padding:0 0 8px;opacity:.45;border-bottom:4px solid #E6D7BF;border-radius:2px}
@@ -164,6 +164,18 @@ main{max-width:560px;margin:0 auto;padding:18px 16px 150px;display:flex;flex-dir
 .prog div.done i{background:var(--ok)}
 .st{font-size:22px}
 .here{width:100%;min-height:64px;font-size:20px}
+.foot{margin-top:18px;background:var(--pd);color:var(--c);border-radius:26px;padding:22px 20px;display:flex;flex-direction:column;gap:14px}
+.foot .logo{height:30px;width:auto;align-self:flex-start}
+.foot .rows{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px;font-size:14px;line-height:1.6}
+.foot .rows b{display:block;font-family:var(--f-en);font-weight:600;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--l);opacity:.8}
+.foot .rows a{color:var(--c)}
+.fam{border-top:1px solid rgba(250,243,224,.18);padding-top:14px;display:flex;flex-direction:column;gap:10px}
+.fam .eyebrow{color:var(--o)}
+.fam .list{display:flex;gap:8px;flex-wrap:wrap}
+.fam a{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:8px 16px;border-radius:999px;border:1.5px solid rgba(250,243,224,.35);color:var(--c);text-decoration:none;font-family:var(--f-en);font-weight:600;font-size:14px;letter-spacing:.06em}
+.fam a i{font-style:normal;font-family:var(--f-ar);font-weight:400;letter-spacing:0;opacity:.75;font-size:13px}
+.fam a:focus-visible{outline:3px solid var(--o);outline-offset:2px}
+.copy{font-family:var(--f-en);font-size:12px;opacity:.55;letter-spacing:.06em}
 @media (max-width:360px){#menu{grid-template-columns:minmax(0,1fr)}.hero h1{font-size:34px}}
 </style>
 <script>
@@ -192,7 +204,7 @@ setTimeout(function(){if(!window.__appStarted)show('The page script did not run.
 <div class="ticker" aria-hidden="true"><div class="run"><span>Açaí Smoothie<b>✦</b></span><span>آساي سموذي<b>✦</b></span><span>Signature<b>✦</b></span><span>سجنتشر<b>✦</b></span><span>Peanut Butter<b>✦</b></span><span>بزبدة الفول السوداني<b>✦</b></span><span>Mini<b>✦</b></span><span>ميني<b>✦</b></span><span>Açaí Smoothie<b>✦</b></span><span>آساي سموذي<b>✦</b></span><span>Signature<b>✦</b></span><span>سجنتشر<b>✦</b></span><span>Peanut Butter<b>✦</b></span><span>بزبدة الفول السوداني<b>✦</b></span><span>Mini<b>✦</b></span><span>ميني<b>✦</b></span></div></div>
 <div class="hours"><div class="in">
   <div class="row"><span class="big">٧</span><span class="lbl" data-t="am7"></span><span class="line"></span><span class="lbl" data-t="pm12"></span><span class="big">١٢</span></div>
-  <div class="foot"><span data-t="daily"></span><span class="eyebrow" dir="ltr" style="font-size:11px;letter-spacing:.12em">7:00 AM – 12:00 AM</span></div>
+  <div class="hfoot"><span data-t="daily"></span><span class="eyebrow" dir="ltr" style="font-size:11px;letter-spacing:.12em">7:00 AM – 12:00 AM</span></div>
 </div></div>
 
 <main id="main">
@@ -226,6 +238,23 @@ setTimeout(function(){if(!window.__appStarted)show('The page script did not run.
       <div><span data-t="howto"></span> <a href="https://maps.app.goo.gl/YEWkdU1vi8ZtnJua8" target="_blank" rel="noopener" style="color:var(--p)" data-t="map"></a></div>
     </div>
   </section>
+  <footer class="foot">
+    <img class="logo" src="assets/logo-cream.png" alt="Açaí Dose">
+    <div class="rows">
+      <div><b>Visit</b><span data-t="fLoc"></span><br><a href="https://maps.app.goo.gl/YEWkdU1vi8ZtnJua8" target="_blank" rel="noopener" data-t="map2"></a></div>
+      <div><b>Hours</b><span data-t="fHours"></span></div>
+      <div><b>Instagram</b><a href="https://instagram.com/acaidose.om" target="_blank" rel="noopener" dir="ltr">@acaidose.om</a></div>
+      <div><b>Talabat</b><a href="https://www.talabat.com/ar/oman/acai-dose" target="_blank" rel="noopener" data-t="fTalabat"></a></div>
+    </div>
+    <div class="fam">
+      <span class="eyebrow" data-t="fFam"></span>
+      <div class="list">
+        <a href="https://ghshopper.com/" target="_blank" rel="noopener">GH SHOPPER <i>جي إتش شوبر</i></a>
+        <a href="https://bakk.om/" target="_blank" rel="noopener">BAKK <i>باك</i></a>
+      </div>
+    </div>
+    <div class="copy" dir="ltr">© Açaí Dose · Al Qurum, Muscat</div>
+  </footer>
 </main>
 
 <div class="bar" id="bar">
@@ -244,7 +273,7 @@ window.__appStarted = true;
 
 const T = {
   ar: {
-    pick: 'دوزك اليومي من الأساي', kick: 'AÇAÍ DOSE · القرم ٢٩', menuT: 'المنيو', goMenu: 'اطلب الحين', map2: 'موقعنا', am7: 'صباحاً', pm12: 'منتصف الليل', daily: 'كل أيام الأسبوع', pk1: 'استلام من سيارتك', pk2: 'الدفع عند الاستلام', pk3: 'من ٧ الصبح لين ١٢ الليل', pk4: 'القرم ٢٩، مسقط', details: 'بيانات الاستلام', yours: 'طلبك', sub: 'استلام من سيارتك في القرم ٢٩ · الدفع عند الاستلام',
+    pick: 'دوزك اليومي من الأساي', kick: 'AÇAÍ DOSE · القرم ٢٩', menuT: 'المنيو', fLoc: 'القرم ٢٩، مسقط', fHours: 'كل يوم ٧ص – ١٢ منتصف الليل', fTalabat: 'اطلب توصيل', fFam: 'من نفس العائلة', goMenu: 'اطلب الحين', map2: 'موقعنا', am7: 'صباحاً', pm12: 'منتصف الليل', daily: 'كل أيام الأسبوع', pk1: 'استلام من سيارتك', pk2: 'الدفع عند الاستلام', pk3: 'من ٧ الصبح لين ١٢ الليل', pk4: 'القرم ٢٩، مسقط', details: 'بيانات الاستلام', yours: 'طلبك', sub: 'استلام من سيارتك في القرم ٢٩ · الدفع عند الاستلام',
     s1: '١ المنيو', s2: '٢ بياناتك', closed: 'المحل مسكر الحين. نفتح من ٧ الصبح لين ١٢ الليل.', loading: 'يحمّل المنيو…',
     car: 'رقم السيارة', cardesc: 'نوع ولون السيارة', cardescPh: 'مثلاً: لاندكروزر أبيض', name: 'الاسم', phone: 'رقم الجوال',
     time: 'وقت الاستلام', notes: 'ملاحظات (اختياري)', notesPh: 'مثلاً: بدون ثلج', offers: 'أبي توصلني عروض أساي دوز على الواتساب',
@@ -267,7 +296,7 @@ const T = {
     loyNote: 'الختم ينحط أول ما تستلم وتدفع', usedFree: d => `انخصم كوبك المجاني (−${d})`, addWallet: 'أضف إلى Apple Wallet', addGWallet: 'أضف إلى Google Wallet', openCard: 'افتح بطاقتي',
   },
   en: {
-    pick: 'Your daily açaí dose', kick: 'AÇAÍ DOSE · AL QURUM 29', menuT: 'Menu', goMenu: 'Order now', map2: 'Find us', am7: 'AM', pm12: 'Midnight', daily: 'Every day', pk1: 'Curbside pickup', pk2: 'Pay on pickup', pk3: 'Open 7 AM – 12 AM', pk4: 'Al Qurum 29, Muscat', details: 'Pickup details', yours: 'Your order', sub: 'Curbside pickup at Al Qurum 29 · Pay on pickup',
+    pick: 'Your daily açaí dose', kick: 'AÇAÍ DOSE · AL QURUM 29', menuT: 'Menu', fLoc: 'Al Qurum 29, Muscat', fHours: 'Daily 7 AM – 12 AM', fTalabat: 'Order delivery', fFam: 'Part of the family', goMenu: 'Order now', map2: 'Find us', am7: 'AM', pm12: 'Midnight', daily: 'Every day', pk1: 'Curbside pickup', pk2: 'Pay on pickup', pk3: 'Open 7 AM – 12 AM', pk4: 'Al Qurum 29, Muscat', details: 'Pickup details', yours: 'Your order', sub: 'Curbside pickup at Al Qurum 29 · Pay on pickup',
     s1: '1 Menu', s2: '2 Your details', closed: 'We are closed now. Open daily 7 AM – 12 AM.', loading: 'Loading menu…',
     car: 'Car plate number', cardesc: 'Car model & color', cardescPh: 'e.g. White Land Cruiser', name: 'Name', phone: 'Mobile number',
     time: 'Pickup time', notes: 'Notes (optional)', notesPh: 'e.g. No ice', offers: 'Send me Açaí Dose offers on WhatsApp',

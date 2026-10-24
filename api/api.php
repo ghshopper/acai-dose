@@ -495,7 +495,7 @@ case 'settings':
         q('SELECT id, username, role, active FROM users ORDER BY id')->fetchAll());
     require_once __DIR__ . '/gwallet_lib.php';
     out(['commissions' => $c, 'products' => $p, 'toppings' => $tp, 'users' => $u, 'loyalty' => loyalty_cfg(), 'wallet' => wallet_status(), 'gwallet' => gw_status(),
-         'whatsapp' => setting('shop_whatsapp', SHOP_PHONE),
+         'whatsapp' => setting('shop_whatsapp', SHOP_PHONE), 'design' => setting('site_design', 'old') === 'new' ? 'new' : 'old',
          'location' => ['coords' => setting('shop_lat') !== '' ? setting('shop_lat') . ', ' . setting('shop_lng') : '', 'text' => setting('nearby_text')]]);
 
 case 'gw_setup':      // owner: Google Wallet service-account key + Issuer ID
@@ -521,6 +521,13 @@ case 'wallet_cer':    // owner: the certificate Apple issued for that request
     $cer = base64_decode((string)($in['cer'] ?? ''), true); $wwdr = base64_decode((string)($in['wwdr'] ?? ''), true);
     if (!$cer || !$wwdr) fail('missing_files');
     out(wallet_install_cer($cer, $wwdr));
+
+case 'save_design':  // owner: which order page the site root shows (old or new design)
+    $post(); need('owner');
+    $d = (string)($in['design'] ?? '');
+    if (!in_array($d, ['old', 'new'], true)) fail('bad_request');
+    set_setting('site_design', $d);
+    out(['ok' => true, 'design' => $d]);
 
 case 'save_contact':  // owner: WhatsApp number shown to customers on the order page
     $post(); need('owner');

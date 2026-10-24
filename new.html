@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>أساي دوز · تجربة التصميم الجديد</title>
+<title>أساي دوز Açaí Dose | اطلب أساي سموذي واستلم من سيارتك – القرم، مسقط</title>
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#FFFFFF">
 <link rel="icon" href="assets/logo-purple.png">
@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alexandria:wght@400;500;600;800&family=Jost:wght@500;600&display=swap">
 <style>
-/* New order page: design 2 in white. Demo only: nothing is sent to the shop. */
+/* Order page, new design (white). The owner picks old or new in the app; index.php serves the chosen one at the site root. */
 :root{
   --p:#470D43; --p2:#5E1A55; --ink:#2A0A27; --sub:#6F5A6C; --o:#E39A2E; --o2:#C27A12; --l:#D9BCDB;
   --bg:#FFFFFF; --card:#F8F3F7; --tile:#F0E4EE; --line:#EEE5EC; --ok:#2F7D4F; --bad:#B3261E;
@@ -117,6 +117,9 @@ h1{margin:8px 0 0;font-size:34px;font-weight:800;line-height:1.15;letter-spacing
 .btn.ghost{background:#fff;color:var(--p);border:1.5px solid var(--line)}
 .btn.wa{background:#25D366;color:#fff}
 .btn:disabled{opacity:.45}
+.btn.wallet{background:#000;color:#fff}
+.btn.ghost.light{background:transparent;color:#fff;border-color:rgba(255,255,255,.35)}
+.loy .acts{margin-top:14px}
 
 /* details */
 .steps{display:flex;gap:6px;margin-top:14px}
@@ -189,12 +192,22 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const money = n => (Math.round((+n || 0) * 1000) / 1000).toFixed(3);
 const store = { get: k => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* private mode */ } } };
-const api = (a, q = {}) => fetch('api/api.php?' + new URLSearchParams({ a, ...q }), { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+async function api(a, body, q = {}) {
+  const opt = body === undefined ? { cache: 'no-store', credentials: 'same-origin' }
+    : { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
+  let r; try { r = await fetch('api/api.php?' + new URLSearchParams({ a, ...q }), opt); } catch { throw new Error('network'); }
+  let d = null; try { d = await r.json(); } catch { /* empty */ }
+  if (!r.ok) throw new Error((d && d.error) || 'http_' + r.status);
+  return d;
+}
+const del = k => { try { localStorage.removeItem(k); } catch { /* private mode */ } };
+const PREVIEW = new URLSearchParams(location.search).has('preview');
+const ST = ['new', 'preparing', 'ready', 'done'];
 const arNum = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
 
 const T = {
   ar: {
-    demo: 'نسخة تجريبية للتصميم الجديد · الطلب منها ما يوصل للمحل', en: 'EN', card: 'بطاقتي',
+    demo: 'صفحة معاينة · الطلب مقفل هني', previewNo: 'هذي صفحة معاينة بس، الطلب منها مقفل', en: 'EN', card: 'بطاقتي',
     eyebrow: 'CURBSIDE PICKUP · AL QURUM 29', pick: 'اختار دوزك', lead: 'اطلب من هنا واستلم وانت في سيارتك. الدفع عند الاستلام.',
     best: 'الأكثر مبيعاً', add: 'أضف', menu: 'المنيو', all: 'ALL DRINKS', fAll: 'الكل', fBig: 'كبير', fMini: 'ميني', fBowl: 'باول',
     omr: 'ر.ع', from: 'يبدأ من', build: 'اصنع باولك', view: 'عرض الطلب', yours: 'طلبك', cont: 'أكمل الطلب', more: 'أضف شي ثاني',
@@ -203,14 +216,19 @@ const T = {
     name: 'الاسم', phone: 'رقم الجوال', time: 'وقت الاستلام', now: 'الحين', later: 'وقت ثاني', notes: 'ملاحظة (اختياري)', notesPh: 'مثلاً: بدون ثلج',
     offers: 'وصلني العروض والجديد على الواتساب', where: 'المحل في القرم ٢٩. لما توصل اضغط «وصلت» ونطلع لك الطلب للسيارة.', map: 'افتح الخريطة',
     confirm: 'أكد الطلب', back: 'رجوع', eName: 'اكتب اسمك', ePhone: 'الرقم ٨ أرقام ويبدأ بـ ٩ أو ٧ أو ٢', eCar: 'اكتب رقم السيارة',
-    yourNo: 'رقم طلبك', st: ['وصلنا طلبك', 'طلبك يتحضر', 'طلبك جاهز!', 'استلمته، بالعافية'], steps: ['استلمنا', 'يتحضر', 'جاهز', 'استلمته'],
+    yourNo: 'رقم طلبك', st: ['وصلنا طلبك', 'طلبك يتحضر', 'طلبك جاهز!', 'استلمته، بالعافية'], cancelled: 'انلغى الطلب. تواصل معنا لو في شي', steps: ['استلمنا', 'يتحضر', 'جاهز', 'استلمته'],
     carL: 'السيارة', amount: 'المبلغ', pay: 'تدفعه عند الاستلام', pickup: 'الاستلام', here: 'وصلت عند المحل', told: 'بلّغناهم، جايين لك',
-    wa: 'كلمنا واتساب', again: 'طلب جديد', loyE: 'LOYALTY CARD', loyT: 'باقي لك ٥ أكواب وتاخذ كوب مجاني', loyS: 'الختم ينحط أول ما تستلم وتدفع', freeTag: 'مجاني',
-    demoDone: 'هذي تجربة: الطلب ما انرسل للمحل', closed: 'المحل مسكر الحين، نفتح ٧ الصبح', cupsN: n => `${arNum(n)} ${n === 1 ? 'صنف' : 'أصناف'}`, empty: 'السلة فاضية',
+    wa: 'كلمنا واتساب', waOrder: r => `هلا أساي دوز 👋 بخصوص طلبي رقم ${r}`, again: 'طلب جديد', loyE: 'LOYALTY CARD', loyS: 'الختم ينحط أول ما تستلم وتدفع', freeTag: 'مجاني',
+    loyLeft: n => `باقي لك ${arNum(n)} ${n === 1 ? 'كوب' : n === 2 ? 'كوبين' : 'أكواب'} وتاخذ كوب مجاني`,
+    loyLeftO: n => `باقي لك ${arNum(n)} ${n === 1 ? 'طلب' : n === 2 ? 'طلبين' : 'طلبات'} وتاخذ كوب مجاني`,
+    loyFree: n => n > 1 ? `عندك ${arNum(n)} أكواب مجانية، تنخصم في طلباتك الجاية` : 'عندك كوب مجاني ينخصم تلقائياً في طلبك الجاي',
+    usedFree: d => `انخصم كوبك المجاني (−${d})`, addWallet: 'أضف إلى Apple Wallet', addGWallet: 'أضف إلى Google Wallet', openCard: 'افتح بطاقتي',
+    sending: 'يرسل…', eMany: 'طلبات كثيرة من نفس الجهاز، انتظر شوي', eFail: 'ما قدرنا نرسل الطلب، جرب مرة ثانية', eClosed: 'المحل مسكر الحين، اختار وقت بعد ٧ الصبح',
+    closed: 'المحل مسكر الحين، نفتح ٧ الصبح', cupsN: n => `${arNum(n)} ${n === 1 ? 'صنف' : 'أصناف'}`, empty: 'السلة فاضية',
     asap: 'بأسرع وقت', min: '١٥ – ٢٠ دقيقة', loadErr: 'ما قدرنا نحمّل المنيو، حدّث الصفحة',
   },
   en: {
-    demo: 'Preview of the new design · orders here are not sent to the shop', en: 'عربي', card: 'My card',
+    demo: 'Preview page · ordering is off here', previewNo: 'This is only a preview, ordering is off here', en: 'عربي', card: 'My card',
     eyebrow: 'CURBSIDE PICKUP · AL QURUM 29', pick: 'Pick your dose', lead: 'Order here and pick it up from your car. Pay on pickup.',
     best: 'Best seller', add: 'Add', menu: 'Menu', all: 'ALL DRINKS', fAll: 'All', fBig: 'Large', fMini: 'Mini', fBowl: 'Bowls',
     omr: 'OMR', from: 'From', build: 'Build your bowl', view: 'View order', yours: 'Your order', cont: 'Continue', more: 'Add something else',
@@ -219,10 +237,15 @@ const T = {
     name: 'Name', phone: 'Mobile', time: 'Pickup time', now: 'Now', later: 'Later', notes: 'Note (optional)', notesPh: 'e.g. no ice',
     offers: 'Send me offers and news on WhatsApp', where: 'We are at Al Qurum 29. When you arrive, tap “I’m here” and we bring it to your car.', map: 'Open map',
     confirm: 'Place order', back: 'Back', eName: 'Enter your name', ePhone: '8 digits, starting with 9, 7 or 2', eCar: 'Enter the plate number',
-    yourNo: 'Your order', st: ['We got your order', 'Being prepared', 'Ready!', 'Picked up, enjoy'], steps: ['Received', 'Preparing', 'Ready', 'Picked up'],
+    yourNo: 'Your order', st: ['We got your order', 'Being prepared', 'Ready!', 'Picked up, enjoy'], cancelled: 'Order cancelled. Contact us if needed', steps: ['Received', 'Preparing', 'Ready', 'Picked up'],
     carL: 'Car', amount: 'Amount', pay: 'pay on pickup', pickup: 'Pickup', here: 'I’m here', told: 'They know you are here',
-    wa: 'WhatsApp us', again: 'New order', loyE: 'LOYALTY CARD', loyT: '5 more cups to a free one', loyS: 'Stamps are added when you pick up and pay', freeTag: 'Free',
-    demoDone: 'This is a preview: the order was not sent', closed: 'We are closed now, open from 7 AM', cupsN: n => `${n} ${n === 1 ? 'item' : 'items'}`, empty: 'Your order is empty',
+    wa: 'WhatsApp us', waOrder: r => `Hi Açaí Dose 👋 About my order ${r}`, again: 'New order', loyE: 'LOYALTY CARD', loyS: 'Stamps are added when you pick up and pay', freeTag: 'Free',
+    loyLeft: n => `${n} more ${n === 1 ? 'cup' : 'cups'} to a free one`,
+    loyLeftO: n => `${n} more ${n === 1 ? 'order' : 'orders'} to a free cup`,
+    loyFree: n => n > 1 ? `You have ${n} free cups, taken off your next orders` : 'You have a free cup, taken off your next order automatically',
+    usedFree: d => `Free cup applied (−${d})`, addWallet: 'Add to Apple Wallet', addGWallet: 'Add to Google Wallet', openCard: 'Open my card',
+    sending: 'Sending…', eMany: 'Too many orders from this device, please wait a bit', eFail: 'Could not send your order, please try again', eClosed: 'We are closed now, pick a time after 7 AM',
+    closed: 'We are closed now, open from 7 AM', cupsN: n => `${n} ${n === 1 ? 'item' : 'items'}`, empty: 'Your order is empty',
     asap: 'As soon as possible', min: '15 – 20 min', loadErr: 'Could not load the menu, please refresh',
   },
 };
@@ -232,7 +255,8 @@ let L = T[lang];
 let products = [], toppings = [], promo = null, shopWa = '';
 const cart = new Map();        // key -> { pid, qty, tops: [ids] }
 let view = 'menu', filter = 'all', track = null;
-const form = { car: '', cardesc: '', name: store.get('n_name') || '', phone: store.get('n_phone') || '', time: 'ASAP', notes: '', offers: true };
+const form = { car: store.get('ad_car') || '', cardesc: store.get('ad_cardesc') || '', name: store.get('ad_name') || '', phone: store.get('ad_phone') || '', time: 'ASAP', notes: '', offers: true };
+let sending = false, trackToken = null, trackTimer = null;
 
 const ICON = {
   back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>',
@@ -353,32 +377,50 @@ function viewDetails() {
   <div class="where">${ICON.pin}<div>${L.where} <a href="https://maps.app.goo.gl/YEWkdU1vi8ZtnJua8" target="_blank" rel="noopener">${L.map}</a></div></div>`;
 }
 
+const WALLET = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="width:20px;height:20px"><rect x="3" y="5" width="18" height="15" rx="3"/><path d="M3 10h18M16 14h2"/></svg>';
+function loyaltyBox(l) {
+  const left = l.need - l.stamps;
+  const msg = l.free > 0 ? L.loyFree(l.free) : (l.unit === 'order' ? L.loyLeftO(left) : L.loyLeft(left));
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  return `<div class="loy">
+    <span class="eyebrow">${L.loyE}</span>
+    <div class="t">${msg}</div>
+    <div class="stamps">${Array.from({ length: l.need }, (_, k) => { const on = l.free > 0 || k < l.stamps; return `<i class="${on ? 'on' : ''}">${on ? ICON.check : ''}</i>`; }).join('')}<i class="gift">${L.freeTag}</i></div>
+    <div class="sm">${L.loyS}</div>
+    <div class="acts">
+      ${l.wallet && ios ? `<a class="btn wallet" href="api/wallet.php?c=${esc(l.card)}">${WALLET}${L.addWallet}</a>` : ''}
+      ${l.gwallet && !ios ? `<a class="btn wallet" href="api/gwallet.php?c=${esc(l.card)}">${WALLET}${L.addGWallet}</a>` : ''}
+      <a class="btn ghost light" href="card.html?c=${esc(l.card)}">${L.openCard}</a>
+    </div>
+  </div>`;
+}
+
 function viewTrack() {
-  const o = track, i = o.step;
+  const o = track;
+  if (!o) return `${header(false)}<div class="done"><div class="tick">${ICON.check}</div></div>`;
+  const i = ST.indexOf(o.status), live = ['new', 'preparing', 'ready'].includes(o.status), cancelled = o.status === 'cancelled';
+  const time = !o.pickup_time || o.pickup_time === 'ASAP' ? L.asap : (buildTimes().find(([v]) => v === o.pickup_time) || [0, o.pickup_time])[1];
   return `${header(false)}
   <div class="done">
-    <div class="tick">${ICON.check}</div>
+    <div class="tick"${cancelled ? ' style="background:#FBE9E7;color:var(--bad)"' : ''}>${cancelled ? ICON.x : ICON.check}</div>
     <div class="eyebrow" style="color:var(--sub);margin-top:16px">${L.yourNo}</div>
-    <div class="ref" dir="ltr">#${o.ref}</div>
-    <div class="status" aria-live="polite">${L.st[i]}</div>
-    <div class="prog">${L.steps.map((s, k) => `<div class="${k < i ? 'on past' : k === i ? 'on' : ''}"><i></i>${s}</div>`).join('')}</div>
+    <div class="ref" dir="ltr">#${esc(o.ref)}</div>
+    <div class="status" aria-live="polite">${cancelled ? L.cancelled : L.st[i]}</div>
+    ${cancelled ? '' : `<div class="prog">${L.steps.map((s, k) => `<div class="${k < i ? 'on past' : k === i ? 'on' : ''}"><i></i>${s}</div>`).join('')}</div>`}
   </div>
   <div class="info">
-    <div class="r"><span>${L.carL}</span><b dir="ltr" class="num">${esc(o.car)}</b></div>
-    <div class="r"><span>${L.pickup}</span><b>${esc(o.time)}</b></div>
+    <div class="r"><span>${L.carL}</span><b dir="ltr" class="num">${esc(o.car_plate || '')}</b></div>
+    <div class="r"><span>${L.pickup}</span><b>${esc(time)}</b></div>
     <div class="r"><span>${L.amount}</span><b><span class="num">${money(o.total)}</span> ${L.omr} · ${L.pay}</b></div>
+    ${o.free_cups ? `<div class="r" style="color:var(--ok);font-weight:700"><span>${L.usedFree(money(o.discount))}</span></div>` : ''}
   </div>
   <div class="acts">
-    ${i < 3 ? (o.told ? `<div class="btn" style="background:var(--ok)" role="status">${L.told}</div>` : `<button type="button" class="btn o" id="here">${L.here}</button>`) : ''}
-    ${shopWa ? `<a class="btn wa" href="https://wa.me/${shopWa.replace(/\D/g, '')}" target="_blank" rel="noopener">${L.wa}</a>` : ''}
-    ${i >= 3 ? `<button type="button" class="btn" id="again">${L.again}</button>` : ''}
+    ${live ? (o.arrived ? `<div class="btn" style="background:var(--ok)" role="status">${L.told}</div>` : `<button type="button" class="btn o" id="here">${L.here}</button>`) : ''}
+    ${shopWa ? `<a class="btn wa" href="https://wa.me/${shopWa.replace(/\D/g, '')}?text=${encodeURIComponent(L.waOrder('#' + o.ref))}" target="_blank" rel="noopener">${L.wa}</a>` : ''}
+    <a class="btn ghost" href="https://maps.app.goo.gl/YEWkdU1vi8ZtnJua8" target="_blank" rel="noopener">${L.map}</a>
+    ${live ? '' : `<button type="button" class="btn" id="again">${L.again}</button>`}
   </div>
-  <div class="loy">
-    <span class="eyebrow">${L.loyE}</span>
-    <div class="t">${L.loyT}</div>
-    <div class="stamps">${Array.from({ length: 6 }, (_, k) => `<i class="${k < 1 ? 'on' : ''}">${k < 1 ? ICON.check : ''}</i>`).join('')}<i class="gift">${L.freeTag}</i></div>
-    <div class="sm">${L.loyS}</div>
-  </div>`;
+  ${o.loyalty && o.loyalty.on ? loyaltyBox(o.loyalty) : ''}`;
 }
 
 // ---------- sheets ----------
@@ -468,7 +510,9 @@ function saveForm() {
 }
 function go(v) { saveForm(); view = v; render(); window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' }); }
 
-function placeDemo() {
+async function placeOrder() {
+  if (sending) return;
+  if (PREVIEW) return toast(L.previewNo);
   saveForm();
   let ok = true;
   const bad = (id, cond) => { $('#' + id).classList.toggle('hidden', !cond); if (cond) ok = false; };
@@ -476,21 +520,48 @@ function placeDemo() {
   bad('eName', form.name.length < 2);
   bad('ePhone', !/^[279]\d{7}$/.test(form.phone));
   if (!ok) { document.querySelector('.err:not(.hidden)')?.scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
-  store.set('n_name', form.name); store.set('n_phone', form.phone);
-  const d = new Date();
-  const timeLbl = form.time === 'ASAP' ? L.asap : (buildTimes().find(([v]) => v === form.time) || [0, form.time])[1];
-  track = { ref: `${String(d.getDate()).padStart(2, '0')}${String(d.getMonth() + 1).padStart(2, '0')}-${String(Math.floor(Math.random() * 40) + 10)}`, step: 0, told: false, car: form.car.toUpperCase(), time: timeLbl, total: totals().t };
-  cart.clear();
-  view = 'track'; render(); window.scrollTo(0, 0); toast(L.demoDone);
-  // The demo order moves along by itself so the tracking screen can be seen working
-  clearInterval(placeDemo.timer);
-  placeDemo.timer = setInterval(() => { if (!track || track.step >= 2) return clearInterval(placeDemo.timer); track.step++; if (view === 'track') render(); }, 5000);
+  if (form.time === 'ASAP' && !isOpenNow()) return toast(L.eClosed);
+  sending = true;
+  const bar = $('#bar'); bar.disabled = true; bar.innerHTML = `<span>${L.sending}</span>`;
+  try {
+    const r = await api('place_order', {
+      name: form.name, phone: '+968' + form.phone, car_plate: form.car.toUpperCase(), car_desc: form.cardesc,
+      pickup: form.time, notes: form.notes, offers: form.offers,
+      items: [...cart.values()].map(l => ({ product_id: l.pid, qty: l.qty, toppings: l.tops })),
+    });
+    store.set('ad_name', form.name); store.set('ad_phone', form.phone); store.set('ad_car', form.car); store.set('ad_cardesc', form.cardesc);
+    store.set('ad_offers', form.offers ? '1' : ''); store.set('ad_track', r.token); if (r.card) store.set('ad_card', r.card);
+    cart.clear(); form.notes = '';
+    showTrack(r.token);
+  } catch (ex) {
+    toast(ex.message === 'too_many' ? L.eMany : ex.message === 'closed' ? L.eClosed : L.eFail);
+  } finally {
+    sending = false; bar.disabled = false; if (view === 'details') render();
+  }
+}
+
+async function tick() {
+  let o;
+  try { o = await api('track', undefined, { t: trackToken }); }
+  catch (ex) { if (ex.message === 'not_found') { del('ad_track'); clearInterval(trackTimer); track = null; trackToken = null; go('menu'); } return; }
+  if (!o.today) del('ad_track');
+  if (o.loyalty && o.loyalty.card) store.set('ad_card', o.loyalty.card);
+  track = o;
+  if (['done', 'cancelled'].includes(o.status)) { clearInterval(trackTimer); del('ad_track'); }
+  if (view === 'track') render();
+}
+function showTrack(token) {
+  trackToken = token; track = null;
+  view = 'track'; render(); window.scrollTo(0, 0);
+  clearInterval(trackTimer);
+  tick(); trackTimer = setInterval(tick, 6000);
 }
 
 function render() {
   document.documentElement.lang = lang;
   document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
-  $('#demo').textContent = L.demo;
+  $('#demo').textContent = PREVIEW ? L.demo : '';
+  $('#demo').classList.toggle('hidden', !PREVIEW);
   const app = $('#app');
   app.innerHTML = view === 'details' ? viewDetails() : view === 'track' ? viewTrack() : viewMenu();
   const { n, t } = totals(), bar = $('#bar');
@@ -501,7 +572,7 @@ function render() {
   } else if (view === 'details') {
     bar.classList.remove('off');
     bar.innerHTML = `<span>${L.confirm}</span><span class="num">${money(t)} ${L.omr}</span>`;
-    bar.onclick = placeDemo;
+    bar.onclick = placeOrder;
   } else bar.classList.add('off');
 }
 
@@ -517,8 +588,9 @@ $('#app').addEventListener('click', e => {
   if (tm) { saveForm(); form.time = 'ASAP'; return render(); }
   if (e.target.closest('#lang')) { saveForm(); lang = lang === 'ar' ? 'en' : 'ar'; L = T[lang]; store.set('ad_lang', lang); return render(); }
   if (e.target.closest('#goBack')) return go('menu');
-  if (e.target.closest('#here')) { track.told = true; return render(); }
-  if (e.target.closest('#again')) { track = null; return go('menu'); }
+  const here = e.target.closest('#here');
+  if (here) { here.disabled = true; api('arrived', { t: trackToken }).then(tick).catch(() => { here.disabled = false; }); return; }
+  if (e.target.closest('#again')) { clearInterval(trackTimer); del('ad_track'); track = null; trackToken = null; return go('menu'); }
 });
 $('#app').addEventListener('input', e => {
   const map = { car: 'eCar', name: 'eName', phone: 'ePhone' };
@@ -529,14 +601,20 @@ $('#app').addEventListener('change', e => {
 });
 
 (async () => {
-  $('#demo').textContent = L.demo;
+  render();
+  // Tracking link sent by the shop (…/?t=<token>) opens that order even after the page was closed
+  const fromLink = new URLSearchParams(location.search).get('t');
+  if (fromLink && /^[a-f0-9]{32}$/.test(fromLink)) { store.set('ad_track', fromLink); history.replaceState(null, '', location.pathname); }
   try {
-    const [m, t, s] = await Promise.all([api('menu'), api('toppings').catch(() => []), api('shop_info').catch(() => ({}))]);
+    const [m, t, s] = await Promise.all([api('menu', undefined, PREVIEW ? { preview: '1' } : {}), api('toppings').catch(() => []), api('shop_info').catch(() => ({}))]);
     products = m; toppings = Array.isArray(t) ? t : []; promo = s.promo || null; shopWa = s.whatsapp || '';
-    render();
   } catch {
     $('#app').innerHTML = header(false) + `<p class="lead" style="margin-top:30px">${L.loadErr}</p>`;
+    return;
   }
+  const saved = store.get('ad_track');
+  if (saved && /^[a-f0-9]{32}$/.test(saved)) return showTrack(saved);
+  render();
 })();
 </script>
 </body>

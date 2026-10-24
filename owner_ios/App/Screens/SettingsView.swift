@@ -6,6 +6,7 @@ struct SettingsView: View {
     @State private var s: J?
     @State private var err: String?
     @State private var wa = ""
+    @State private var design = "old"
     @State private var loyOn = true
     @State private var need = 6
     @State private var unit = "cup"
@@ -21,6 +22,18 @@ struct SettingsView: View {
         Group {
             if let s {
                 Form {
+                    Section {
+                        Picker("التصميم", selection: Binding(get: { design }, set: { v in
+                            design = v
+                            Task { await post("save_design", ["design": v], v == "new" ? "صار الموقع بالتصميم الجديد" : "رجع الموقع للتصميم القديم") }
+                        })) {
+                            Text("القديم").tag("old")
+                            Text("الجديد").tag("new")
+                        }
+                        .pickerStyle(.segmented)
+                        Button { openURL("\(SharedStore.site)/new.html?preview") } label: { Label("شوف التصميم الجديد", systemImage: "eye") }
+                        Button { openURL("\(SharedStore.site)/") } label: { Label("افتح الموقع", systemImage: "safari") }
+                    } header: { Text("صفحة الطلب") } footer: { Text("اللي تختاره يطلع للزبائن على order.acaiee.com على طول. الطلبات توصلك من التصميمين.") }
                     Section { ForEach(s["products"].array, id: \.self) { p in ProductRow(p: p, save: save) } } header: { Text("المنيو والأسعار") } footer: { Text("اللي تطفيه يختفي من الموقع والكاشير") }
                     let tops = s["toppings"].array
                     if !tops.isEmpty {
@@ -128,6 +141,7 @@ struct SettingsView: View {
             need = r["loyalty"]["need"].isNull ? 6 : r["loyalty"]["need"].int
             unit = r["loyalty"]["unit"].string.isEmpty ? "cup" : r["loyalty"]["unit"].string
             loyDirty = false
+            design = r["design"].string == "new" ? "new" : "old"
             wa = r["whatsapp"].string.replacingOccurrences(of: "+968", with: "")
             for (k, _) in kChannels { comm[k] = shortNumber(r["commissions"][k].double) }
         } catch { err = errText(error) }

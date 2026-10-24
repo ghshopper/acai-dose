@@ -171,7 +171,7 @@ const noteName = n => { const f = [...NOTES_D, ...NOTES_F].find(x => x[0] === n)
 
 const T = {
   ar: {
-    en: 'EN', eyebrow: 'CURBSIDE PICKUP · AL QURUM 29', h1: 'كرك على كيفك', lead: 'اطلب من هنا واستلم وانت في سيارتك. الدفع عند الاستلام.',
+    en: 'EN', eyebrow: 'CURBSIDE PICKUP · AL QURUM 29', h1: 'كرك على كيفك', lead: 'اطلب من هنا واستلم وانت في سيارتك. الدفع عند الاستلام. نفتح من ٦ الصبح لين ١٢ الليل.',
     omr: 'ر.ع', view: 'عرض الطلب', yours: 'طلبك', cont: 'أكمل الطلب', more: 'أضف شي ثاني', total: 'المجموع', empty: 'السلة فاضية',
     size: 'الحجم', notes: 'ملاحظة', addTo: t => `أضف للطلب · ${t}`, out: 'خلص',
     details: 'بيانات الاستلام', detLead: 'عشان نعرف سيارتك ونطلع لك الطلب', car: 'رقم السيارة', cardesc: 'نوع ولون السيارة', cardescPh: 'لاندكروزر أبيض',
@@ -181,12 +181,12 @@ const T = {
     yourNo: 'رقم طلبك', st: ['وصلنا طلبك', 'طلبك يتحضر', 'طلبك جاهز!', 'استلمته، بالعافية'], cancelled: 'انلغى الطلب. تواصل معنا لو في شي',
     steps: ['استلمنا', 'يتحضر', 'جاهز', 'استلمته'], carL: 'السيارة', amount: 'المبلغ', pay: 'تدفعه عند الاستلام', pickup: 'الاستلام',
     here: 'وصلت عند المحل', told: 'بلّغناهم، جايين لك', wa: 'كلمنا واتساب', again: 'طلب جديد', asap: 'بأسرع وقت', min: '١٠ – ١٥ دقيقة',
-    eClosed: 'المحل مسكر الحين، اختار وقت لاحق', sending: 'يرسل…', eMany: 'طلبات كثيرة من نفس الجهاز، انتظر شوي', eFail: 'ما قدرنا نرسل الطلب، جرب مرة ثانية', eOut: 'صنف في طلبك خلص، شيله وجرب',
+    eClosed: 'المحل مسكر الحين، نفتح ٦ الصبح', sending: 'يرسل…', eMany: 'طلبات كثيرة من نفس الجهاز، انتظر شوي', eFail: 'ما قدرنا نرسل الطلب، جرب مرة ثانية', eOut: 'صنف في طلبك خلص، شيله وجرب',
     loadErr: 'ما قدرنا نحمّل المنيو، حدّث الصفحة', items: n => `${arNum(n)} ${n === 1 ? 'صنف' : 'أصناف'}`,
     loyLeftO: n => `باقي لك ${arNum(n)} ${n === 1 ? 'طلب' : n === 2 ? 'طلبين' : 'طلبات'} وتاخذ واحد مجاني`, loyFree: 'عندك واحد مجاني ينخصم في طلبك الجاي',
   },
   en: {
-    en: 'عربي', eyebrow: 'CURBSIDE PICKUP · AL QURUM 29', h1: 'Karak your way', lead: 'Order here and pick it up from your car. Pay on pickup.',
+    en: 'عربي', eyebrow: 'CURBSIDE PICKUP · AL QURUM 29', h1: 'Karak your way', lead: 'Order here and pick it up from your car. Pay on pickup. Open 6 AM to midnight.',
     omr: 'OMR', view: 'View order', yours: 'Your order', cont: 'Continue', more: 'Add something else', total: 'Total', empty: 'Your order is empty',
     size: 'Size', notes: 'Note', addTo: t => `Add to order · ${t}`, out: 'Sold out',
     details: 'Pickup details', detLead: 'So we can find your car and bring it out', car: 'Car plate', cardesc: 'Car model & colour', cardescPh: 'White Land Cruiser',
@@ -196,7 +196,7 @@ const T = {
     yourNo: 'Your order', st: ['We got your order', 'Being prepared', 'Ready!', 'Picked up, enjoy'], cancelled: 'Order cancelled. Contact us if needed',
     steps: ['Received', 'Preparing', 'Ready', 'Picked up'], carL: 'Car', amount: 'Amount', pay: 'pay on pickup', pickup: 'Pickup',
     here: 'I’m here', told: 'They know you are here', wa: 'WhatsApp us', again: 'New order', asap: 'As soon as possible', min: '10 – 15 min',
-    eClosed: 'We are closed now, pick a later time', sending: 'Sending…', eMany: 'Too many orders from this device, please wait a bit', eFail: 'Could not send your order, please try again', eOut: 'Something in your order just sold out, remove it and try again',
+    eClosed: 'We are closed now, we open at 6 AM', sending: 'Sending…', eMany: 'Too many orders from this device, please wait a bit', eFail: 'Could not send your order, please try again', eOut: 'Something in your order just sold out, remove it and try again',
     loadErr: 'Could not load the menu, please refresh', items: n => `${n} ${n === 1 ? 'item' : 'items'}`,
     loyLeftO: n => `${n} more ${n === 1 ? 'order' : 'orders'} to a free one`, loyFree: 'You have a free one, taken off your next order',
   },

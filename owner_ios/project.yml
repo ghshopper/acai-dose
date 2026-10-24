@@ -42,7 +42,7 @@ targets:
     entitlements:
       path: App/App.entitlements
       properties:
-        com.apple.security.application-groups: [group.com.acaidose.owner]
+        keychain-access-groups: ["$(AppIdentifierPrefix)com.acaidose.owner.shared"]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.acaidose.owner
@@ -66,7 +66,7 @@ targets:
     entitlements:
       path: Widgets/Widgets.entitlements
       properties:
-        com.apple.security.application-groups: [group.com.acaidose.owner]
+        keychain-access-groups: ["$(AppIdentifierPrefix)com.acaidose.owner.shared"]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.acaidose.owner.widgets

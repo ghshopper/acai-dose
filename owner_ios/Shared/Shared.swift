@@ -3,16 +3,34 @@ import Foundation
 import ActivityKit
 #endif
 
-/// Things both the app and the widget extension use.
+import Security
+
+/// Things both the app and the widget extension use. They share a keychain group
+/// (keychain-access-groups in both entitlements), which needs no extra setup on Apple's portal.
 enum SharedStore {
-    static let group = "group.com.acaidose.owner"
     static let site = "https://order.acaiee.com"
-    static var defaults: UserDefaults { UserDefaults(suiteName: group) ?? .standard }
 
     /// Read-only key the widget uses to fetch today's numbers (made by the app after login).
     static var widgetKey: String? {
-        get { defaults.string(forKey: "wkey") }
-        set { defaults.set(newValue, forKey: "wkey") }
+        get { read("wkey").flatMap { String(data: $0, encoding: .utf8) } }
+        set { write("wkey", newValue?.data(using: .utf8)) }
+    }
+
+    static func read(_ account: String) -> Data? {
+        let q: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "acai-shared",
+                                kSecAttrAccount as String: account, kSecReturnData as String: true, kSecMatchLimit as String: kSecMatchLimitOne]
+        var out: AnyObject?
+        return SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess ? out as? Data : nil
+    }
+
+    static func write(_ account: String, _ data: Data?) {
+        let base: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "acai-shared", kSecAttrAccount as String: account]
+        SecItemDelete(base as CFDictionary)
+        guard let data else { return }
+        var add = base
+        add[kSecValueData as String] = data
+        add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        SecItemAdd(add as CFDictionary, nil)
     }
 }
 
@@ -35,14 +53,8 @@ struct Glance: Codable, Hashable {
     static let sample = Glance(day: "", sales: 48.6, orders: 15, pending: 2, new: 1, expenses: 6.5, lastRef: "2410-15", at: "14:05")
 
     static var cached: Glance? {
-        get {
-            guard let d = SharedStore.defaults.data(forKey: "glance") else { return nil }
-            return try? JSONDecoder().decode(Glance.self, from: d)
-        }
-        set {
-            if let v = newValue, let d = try? JSONEncoder().encode(v) { SharedStore.defaults.set(d, forKey: "glance") }
-            else { SharedStore.defaults.removeObject(forKey: "glance") }
-        }
+        get { SharedStore.read("glance").flatMap { try? JSONDecoder().decode(Glance.self, from: $0) } }
+        set { SharedStore.write("glance", newValue.flatMap { try? JSONEncoder().encode($0) }) }
     }
 
     /// Fetches today's numbers with the widget key; nil when there is no key yet.

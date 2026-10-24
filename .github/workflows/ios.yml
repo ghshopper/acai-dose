@@ -61,8 +61,13 @@ jobs:
           if st == 200:
               for b in body["data"]: print("  bundle:", b["attributes"]["identifier"], b["attributes"].get("platform"))
           else: print(body)
-          st, body = get("/v1/certificates?limit=20")
-          print("certificates:", st, [ (c["attributes"]["certificateType"], c["attributes"].get("expirationDate","")[:10]) for c in body["data"]] if st == 200 else body)
+          if st == 200 and not any(b["attributes"]["identifier"] == "com.acaidose.owner.widgets" for b in body["data"]):
+              data = json.dumps({"data": {"type": "bundleIds", "attributes": {"identifier": "com.acaidose.owner.widgets", "name": "Acai Dose Owner Widgets", "platform": "IOS"}}}).encode()
+              req = urllib.request.Request("https://api.appstoreconnect.apple.com/v1/bundleIds", data=data, method="POST",
+                                           headers={"Authorization": "Bearer " + tok, "Content-Type": "application/json"})
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as r: print("registered widget bundle id:", r.status)
+              except urllib.error.HTTPError as e: print("could not register widget bundle id:", e.code, e.read().decode()[:300])
           PY
 
       - name: Archive, sign and upload to TestFlight
@@ -87,8 +92,10 @@ jobs:
             > ../archive.log 2>&1 || { grep -E "error:|\*\* ARCHIVE" ../archive.log | head -60 >> ../build.log; tail -40 ../archive.log >> ../build.log; exit 1; }
           grep -E "\*\* ARCHIVE" ../archive.log >> ../build.log
           APP="$RUNNER_TEMP/Owner.xcarchive/Products/Applications/AcaiOwner.app"
-          codesign --force --sign - --entitlements Widgets/Widgets.entitlements "$APP/PlugIns/AcaiWidgets.appex" 2>&1 | tee -a ../build.log
-          codesign --force --sign - --entitlements App/App.entitlements "$APP" 2>&1 | tee -a ../build.log
+          sed "s/\$(AppIdentifierPrefix)/$TEAM_ID./g" Widgets/Widgets.entitlements > "$RUNNER_TEMP/w.entitlements"
+          sed "s/\$(AppIdentifierPrefix)/$TEAM_ID./g" App/App.entitlements > "$RUNNER_TEMP/a.entitlements"
+          codesign --force --sign - --entitlements "$RUNNER_TEMP/w.entitlements" "$APP/PlugIns/AcaiWidgets.appex" 2>&1 | tee -a ../build.log
+          codesign --force --sign - --entitlements "$RUNNER_TEMP/a.entitlements" "$APP" 2>&1 | tee -a ../build.log
           codesign -d --entitlements - "$APP" 2>&1 | tail -8 >> ../build.log
           cat > "$RUNNER_TEMP/export.plist" <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>

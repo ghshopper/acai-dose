@@ -38,6 +38,33 @@ jobs:
               exit 1; }
           grep -E "\*\* BUILD" ../compile.log >> ../build.log
 
+      - name: Check the App Store Connect key
+        if: env.HAS_KEYS == 'true'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          python3 -m pip install --quiet --break-system-packages pyjwt cryptography >/dev/null 2>&1 || python3 -m pip install --quiet pyjwt cryptography >/dev/null 2>&1
+          python3 - <<'PY' 2>&1 | tee -a build.log
+          import os, time, json, urllib.request, jwt
+          key = os.environ["ASC_KEY_P8"].strip()
+          tok = jwt.encode({"iss": os.environ["ASC_ISSUER_ID"].strip(), "iat": int(time.time()), "exp": int(time.time()) + 600, "aud": "appstoreconnect-v1"},
+                           key, algorithm="ES256", headers={"kid": os.environ["ASC_KEY_ID"].strip(), "typ": "JWT"})
+          def get(path):
+              req = urllib.request.Request("https://api.appstoreconnect.apple.com" + path, headers={"Authorization": "Bearer " + tok})
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as r: return r.status, json.load(r)
+              except urllib.error.HTTPError as e: return e.code, e.read().decode()[:300]
+          st, body = get("/v1/bundleIds?filter[identifier]=com.acaidose.owner,com.acaidose.owner.widgets&limit=10")
+          print("ASC key check:", st)
+          if st == 200:
+              for b in body["data"]: print("  bundle:", b["attributes"]["identifier"], b["attributes"].get("platform"))
+          else: print(body)
+          st, body = get("/v1/certificates?limit=20")
+          print("certificates:", st, [ (c["attributes"]["certificateType"], c["attributes"].get("expirationDate","")[:10]) for c in body["data"]] if st == 200 else body)
+          PY
+
       - name: Archive, sign and upload to TestFlight
         if: env.HAS_KEYS == 'true'
         env:

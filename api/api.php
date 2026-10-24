@@ -66,7 +66,7 @@ function promo_price(float $v, bool $offer = true): float {
 
 /** Validates [{product_id, qty, toppings?}] against the menu; returns [lines, total].
  *  "Build your bowl" lines carry the chosen toppings; their names list them so every screen and receipt shows them. */
-function price_items($items, bool $offer = true): array {
+function price_items($items, bool $offer = true, bool $staff = false): array {
     if (!is_array($items) || !count($items) || count($items) > 40) fail('invalid_items');
     $lines = []; $total = 0.0;
     foreach ($items as $it) {
@@ -75,6 +75,16 @@ function price_items($items, bool $offer = true): array {
         $p = q('SELECT id, name_ar, name_en, price, kind, size, soldout FROM products WHERE id = ? AND active = 1', [$pid])->fetch();
         if (!$p) fail('invalid_product');
         if ((int)$p['soldout']) fail('sold_out');
+        if ($p['kind'] === 'open') {
+            // Custom item from the till: staff type the name and price
+            if (!$staff) fail('invalid_product');
+            $cp = round((float)($it['price'] ?? 0), 3); $cn = clean((string)($it['name'] ?? ''), 40);
+            if ($cp <= 0 || $cp > 100) fail('bad_amount');
+            if ($cn === '') $cn = $p['name_en'];
+            $line = ['product_id' => (int)$p['id'], 'name_ar' => $cn, 'name_en' => $cn, 'price' => $cp, 'qty' => $qty, 'custom' => true];
+            $lines[] = $line; $total += $cp * $qty;
+            continue;
+        }
         if (!empty($p['size']) && isset(SIZE_NAMES[$p['size']])) { $p['name_en'] .= ' (' . SIZE_NAMES[$p['size']][0] . ')'; $p['name_ar'] .= ' (' . SIZE_NAMES[$p['size']][1] . ')'; }
         $note = clean((string)($it['note'] ?? ''), 60);
         $line = ['product_id' => (int)$p['id'], 'name_ar' => $p['name_ar'], 'name_en' => $p['name_en'], 'price' => promo_price((float)$p['price'], $offer), 'qty' => $qty];
@@ -172,7 +182,7 @@ case 'menu':
         // ?preview=1: the menu as it will look with the bowls switched on (no Mini), for the owner's check before launch
         !empty($_GET['preview'])
             ? q("SELECT * FROM products WHERE (active = 1 OR kind IN ('bowl','build')) AND name_en NOT LIKE 'Mini %' ORDER BY sort, id")->fetchAll()
-            : q('SELECT * FROM products WHERE active = 1 ORDER BY sort, id')->fetchAll()));
+            : q('SELECT * FROM products WHERE active = 1' . (user_if_any() ? '' : " AND kind <> 'open'") . ' ORDER BY sort, id')->fetchAll()));
 
 case 'cats':       // public: menu sections (Karak Dose), in order
     out(shop_cats());
@@ -303,7 +313,7 @@ case 'pos_sale':
     $pay = $in['payment'] ?? '';
     if (!in_array($pay, payments(), true)) fail('bad_payment');
     // Delivery-app orders (Talabat, Snoonu, Khedmah) always go in at full price: the day offer is for our own customers
-    [$lines, $total] = price_items($in['items'] ?? null, !in_array($pay, channels(), true));
+    [$lines, $total] = price_items($in['items'] ?? null, !in_array($pay, channels(), true), true);
     // App orders: snapshot today's commission so later rate changes don't rewrite history
     $commission = 0.0;
     if (in_array($pay, channels(), true)) {
@@ -337,7 +347,7 @@ case 'curb_order':  // staff outside takes an order at the car; it goes to the o
     $name = clean($in['name'] ?? '', 60);
     $cphone = '';
     if (!empty($in['phone'])) { $cphone = norm_phone($in['phone']); if ($cphone === '') fail('invalid_phone'); }
-    [$lines, $total] = price_items($in['items'] ?? null);
+    [$lines, $total] = price_items($in['items'] ?? null, true, true);
     $no = insert_order([
         'source' => 'curb', 'customer_name' => $name !== '' ? $name : 'Car order', 'phone' => $cphone, 'car_plate' => $car, 'car_desc' => $carDesc ?: null,
         'pickup_time' => 'ASAP', 'notes' => clean($in['notes'] ?? '', 300) ?: null, 'items' => json_encode($lines, JSON_UNESCAPED_UNICODE),

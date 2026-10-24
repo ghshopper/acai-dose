@@ -166,6 +166,13 @@ function create_schema(): void {
         seed_karak();
     }
 
+    // A "custom item" the till can sell with any name and price (never shown on the order page)
+    if (!q("SELECT 1 FROM settings WHERE k = 'open_item'")->fetch()) {
+        if (!q("SELECT 1 FROM products WHERE kind = 'open'")->fetch())
+            q("INSERT INTO products (name_ar, name_en, img, price, sort, active, kind) VALUES ('صنف آخر', 'Custom item', '', 0, 99999, 1, 'open')");
+        q("INSERT INTO settings (k, v) VALUES ('open_item', '1')");
+    }
+
     // Delivery apps this shop sells through (each with its commission, set by the owner)
     foreach ((BIZ === 'karak' ? ['talabat', 'tmdone', 'khedmah', 'snoonu'] : ['talabat', 'snoonu', 'khedmah']) as $c) {
         if (!q('SELECT 1 FROM channel_commissions WHERE channel = ?', [$c])->fetch())

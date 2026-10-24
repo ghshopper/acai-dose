@@ -32,6 +32,8 @@ class _PosPageState extends State<PosPage> {
   String _err = '';
   String _menuErr = '';
   Timer? _lookup;
+  /// Custom items typed at the till: sale line key -> price
+  final Map<String, double> _customPrice = {};
   String _cat = ''; // menu section shown on the till ('' = first section, or everything when the shop has none)
   final _search = TextEditingController();
 
@@ -104,9 +106,66 @@ class _PosPageState extends State<PosPage> {
     return parts.length > 2 ? parts.sublist(2).join(':') : '';
   }
 
-  List<Map<String, dynamic>> get _items => _cart.entries
-      .map((e) => {'product_id': _keyPid(e.key), 'qty': e.value, 'toppings': _keyTops(e.key), if (_keyNote(e.key).isNotEmpty) 'note': _keyNote(e.key)})
-      .toList();
+  List<Map<String, dynamic>> get _items => _cart.entries.map((e) {
+        final custom = _customPrice[e.key];
+        if (custom != null) return {'product_id': _keyPid(e.key), 'qty': e.value, 'name': _keyNote(e.key), 'price': custom};
+        return {'product_id': _keyPid(e.key), 'qty': e.value, 'toppings': _keyTops(e.key), if (_keyNote(e.key).isNotEmpty) 'note': _keyNote(e.key)};
+      }).toList();
+
+  Map<String, dynamic>? get _openItem {
+    for (final p in _products) {
+      if (p['kind'] == 'open') return p;
+    }
+    return null;
+  }
+
+  /// An item that isn't on the menu: staff type its name and price.
+  Future<void> _customItem() async {
+    final open = _openItem;
+    if (open == null) return;
+    final name = TextEditingController();
+    final price = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => StatefulBuilder(
+        builder: (c, set) {
+          final v = double.tryParse(price.text.trim()) ?? 0;
+          return AlertDialog(
+            title: const Text('Custom item'),
+            content: SizedBox(
+              width: 420,
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                TextField(controller: name, autofocus: true, textCapitalization: TextCapitalization.sentences, decoration: const InputDecoration(labelText: 'Name', hintText: 'e.g. Chips, Water bottle')),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: price,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+                  decoration: const InputDecoration(labelText: 'Price (OMR)', hintText: '0.000'),
+                  onChanged: (_) => set(() {}),
+                ),
+              ]),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+              FilledButton(onPressed: v > 0 && v <= 100 ? () => Navigator.pop(c, true) : null, child: Text(v > 0 ? 'Add · ${money(v)}' : 'Add')),
+            ],
+          );
+        },
+      ),
+    );
+    if (ok != true) return;
+    final v = double.tryParse(price.text.trim()) ?? 0;
+    var n = name.text.trim().replaceAll(':', ' ');
+    if (n.isEmpty) n = 'Custom item';
+    var key = '${_id(open)}::$n';
+    // Same name at another price is its own line
+    while (_customPrice.containsKey(key) && _customPrice[key] != v) {
+      key = '$key ';
+    }
+    _customPrice[key] = v;
+    _add(key, 1);
+  }
 
   List<Map<String, dynamic>> _topsOf(String k) => [
         for (final id in _keyTops(k))
@@ -115,6 +174,8 @@ class _PosPageState extends State<PosPage> {
       ];
 
   double _unit(String k) {
+    final custom = _customPrice[k];
+    if (custom != null) return custom;
     final p = _prod(_keyPid(k));
     if (p == null) return 0;
     return _price(p) + _topsOf(k).fold(0.0, (s, t) => s + (t['price'] as num).toDouble());
@@ -123,6 +184,7 @@ class _PosPageState extends State<PosPage> {
   String _lineName(String k, {bool ar = false}) {
     final p = _prod(_keyPid(k));
     if (p == null) return '';
+    if (_customPrice.containsKey(k)) return _keyNote(k).trim();
     final counts = <int, int>{};
     for (final id in _keyTops(k)) {
       counts[id] = (counts[id] ?? 0) + 1;
@@ -158,6 +220,7 @@ class _PosPageState extends State<PosPage> {
         _cart[key] = q;
       } else {
         _cart.remove(key);
+        _customPrice.remove(key);
       }
     });
   }
@@ -214,6 +277,7 @@ class _PosPageState extends State<PosPage> {
   void _reset() {
     setState(() {
       _cart.clear();
+      _customPrice.clear();
       _given.clear();
       _phone.clear();
       _cust = null;
@@ -406,6 +470,7 @@ class _PosPageState extends State<PosPage> {
     final out = <String, List<Map<String, dynamic>>>{};
     final q = _search.text.trim().toLowerCase();
     for (final p in _products) {
+      if (p['kind'] == 'open') continue;
       if (q.isNotEmpty) {
         if (!'${p['name_en']} ${p['name_ar']}'.toLowerCase().contains(q)) continue;
       } else if (_cats.isNotEmpty && p['cat'] != _currentCat) {
@@ -550,6 +615,10 @@ class _PosPageState extends State<PosPage> {
               ),
           ]),
         ),
+        const SizedBox(height: 10),
+      ],
+      if (_openItem != null) ...[
+        OutlinedButton.icon(onPressed: _customItem, icon: const Icon(Icons.edit_note), label: const Text('Custom item (type name and price)')),
         const SizedBox(height: 10),
       ],
       if (tiles.isEmpty) const Padding(padding: EdgeInsets.all(24), child: Text('Nothing matches', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w700))),

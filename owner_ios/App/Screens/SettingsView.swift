@@ -39,7 +39,7 @@ struct SettingsView: View {
                     }
                     let cats = s["cats"].array
                     if cats.isEmpty {
-                        Section { ForEach(s["products"].array, id: \.self) { p in ProductRow(p: p, save: save) } } header: { Text("المنيو والأسعار") } footer: { Text("اللي تطفيه يختفي من الموقع والكاشير") }
+                        Section { ForEach(s["products"].array.filter { $0["kind"].string != "open" }, id: \.self) { p in ProductRow(p: p, save: save) } } header: { Text("المنيو والأسعار") } footer: { Text("اللي تطفيه يختفي من الموقع والكاشير") }
                     } else {
                         Section {
                             ForEach(cats, id: \.self) { c in

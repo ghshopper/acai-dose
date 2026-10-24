@@ -136,11 +136,8 @@ Future<Uint8List> renderReceipt(ReceiptData d, int width) async {
 
   // Logo
   final karak = Api.I.shop.isKarak;
-  if (karak) {
-    center('كرك دوز', 34, weight: FontWeight.w900, gap: 0);
-    center('KARAK DOSE', 18, weight: FontWeight.w800);
-  } else try {
-    final data = await rootBundle.load('assets/logo-black.png');
+  try {
+    final data = await rootBundle.load(karak ? 'assets/karak-black.png' : 'assets/logo-black.png');
     final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
     final img = (await codec.getNextFrame()).image;
     final lw = w * 0.62;
@@ -148,9 +145,9 @@ Future<Uint8List> renderReceipt(ReceiptData d, int width) async {
     c.drawImageRect(img, Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()), Rect.fromLTWH((w - lw) / 2, y, lw, lh), Paint()..filterQuality = FilterQuality.high);
     y += lh + s(6);
   } catch (_) {
-    center('AÇAÍ DOSE', 30, weight: FontWeight.w900);
+    center(karak ? 'KARAK DOSE' : 'AÇAÍ DOSE', 30, weight: FontWeight.w900);
   }
-  center('Al Qurum 29, Muscat · القرم ٢٩، مسقط', 15, weight: FontWeight.w600);
+  center(karak ? 'Al Qurum 29, Muscat Gallery Building' : 'Al Qurum 29, Muscat · القرم ٢٩، مسقط', 15, weight: FontWeight.w600);
   dashes();
 
   // Order number

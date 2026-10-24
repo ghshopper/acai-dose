@@ -70,22 +70,12 @@ class Api {
 
   String? _cookie;
   String? get cookie => _cookie;
-  Shop shop = Shop.acai;
+  /// Fixed when the app is built: the Açaí Dose app and the Karak Dose app are separate installs.
+  final Shop shop = Shop.byId(const String.fromEnvironment('SHOP', defaultValue: 'acai'));
 
   Future<void> load() async {
     final p = await SharedPreferences.getInstance();
-    shop = Shop.byId(p.getString('shop'));
     _cookie = p.getString('cookie');
-  }
-
-  /// Switches shop (only on the login screen); the old session belongs to the other shop so it is dropped.
-  Future<void> setShop(Shop s) async {
-    if (s.id == shop.id) return;
-    shop = s;
-    _cookie = null;
-    final p = await SharedPreferences.getInstance();
-    await p.setString('shop', s.id);
-    await p.remove('cookie');
   }
 
   Future<void> clearSession() async {

@@ -19,11 +19,7 @@ struct LoginView: View {
                     .pickerStyle(.segmented)
                     .padding(.top, 24)
                     if BizStore.shared.current == .karak {
-                        VStack(spacing: 0) {
-                            Text("كرك دوز").font(.system(size: 46, weight: .heavy))
-                            Text("K A R A K   D O S E").font(.caption.weight(.bold))
-                        }
-                        .foregroundStyle(Color.cream).padding(.top, 40)
+                        Image("karak-white").resizable().scaledToFit().frame(height: 80).padding(.top, 40)
                     } else {
                         Image("logo-cream").resizable().scaledToFit().frame(height: 72).padding(.top, 40)
                     }

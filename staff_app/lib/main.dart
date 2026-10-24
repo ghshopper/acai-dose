@@ -18,7 +18,7 @@ class AcaiApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Dose Staff',
+      title: Api.I.shop.isKarak ? 'Karak Dose Staff' : 'Açaí Dose Staff',
       debugShowCheckedModeBanner: false,
       theme: appTheme(),
       home: const Gate(),

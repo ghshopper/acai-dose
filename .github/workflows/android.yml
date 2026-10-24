@@ -36,6 +36,23 @@ jobs:
           flutter pub get 2>&1 | tee -a ../build.log
           flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee -a ../build.log || true
           flutter build apk --release --target-platform android-arm,android-arm64 2>&1 | tee -a ../build.log
+          cp build/app/outputs/flutter-apk/app-release.apk ../acai-unsigned.apk
+
+      - name: Build the Karak Dose app (separate install, own name and icon)
+        working-directory: staff_app
+        run: |
+          set -o pipefail
+          echo "===== Karak Dose =====" | tee -a ../build.log
+          for f in android/app/build.gradle.kts android/app/build.gradle; do
+            if [ -f "$f" ]; then
+              sed -i '/applicationId/s/"com\.acaidose\.staff"/"com.karakdose.staff"/' "$f"
+              grep -n "applicationId" "$f" | tee -a ../build.log
+            fi
+          done
+          sed -i 's/android:label="Açaí Dose Staff"/android:label="Karak Dose Staff"/' android/app/src/main/AndroidManifest.xml
+          cp -r brand/karak/mipmap-* android/app/src/main/res/
+          flutter build apk --release --target-platform android-arm,android-arm64 --dart-define=SHOP=karak 2>&1 | tee -a ../build.log
+          cp build/app/outputs/flutter-apk/app-release.apk ../karak-unsigned.apk
 
       - name: Sign with the shop key (installs over earlier versions)
         run: |
@@ -43,8 +60,12 @@ jobs:
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           "$BT/apksigner" sign --ks staff_app/keystore/acai-staff.jks --ks-pass pass:acaidose-staff \
             --ks-key-alias acai --key-pass pass:acaidose-staff \
-            --out acai-dose-staff.apk staff_app/build/app/outputs/flutter-apk/app-release.apk 2>&1 | tee -a build.log
+            --out acai-dose-staff.apk acai-unsigned.apk 2>&1 | tee -a build.log
           "$BT/apksigner" verify acai-dose-staff.apk 2>&1 | tee -a build.log
+          "$BT/apksigner" sign --ks staff_app/keystore/acai-staff.jks --ks-pass pass:acaidose-staff \
+            --ks-key-alias acai --key-pass pass:acaidose-staff \
+            --out karak-dose-staff.apk karak-unsigned.apk 2>&1 | tee -a build.log
+          "$BT/apksigner" verify karak-dose-staff.apk 2>&1 | tee -a build.log
 
       - name: Publish to the "app-latest" release
         env:
@@ -55,6 +76,11 @@ jobs:
             --title "Açaí Dose staff app" \
             --notes "Install on the Sunmi device. Built from ${GITHUB_SHA::7}." \
             --latest
+          gh release delete karak-latest --yes --cleanup-tag || true
+          gh release create karak-latest karak-dose-staff.apk \
+            --title "Karak Dose staff app" \
+            --notes "Install on the Karak Dose Sunmi device. Built from ${GITHUB_SHA::7}." \
+            --latest=false
 
       - name: Keep the build log on the ci-logs branch
         if: always()

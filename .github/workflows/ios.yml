@@ -104,7 +104,13 @@ jobs:
           PLIST
           sed -i '' 's/^          //' "$RUNNER_TEMP/export.plist"
           xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/Owner.xcarchive" \
-            -exportOptionsPlist "$RUNNER_TEMP/export.plist" -exportPath "$RUNNER_TEMP/out" "${AUTH[@]}" 2>&1 | tee -a ../build.log
+            -exportOptionsPlist "$RUNNER_TEMP/export.plist" -exportPath "$RUNNER_TEMP/out" "${AUTH[@]}" 2>&1 | tee -a ../build.log || {
+              for f in $(ls -d "${TMPDIR:-/tmp}"/AcaiOwner_*.xcdistributionlogs 2>/dev/null) /var/folders/*/*/T/AcaiOwner_*.xcdistributionlogs; do
+                [ -d "$f" ] || continue
+                echo "---- $f" >> ../build.log
+                grep -hiE "error|fail|auth|401|403|profile|certificate" "$f"/*.log 2>/dev/null | grep -v "^\s*$" | head -80 >> ../build.log
+              done
+              rm -f "$KEY"; exit 1; }
           rm -f "$KEY"
 
       - name: Keep the build log on the ci-logs-ios branch

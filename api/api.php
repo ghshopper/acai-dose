@@ -22,6 +22,8 @@ function channels(): array {
     }
     return $c;
 }
+/** Hour the shop starts taking orders (Karak Dose opens earlier). */
+function open_from(): int { return max(0, min(12, (int)setting('open_from', BIZ === 'karak' ? '6' : '7'))); }
 function payments(): array { return array_merge(['cash', 'card'], channels()); }
 const CHANNEL_NAMES = ['talabat' => ['Talabat', 'طلبات'], 'tmdone' => ['TM Done', 'تم دن'], 'snoonu' => ['Snoonu', 'سنونو'], 'khedmah' => ['Khedmah', 'خدمة']];
 function channel_list(): array { return array_map(fn($k) => ['k' => $k, 'en' => CHANNEL_NAMES[$k][0], 'ar' => CHANNEL_NAMES[$k][1]], channels()); }
@@ -181,7 +183,7 @@ case 'toppings':   // public: what can go on a "build your bowl"
 
 case 'shop_info':    // public: how customers can reach the shop
     $pr = promo();
-    out(['biz' => BIZ, 'whatsapp' => setting('shop_whatsapp', SHOP_PHONE), 'promo' => $pr ? ['pct' => (float)$pr['pct'], 'ar' => (string)($pr['ar'] ?? ''), 'en' => (string)($pr['en'] ?? '')] : null]);
+    out(['biz' => BIZ, 'open_from' => open_from(), 'whatsapp' => setting('shop_whatsapp', SHOP_PHONE), 'promo' => $pr ? ['pct' => (float)$pr['pct'], 'ar' => (string)($pr['ar'] ?? ''), 'en' => (string)($pr['en'] ?? '')] : null]);
 
 case 'place_order':
     $post();
@@ -196,7 +198,7 @@ case 'place_order':
     if (!preg_match('/^\+968[279]\d{7}$/', $phone)) fail('invalid_phone');
     if (mb_strlen($car) < 1) fail('invalid_car');
     if ($pickup !== 'ASAP' && !preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $pickup)) fail('invalid_pickup');
-    if ((int)date('G') < 7) fail('closed');
+    if ((int)date('G') < open_from()) fail('closed');
     [$lines, $total] = price_items($in['items'] ?? null);
     // Loyalty: a free cup waiting on this phone is taken off the dearest cup in the order
     $free = 0; $discount = 0.0;

@@ -35,6 +35,7 @@ targets:
         UILaunchScreen:
           UIColorName: AccentColor
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIRequiresFullScreen: true
         ITSAppUsesNonExemptEncryption: false
         NSSupportsLiveActivities: true
         UIBackgroundModes: [fetch]

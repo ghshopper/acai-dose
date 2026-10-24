@@ -9,8 +9,8 @@
 <meta property="og:title" content="كرك دوز | اطلب واستلم من سيارتك">
 <meta property="og:description" content="كرك وفطور وعصائر في القرم ٢٩، مسقط. اطلب من الموقع واستلم من سيارتك.">
 <meta name="theme-color" content="#393939">
-<link rel="icon" href="assets/karak/icon-64.png">
-<link rel="apple-touch-icon" href="assets/karak/apple-touch-icon.png">
+<link rel="icon" href="/karak/assets/karak/icon-64.png">
+<link rel="apple-touch-icon" href="/karak/assets/karak/apple-touch-icon.png">
 <meta property="og:image" content="https://order.acaiee.com/assets/karak/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alexandria:wght@400;500;600;800&family=Jost:wght@500;600&display=swap">
@@ -156,7 +156,7 @@ const store = { get: k => { try { return localStorage.getItem(k); } catch { retu
 async function api(a, body, q = {}) {
   const opt = body === undefined ? { cache: 'no-store', credentials: 'same-origin' }
     : { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
-  let r; try { r = await fetch('api/api.php?' + new URLSearchParams({ a, ...q }), opt); } catch { throw new Error('network'); }
+  let r; try { r = await fetch('/karak/api/api.php?' + new URLSearchParams({ a, ...q }), opt); } catch { throw new Error('network'); }
   let d = null; try { d = await r.json(); } catch { /* empty */ }
   if (!r.ok) throw new Error((d && d.error) || 'http_' + r.status);
   return d;
@@ -248,7 +248,7 @@ function buildTimes() {
 function header(back) {
   return `<div class="top">
     ${back ? `<button class="iconbtn back" type="button" id="goBack" aria-label="${L.back}">${ICON.back}</button>` : ''}
-    <a class="brand" href="./"><img src="assets/karak/logo-dark.png" alt="كرك دوز Karak Dose"></a>
+    <a class="brand" href="/karak/"><img src="/karak/assets/karak/logo-dark.png" alt="كرك دوز Karak Dose"></a>
     <button class="pill" type="button" id="lang">${L.en}</button>
   </div>`;
 }

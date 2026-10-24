@@ -12,7 +12,7 @@ RewriteRule ^orders/?$ https://github.com/ghshopper/acai-dose/releases/download/
 # Karak Dose: same site under /karak/ (its own tables; the API knows from the address)
 # Always /karak/ with the slash, so the page's links stay under Karak Dose
 RewriteRule ^karak$ /karak/ [R=301,L]
-RewriteRule ^karak/$ karak.html [L]
+RewriteRule ^karak/$ karak.php [L]
 RewriteRule ^karak/app/?$ https://github.com/ghshopper/acai-dose/releases/download/karak-latest/karak-dose-staff.apk [R=302,L]
 RewriteRule ^karak/api/(api|setup)\.php$ api/$1.php [QSA,L]
 RewriteRule ^karak/(pos|screen|dashboard)(\.html)?/?$ $1.html [L]

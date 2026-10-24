@@ -1,9 +1,10 @@
 name: Build owner app (iPhone → TestFlight)
 
+# Native SwiftUI app in owner_ios/ (replaces the Flutter owner_app on the same App Store record).
 on:
   push:
     branches: [main]
-    paths: ['owner_app/**', '.github/workflows/ios.yml']
+    paths: ['owner_ios/**', '.github/workflows/ios.yml']
   workflow_dispatch:
 
 permissions:
@@ -13,49 +14,51 @@ jobs:
   build:
     runs-on: macos-latest
     env:
-      # Upload only runs once the App Store Connect key is saved in the repo secrets
       HAS_KEYS: ${{ secrets.ASC_KEY_ID != '' && secrets.ASC_ISSUER_ID != '' && secrets.ASC_KEY_P8 != '' && secrets.APPLE_TEAM_ID != '' }}
+      BUILD_NO: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v5
 
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-
-      - name: Build the app (unsigned check)
-        working-directory: owner_app
+      - name: Generate the Xcode project
+        working-directory: owner_ios
         run: |
           set -o pipefail
-          flutter --version 2>&1 | tee ../build.log
-          # Standard iOS project files; our own files (app icon) are kept
-          flutter create --org com.acaidose --project-name owner --platforms ios . 2>&1 | tee -a ../build.log
-          rm -f test/widget_test.dart
-          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Açaí Dose" ios/Runner/Info.plist
-          /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" ios/Runner/Info.plist || true
-          flutter pub get 2>&1 | tee -a ../build.log
-          flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee -a ../build.log || true
-          flutter build ios --release --no-codesign --build-number=${{ github.run_number }} 2>&1 | tee -a ../build.log
+          brew install xcodegen >/dev/null 2>&1 || brew upgrade xcodegen >/dev/null 2>&1 || true
+          xcodebuild -version 2>&1 | tee ../build.log
+          xcodegen generate 2>&1 | tee -a ../build.log
 
-      - name: Sign, archive and upload to TestFlight
+      - name: Compile (unsigned check)
+        working-directory: owner_ios
+        run: |
+          set -o pipefail
+          xcodebuild -project AcaiOwner.xcodeproj -scheme AcaiOwner -configuration Release \
+            -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO CURRENT_PROJECT_VERSION=$BUILD_NO build > ../compile.log 2>&1 || {
+              grep -E "error:|warning: .*unavailable|\*\* BUILD" ../compile.log | head -120 >> ../build.log
+              tail -60 ../compile.log >> ../build.log
+              exit 1; }
+          grep -E "\*\* BUILD" ../compile.log >> ../build.log
+
+      - name: Archive, sign and upload to TestFlight
         if: env.HAS_KEYS == 'true'
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
           TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        working-directory: owner_ios
         run: |
           set -o pipefail
           KEY="$RUNNER_TEMP/AuthKey_$ASC_KEY_ID.p8"
           printf '%s\n' "$ASC_KEY_P8" > "$KEY"
           AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$KEY" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
-          cd owner_app/ios
-          # Archive without signing; the export step signs it for the App Store (cloud-managed
-          # distribution certificate), so no development profile or registered device is needed.
-          xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release \
+          # Ad-hoc signature keeps the entitlements (App Group for the widget) in the archive;
+          # the export step re-signs everything for the App Store with cloud-managed signing.
+          xcodebuild -project AcaiOwner.xcodeproj -scheme AcaiOwner -configuration Release \
             -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/Owner.xcarchive" archive \
-            DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" 2>&1 | tee -a ../../build.log | grep -E "error|ARCHIVE" || true
-          test -d "$RUNNER_TEMP/Owner.xcarchive"
+            DEVELOPMENT_TEAM="$TEAM_ID" CURRENT_PROJECT_VERSION=$BUILD_NO \
+            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=YES PROVISIONING_PROFILE_SPECIFIER="" \
+            > ../archive.log 2>&1 || { grep -E "error:|\*\* ARCHIVE" ../archive.log | head -60 >> ../build.log; tail -40 ../archive.log >> ../build.log; exit 1; }
+          grep -E "\*\* ARCHIVE" ../archive.log >> ../build.log
           cat > "$RUNNER_TEMP/export.plist" <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -70,7 +73,7 @@ jobs:
           PLIST
           sed -i '' 's/^          //' "$RUNNER_TEMP/export.plist"
           xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/Owner.xcarchive" \
-            -exportOptionsPlist "$RUNNER_TEMP/export.plist" -exportPath "$RUNNER_TEMP/out" "${AUTH[@]}" 2>&1 | tee -a ../../build.log
+            -exportOptionsPlist "$RUNNER_TEMP/export.plist" -exportPath "$RUNNER_TEMP/out" "${AUTH[@]}" 2>&1 | tee -a ../build.log
           rm -f "$KEY"
 
       - name: Keep the build log on the ci-logs-ios branch

@@ -452,6 +452,31 @@ case 'customer_add':    // owner adds a customer by mobile (gets a loyalty card 
     save_customer($ph, clean((string)($in['name'] ?? ''), 60), null, null, !empty($in['offers']));
     out(['ok' => true]);
 
+case 'widget_token':  // owner app: a read-only key for the iPhone widget and Live Activity (no session needed)
+    $post(); need('owner');
+    $tok = bin2hex(random_bytes(20));
+    $list = json_decode(setting('widget_keys', '[]'), true) ?: [];
+    $list[] = hash('sha256', $tok);
+    set_setting('widget_keys', json_encode(array_slice($list, -6)));
+    out(['token' => $tok]);
+
+case 'glance':  // today's numbers for the widget, by its key
+    $k = (string)($_GET['k'] ?? '');
+    if (!preg_match('/^[a-f0-9]{40}$/', $k) || !in_array(hash('sha256', $k), json_decode(setting('widget_keys', '[]'), true) ?: [], true)) fail('forbidden', 403);
+    $d = date('Y-m-d');
+    $rows = q("SELECT status, source, total, n_orders, created_at, order_no FROM orders WHERE day = ? AND status <> 'cancelled' ORDER BY id DESC", [$d])->fetchAll();
+    $sales = 0.0; $n = 0; $pending = 0; $new = 0;
+    foreach ($rows as $r) {
+        $sales += (float)$r['total']; $n += $r['n_orders'] === null ? 1 : (int)$r['n_orders'];
+        if ($r['source'] !== 'pos' && in_array($r['status'], ['new', 'preparing', 'ready'], true)) $pending++;
+        if ($r['status'] === 'new') $new++;
+    }
+    foreach (q('SELECT gross, orders_count FROM channel_sales WHERE sale_date = ?', [$d])->fetchAll() as $r) { $sales += (float)$r['gross']; $n += (int)($r['orders_count'] ?? 0); }
+    $exp = (float)(q('SELECT COALESCE(SUM(amount), 0) s FROM expenses WHERE expense_date = ?', [$d])->fetch()['s'] ?? 0);
+    $last = $rows[0] ?? null;
+    out(['day' => $d, 'sales' => money($sales), 'orders' => $n, 'pending' => $pending, 'new' => $new, 'expenses' => money($exp),
+         'last_ref' => $last ? order_ref($d, (int)$last['order_no']) : null, 'last_at' => $last['created_at'] ?? null, 'at' => date('H:i')]);
+
 case 'customer_orders':  // owner: one customer's order history
     need('owner');
     $ph = norm_phone($_GET['phone'] ?? ''); if ($ph === '') fail('invalid_phone');

@@ -45,7 +45,9 @@ final class BizStore {
 }
 
 /// Size labels for Karak Dose items.
-let kSizeNames = ["small": "صغير", "large": "كبير", "meal": "وجبة", "regular": "عادي"]
+let kSizeNames = ["small": "صغير", "large": "كبير", "meal": "وجبة", "regular": "عادي",
+                  "cola": "كولا", "cola_diet": "كولا دايت", "lemon": "ليمون", "lemon_diet": "ليمون دايت", "citrus": "حمضيات",
+                  "berry": "توت", "orange": "برتقال", "mango": "مانجو", "mixed": "مشكل"]
 
 /// "كرك (صغير)" for an item with a size, else just the name.
 func itemName(_ p: J) -> String {

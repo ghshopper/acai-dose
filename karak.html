@@ -162,18 +162,23 @@ async function api(a, body, q = {}) {
   return d;
 }
 const ST = ['new', 'preparing', 'ready', 'done'];
-const SIZES = { small: ['صغير', 'Small'], large: ['كبير', 'Large'], meal: ['وجبة', 'Meal'], regular: ['عادي', 'Regular'] };
-const DRINKS = new Set(['karak', 'milk', 'drinks', 'juices', 'mojito', 'passion', 'roob']);
+const SIZES = { small: ['صغير', 'Small'], large: ['كبير', 'Large'], meal: ['وجبة', 'Meal'], regular: ['عادي', 'Regular'],
+  cola: ['كولا', 'Cola'], cola_diet: ['كولا دايت', 'Cola Diet'], lemon: ['ليمون', 'Lemon'], lemon_diet: ['ليمون دايت', 'Lemon Diet'],
+  citrus: ['حمضيات', 'Citrus'], berry: ['توت', 'Berry'], orange: ['برتقال', 'Orange'], mango: ['مانجو', 'Mango'], mixed: ['مشكل', 'Mixed'] };
+const isSize = s => ['small', 'large', 'meal', 'regular'].includes(s);
+// Sugar notes only for drinks that are made in the shop
+const NO_NOTES = new Set(['Water', 'Kinza', 'Top Fruit']);
+// Sugar notes only on tea, milk and hot drinks (not juices, mojito, passion, roob or food)
+const DRINKS = new Set(['karak', 'milk', 'drinks']);
 // Kitchen notes go to the shop in English (the staff read English); customers see them in their language
 const NOTES_D = [['Less sugar', 'سكر خفيف'], ['No sugar', 'بدون سكر'], ['Extra sugar', 'سكر زيادة'], ['Extra strong', 'ثقيل'], ['Cold', 'بارد']];
-const NOTES_F = [['Spicy', 'حار'], ['No spice', 'بدون حار'], ['Extra cheese', 'جبن زيادة'], ['No onion', 'بدون بصل'], ['No mayo', 'بدون مايونيز']];
-const noteName = n => { const f = [...NOTES_D, ...NOTES_F].find(x => x[0] === n); return f ? f[lang === 'ar' ? 1 : 0] : n; };
+const noteName = n => { const f = NOTES_D.find(x => x[0] === n); return f ? f[lang === 'ar' ? 1 : 0] : n; };
 
 const T = {
   ar: {
     en: 'EN', eyebrow: 'CURBSIDE PICKUP · AL QURUM 29', h1: 'كرك على كيفك', lead: 'اطلب من هنا واستلم وانت في سيارتك. الدفع عند الاستلام. نفتح من ٦ الصبح لين ١٢ الليل.',
     omr: 'ر.ع', view: 'عرض الطلب', yours: 'طلبك', cont: 'أكمل الطلب', more: 'أضف شي ثاني', total: 'المجموع', empty: 'السلة فاضية',
-    size: 'الحجم', notes: 'ملاحظة', addTo: t => `أضف للطلب · ${t}`, out: 'خلص',
+    size: 'الحجم', kind: 'النوع', notes: 'ملاحظة', addTo: t => `أضف للطلب · ${t}`, out: 'خلص',
     details: 'بيانات الاستلام', detLead: 'عشان نعرف سيارتك ونطلع لك الطلب', car: 'رقم السيارة', cardesc: 'نوع ولون السيارة', cardescPh: 'لاندكروزر أبيض',
     name: 'الاسم', phone: 'رقم الجوال', time: 'وقت الاستلام', now: 'الحين', later: 'وقت ثاني', note: 'ملاحظة (اختياري)', notePh: 'مثلاً: بدون ثلج',
     where: 'المحل في القرم ٢٩، بناية مسقط جاليري. لما توصل اضغط «وصلت» ونطلع لك الطلب للسيارة.', map: 'افتح الخريطة',
@@ -188,7 +193,7 @@ const T = {
   en: {
     en: 'عربي', eyebrow: 'CURBSIDE PICKUP · AL QURUM 29', h1: 'Karak your way', lead: 'Order here and pick it up from your car. Pay on pickup. Open 6 AM to midnight.',
     omr: 'OMR', view: 'View order', yours: 'Your order', cont: 'Continue', more: 'Add something else', total: 'Total', empty: 'Your order is empty',
-    size: 'Size', notes: 'Note', addTo: t => `Add to order · ${t}`, out: 'Sold out',
+    size: 'Size', kind: 'Flavour', notes: 'Note', addTo: t => `Add to order · ${t}`, out: 'Sold out',
     details: 'Pickup details', detLead: 'So we can find your car and bring it out', car: 'Car plate', cardesc: 'Car model & colour', cardescPh: 'White Land Cruiser',
     name: 'Name', phone: 'Mobile', time: 'Pickup time', now: 'Now', later: 'Later', note: 'Note (optional)', notePh: 'e.g. no ice',
     where: 'We are at Al Qurum 29, Muscat Gallery Building. When you arrive, tap “I’m here” and we bring it to your car.', map: 'Open map',
@@ -263,7 +268,7 @@ function viewMenu() {
   ${shown.map(c => `<section class="sec" id="sec-${esc(c.k)}"><h2>${esc(catName(c))}<span class="eyebrow">${esc(c.en)}</span></h2>
     ${groups(c.k).map(vs => {
       const p = vs[0], out = vs.every(v => v.soldout), n = inCart(vs);
-      const price = vs.map(v => money(v.price)).join(' / ');
+      const price = [...new Set(vs.map(v => money(v.price)))].join(' / ');
       return `<button type="button" class="item${out ? ' out' : ''}" data-g="${esc(p.name_en)}" data-c="${esc(c.k)}"${out ? ' aria-disabled="true"' : ''}>
         <span class="t"><span class="nm">${esc(nm(p))}${out ? `<span class="tag">${L.out}</span>` : ''}</span>${lang === 'ar' ? `<span class="en" style="display:block">${esc(p.name_en)}</span>` : ''}</span>
         <span class="pr">${price}<small>${L.omr}</small></span>
@@ -346,12 +351,12 @@ function openItem(vs) {
   const avail = vs.filter(v => !v.soldout);
   if (!avail.length) return toast(L.out);
   let pick = avail[0], note = '', qty = 1;
-  const notes = DRINKS.has(vs[0].cat) ? NOTES_D : NOTES_F;
+  const notes = DRINKS.has(vs[0].cat) && !NO_NOTES.has(vs[0].name_en) ? NOTES_D : [];
   const draw = () => `<button type="button" class="iconbtn x" data-close aria-label="×">${ICON.x}</button>
     <h3>${esc(nm(vs[0]))}</h3>${lang === 'ar' ? `<div class="lead">${esc(vs[0].name_en)}</div>` : ''}
-    ${vs.length > 1 ? `<div class="lbl">${L.size}</div><div class="sizes">${vs.map(v => `<button type="button" class="size" data-s="${v.id}" aria-pressed="${v === pick}"${v.soldout ? ' disabled' : ''}>${sizeName(v.size)}<span class="num">${v.soldout ? L.out : money(v.price) + ' ' + L.omr}</span></button>`).join('')}</div>` : ''}
-    <div class="lbl">${L.notes}</div>
-    <div class="notes">${notes.map(([k]) => `<button type="button" class="chip" data-n="${esc(k)}" aria-pressed="${k === note}">${esc(noteName(k))}</button>`).join('')}</div>
+    ${vs.length > 1 ? `<div class="lbl">${isSize(vs[0].size) ? L.size : L.kind}</div><div class="sizes">${vs.map(v => `<button type="button" class="size" data-s="${v.id}" aria-pressed="${v === pick}"${v.soldout ? ' disabled' : ''}>${sizeName(v.size)}<span class="num">${v.soldout ? L.out : money(v.price) + ' ' + L.omr}</span></button>`).join('')}</div>` : ''}
+    ${notes.length ? `<div class="lbl">${L.notes}</div>
+    <div class="notes">${notes.map(([k]) => `<button type="button" class="chip" data-n="${esc(k)}" aria-pressed="${k === note}">${esc(noteName(k))}</button>`).join('')}</div>` : ''}
     <div class="qty"><button type="button" data-q="-1" aria-label="−">−</button><span>${qty}</span><button type="button" data-q="1" aria-label="+">+</button></div>
     <button type="button" class="btn" id="iadd" style="margin-top:10px">${L.addTo(money(pick.price * qty) + ' ' + L.omr)}</button>`;
   sheet(draw(), (bg, close) => {

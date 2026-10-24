@@ -27,7 +27,10 @@ function open_from(): int { return max(0, min(12, (int)setting('open_from', BIZ 
 function payments(): array { return array_merge(['cash', 'card'], channels()); }
 const CHANNEL_NAMES = ['talabat' => ['Talabat', 'طلبات'], 'tmdone' => ['TM Done', 'تم دن'], 'snoonu' => ['Snoonu', 'سنونو'], 'khedmah' => ['Khedmah', 'خدمة']];
 function channel_list(): array { return array_map(fn($k) => ['k' => $k, 'en' => CHANNEL_NAMES[$k][0], 'ar' => CHANNEL_NAMES[$k][1]], channels()); }
-const SIZE_NAMES = ['small' => ['Small', 'صغير'], 'large' => ['Large', 'كبير'], 'meal' => ['Meal', 'وجبة'], 'regular' => ['Regular', 'عادي']];
+// Choices of one item: sizes, or flavours (Kinza, Top Fruit)
+const SIZE_NAMES = ['small' => ['Small', 'صغير'], 'large' => ['Large', 'كبير'], 'meal' => ['Meal', 'وجبة'], 'regular' => ['Regular', 'عادي'],
+    'cola' => ['Cola', 'كولا'], 'cola_diet' => ['Cola Diet', 'كولا دايت'], 'lemon' => ['Lemon', 'ليمون'], 'lemon_diet' => ['Lemon Diet', 'ليمون دايت'],
+    'citrus' => ['Citrus', 'حمضيات'], 'berry' => ['Berry', 'توت'], 'orange' => ['Orange', 'برتقال'], 'mango' => ['Mango', 'مانجو'], 'mixed' => ['Mixed', 'مشكل']];
 function shop_cats(): array { return json_decode(setting('categories', '[]'), true) ?: []; }
 const STATUSES = ['new', 'preparing', 'ready', 'done', 'cancelled'];
 

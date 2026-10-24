@@ -101,7 +101,7 @@ function clean(?string $s, int $max): string { return mb_substr(trim((string)$s)
 function ensure_schema(): void {
     try { q('SELECT source, car_plate, token, commission, n_orders FROM orders LIMIT 0'); q('SELECT id, card_token, pass_updated, gwallet, stamp_adj FROM customers LIMIT 0'); q('SELECT free_cups FROM orders LIMIT 0'); q('SELECT k FROM settings LIMIT 0'); q('SELECT serial FROM wallet_regs LIMIT 0'); q('SELECT id FROM stock_counts LIMIT 0');
           q('SELECT cat, size, soldout FROM products LIMIT 0');
-          $flags = BIZ === 'karak' ? ['karak_menu', 'open_item'] : ['mini_prices_set', 'bowls_added', 'costing_added', 'open_item'];
+          $flags = BIZ === 'karak' ? ['karak_menu', 'open_item', 'karak_flavours'] : ['mini_prices_set', 'bowls_added', 'costing_added', 'open_item'];
           foreach ($flags as $f) if (!q('SELECT 1 FROM settings WHERE k = ?', [$f])->fetch()) throw new RuntimeException("$f missing"); }
     catch (Throwable $e) { require_once __DIR__ . '/schema.php'; create_schema(); }
 }

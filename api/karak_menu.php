@@ -100,3 +100,18 @@ function seed_karak(): void {
     }
     set_setting('karak_menu', '1');
 }
+
+/** Kinza and Top Fruit come in flavours: one row per flavour, same price (owner's update after the first menu). */
+function karak_flavours(): void {
+    if (q("SELECT 1 FROM settings WHERE k = 'karak_flavours'")->fetch()) return;
+    $sets = ['Kinza' => ['cola', 'cola_diet', 'lemon', 'lemon_diet', 'citrus', 'berry', 'orange'], 'Top Fruit' => ['mango', 'orange', 'mixed']];
+    foreach ($sets as $en => $flav) {
+        $p = q("SELECT * FROM products WHERE name_en = ? AND size IS NULL ORDER BY id LIMIT 1", [$en])->fetch();
+        if (!$p) continue;
+        q('UPDATE products SET size = ? WHERE id = ?', [$flav[0], (int)$p['id']]);
+        foreach (array_slice($flav, 1) as $i => $f)
+            q("INSERT INTO products (name_ar, name_en, img, price, sort, active, kind, cat, size) VALUES (?,?,'',?,?,?,?,?,?)",
+              [$p['name_ar'], $p['name_en'], $p['price'], (int)$p['sort'] + $i + 1, (int)$p['active'], $p['kind'], $p['cat'], $f]);
+    }
+    set_setting('karak_flavours', '1');
+}

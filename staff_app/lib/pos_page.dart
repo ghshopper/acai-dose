@@ -461,9 +461,10 @@ class _PosPageState extends State<PosPage> {
 
   // ---------- widgets ----------
 
-  static const _drinkCats = {'karak', 'milk', 'drinks', 'juices', 'mojito', 'passion', 'roob'};
+  static const _drinkCats = {'karak', 'milk', 'drinks'};
   static const _drinkNotes = ['Less sugar', 'No sugar', 'Extra sugar', 'Extra strong', 'Cold'];
-  static const _foodNotes = ['Spicy', 'No spice', 'Extra cheese', 'No onion', 'No mayo'];
+  /// Bought-in drinks get no sugar notes; food gets no notes at all
+  static const _noNotes = {'Water', 'Kinza', 'Top Fruit'};
 
   /// Items on the till: sizes of the same item (Karak Small / Large) share one tile.
   List<List<Map<String, dynamic>>> get _tiles {
@@ -501,7 +502,11 @@ class _PosPageState extends State<PosPage> {
     }
     var size = variants.firstWhere((v) => v['soldout'] != true);
     String note = '';
-    final notes = _drinkCats.contains(first['cat']) ? _drinkNotes : _foodNotes;
+    final notes = _drinkCats.contains(first['cat']) && !_noNotes.contains(first['name_en']) ? _drinkNotes : const <String>[];
+    if (variants.length == 1 && notes.isEmpty) {
+      _add('${_id(size)}', 1);
+      return;
+    }
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => StatefulBuilder(
@@ -529,7 +534,7 @@ class _PosPageState extends State<PosPage> {
                 ]),
                 const SizedBox(height: 14),
               ],
-              Wrap(spacing: 8, runSpacing: 8, children: [
+              if (notes.isNotEmpty) Wrap(spacing: 8, runSpacing: 8, children: [
                 for (final n in notes)
                   ChoiceChip(
                     label: Text(n, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
@@ -575,7 +580,7 @@ class _PosPageState extends State<PosPage> {
     }
   }
 
-  String _priceLabel(List<Map<String, dynamic>> vs) => vs.map((v) => money(v['price'])).join(' / ');
+  String _priceLabel(List<Map<String, dynamic>> vs) => vs.map((v) => money(v['price'])).toSet().join(' / ');
 
   Widget _grid(bool wide) {
     if (_menuErr.isNotEmpty) {

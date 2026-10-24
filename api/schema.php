@@ -164,6 +164,7 @@ function create_schema(): void {
         }
     } else {
         seed_karak();
+        karak_flavours();
     }
 
     // A "custom item" the till can sell with any name and price (never shown on the order page)

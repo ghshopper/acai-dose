@@ -27,6 +27,7 @@ class MainActivity : FlutterActivity() {
             when (call.method) {
                 "start" -> {
                     OrderWatchService.saveCookie(this, call.argument<String>("cookie") ?: "")
+                    OrderWatchService.saveShop(this, call.argument<String>("base") ?: "", call.argument<String>("title") ?: "")
                     OrderWatchService.start(this)
                     result.success(null)
                 }

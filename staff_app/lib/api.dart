@@ -6,6 +6,56 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// The ordering site; the app uses the same API as the web pages.
 const String kSite = 'https://order.acaiee.com';
 
+/// The two shops this app can run. Karak Dose lives under /karak on the same site with its own menu, staff and sales.
+class Shop {
+  const Shop(this.id, this.base, this.name, this.cookieName);
+  final String id; // acai | karak
+  final String base; // '' or '/karak'
+  final String name;
+  final String cookieName;
+  static const acai = Shop('acai', '', 'Açaí Dose', 'acai_sid');
+  static const karak = Shop('karak', '/karak', 'Karak Dose', 'kd_sid');
+  static Shop byId(String? id) => id == 'karak' ? karak : acai;
+  bool get isKarak => id == 'karak';
+}
+
+/// What the server says about this shop after login: delivery apps, menu sections, size names.
+class ShopConfig {
+  ShopConfig({this.channels = const [], this.cats = const [], this.sizes = const {}});
+  final List<Map<String, dynamic>> channels; // [{k, en, ar}]
+  final List<Map<String, dynamic>> cats; // [{k, en, ar}]
+  final Map<String, Map<String, dynamic>> sizes; // small -> {en, ar}
+  static ShopConfig I = ShopConfig();
+
+  static Future<void> load() async {
+    try {
+      final r = Map<String, dynamic>.from(await Api.I.get('pos_config') as Map);
+      List<Map<String, dynamic>> list(dynamic v) => ((v as List?) ?? []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      I = ShopConfig(
+        channels: list(r['channels']),
+        cats: list(r['cats']),
+        sizes: ((r['sizes'] as Map?) ?? {}).map((k, v) => MapEntry('$k', Map<String, dynamic>.from(v as Map))),
+      );
+    } catch (_) {
+      // Older server: the three delivery apps it always had
+      I = ShopConfig(channels: [
+        {'k': 'talabat', 'en': 'Talabat', 'ar': 'طلبات'},
+        {'k': 'snoonu', 'en': 'Snoonu', 'ar': 'سنونو'},
+        {'k': 'khedmah', 'en': 'Khedmah', 'ar': 'خدمة'},
+      ]);
+    }
+  }
+
+  String channelName(String k) {
+    for (final c in channels) {
+      if (c['k'] == k) return '${c['en']}';
+    }
+    return k;
+  }
+
+  String sizeName(String? k) => k == null ? '' : '${sizes[k]?['en'] ?? k}';
+}
+
 class ApiError implements Exception {
   ApiError(this.code);
   final String code;
@@ -20,10 +70,22 @@ class Api {
 
   String? _cookie;
   String? get cookie => _cookie;
+  Shop shop = Shop.acai;
 
   Future<void> load() async {
     final p = await SharedPreferences.getInstance();
+    shop = Shop.byId(p.getString('shop'));
     _cookie = p.getString('cookie');
+  }
+
+  /// Switches shop (only on the login screen); the old session belongs to the other shop so it is dropped.
+  Future<void> setShop(Shop s) async {
+    if (s.id == shop.id) return;
+    shop = s;
+    _cookie = null;
+    final p = await SharedPreferences.getInstance();
+    await p.setString('shop', s.id);
+    await p.remove('cookie');
   }
 
   Future<void> clearSession() async {
@@ -35,7 +97,7 @@ class Api {
   Future<void> _keepCookie(http.Response r) async {
     final sc = r.headers['set-cookie'];
     if (sc == null) return;
-    final m = RegExp(r'acai_sid=([^;,]*)').firstMatch(sc);
+    final m = RegExp('${shop.cookieName}=([^;,]*)').firstMatch(sc);
     if (m == null) return;
     final v = m.group(1) ?? '';
     final p = await SharedPreferences.getInstance();
@@ -43,7 +105,7 @@ class Api {
       _cookie = null;
       await p.remove('cookie');
     } else {
-      _cookie = 'acai_sid=$v';
+      _cookie = '${shop.cookieName}=$v';
       await p.setString('cookie', _cookie!);
     }
   }
@@ -55,7 +117,7 @@ class Api {
   Future<dynamic> _send(String action, Map<String, dynamic>? body, Map<String, String>? query) async {
     final params = <String, String>{'a': action};
     if (query != null) params.addAll(query);
-    final uri = Uri.parse('$kSite/api/api.php').replace(queryParameters: params);
+    final uri = Uri.parse('$kSite${shop.base}/api/api.php').replace(queryParameters: params);
     final headers = <String, String>{'User-Agent': 'AcaiDoseApp/2.0'};
     if (_cookie != null) headers['Cookie'] = _cookie!;
     http.Response r;
@@ -95,6 +157,8 @@ const Map<String, String> kErrors = {
   'void_window': 'You can only void your own sale within 15 minutes',
   'invalid_phone': 'Customer mobile must be 8 digits',
   'no_free_cup': 'This customer has no free cup',
+  'sold_out': 'An item in this sale is sold out',
+  'invalid_car': 'Write the car plate',
 };
 
 String errText(Object e) => kErrors[e.toString()] ?? 'Something went wrong, try again';

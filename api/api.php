@@ -13,9 +13,21 @@ if ($method === 'POST' && stripos($_SERVER['CONTENT_TYPE'] ?? '', 'application/j
 $in = $method === 'POST' ? body() : [];
 $post = fn() => $method === 'POST' || fail('method', 405);
 
-const CHANNELS = ['talabat', 'snoonu', 'khedmah'];
+/** Delivery apps this shop sells through (rows in channel_commissions), in a fixed order. */
+function channels(): array {
+    static $c = null;
+    if ($c === null) {
+        $have = array_column(q('SELECT channel FROM channel_commissions')->fetchAll(), 'channel');
+        $c = array_values(array_filter(array_keys(CHANNEL_NAMES), fn($k) => in_array($k, $have, true)));
+    }
+    return $c;
+}
+function payments(): array { return array_merge(['cash', 'card'], channels()); }
+const CHANNEL_NAMES = ['talabat' => ['Talabat', 'طلبات'], 'tmdone' => ['TM Done', 'تم دن'], 'snoonu' => ['Snoonu', 'سنونو'], 'khedmah' => ['Khedmah', 'خدمة']];
+function channel_list(): array { return array_map(fn($k) => ['k' => $k, 'en' => CHANNEL_NAMES[$k][0], 'ar' => CHANNEL_NAMES[$k][1]], channels()); }
+const SIZE_NAMES = ['small' => ['Small', 'صغير'], 'large' => ['Large', 'كبير'], 'meal' => ['Meal', 'وجبة'], 'regular' => ['Regular', 'عادي']];
+function shop_cats(): array { return json_decode(setting('categories', '[]'), true) ?: []; }
 const STATUSES = ['new', 'preparing', 'ready', 'done', 'cancelled'];
-const PAYMENTS = ['cash', 'card', 'talabat', 'snoonu', 'khedmah'];
 
 function valid_date($d): string {
     if (!is_string($d) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) || !strtotime($d)) fail('bad_date');
@@ -53,13 +65,16 @@ function promo_price(float $v, bool $offer = true): float {
 /** Validates [{product_id, qty, toppings?}] against the menu; returns [lines, total].
  *  "Build your bowl" lines carry the chosen toppings; their names list them so every screen and receipt shows them. */
 function price_items($items, bool $offer = true): array {
-    if (!is_array($items) || !count($items) || count($items) > 15) fail('invalid_items');
+    if (!is_array($items) || !count($items) || count($items) > 40) fail('invalid_items');
     $lines = []; $total = 0.0;
     foreach ($items as $it) {
         $pid = (int)($it['product_id'] ?? 0); $qty = (int)($it['qty'] ?? 0);
         if ($qty < 1 || $qty > 50) fail('invalid_qty');
-        $p = q('SELECT id, name_ar, name_en, price, kind FROM products WHERE id = ? AND active = 1', [$pid])->fetch();
+        $p = q('SELECT id, name_ar, name_en, price, kind, size, soldout FROM products WHERE id = ? AND active = 1', [$pid])->fetch();
         if (!$p) fail('invalid_product');
+        if ((int)$p['soldout']) fail('sold_out');
+        if (!empty($p['size']) && isset(SIZE_NAMES[$p['size']])) { $p['name_en'] .= ' (' . SIZE_NAMES[$p['size']][0] . ')'; $p['name_ar'] .= ' (' . SIZE_NAMES[$p['size']][1] . ')'; }
+        $note = clean((string)($it['note'] ?? ''), 60);
         $line = ['product_id' => (int)$p['id'], 'name_ar' => $p['name_ar'], 'name_en' => $p['name_en'], 'price' => promo_price((float)$p['price'], $offer), 'qty' => $qty];
         if ($offer && promo()) $line['was'] = (float)$p['price'];
         if (($p['kind'] ?? 'cup') === 'build') {
@@ -86,6 +101,7 @@ function price_items($items, bool $offer = true): array {
                 $line['name_en'] .= ' (' . implode(', ', $namesEn) . ')';
             }
         }
+        if ($note !== '') { $line['note'] = $note; $line['name_en'] .= " · $note"; $line['name_ar'] .= " · $note"; }
         $lines[] = $line;
         $total += $line['price'] * $qty;
     }
@@ -149,11 +165,15 @@ case 'menu':
     $best = (int)setting('best_seller', '0') ?: (int)(q("SELECT id FROM products WHERE name_en = 'Açaí Smoothie with Peanut Butter'")->fetch()['id'] ?? 0);
     out(array_map(fn($p) => ['id' => (int)$p['id'], 'best' => (int)$p['id'] === $best, 'name_ar' => $p['name_ar'], 'name_en' => $p['name_en'],
         'img' => $p['img'], 'price' => promo_price((float)$p['price']), 'was' => promo() ? (float)$p['price'] : null, 'kind' => $p['kind'] ?? 'cup',
-        'desc_ar' => (string)($p['desc_ar'] ?? ''), 'desc_en' => (string)($p['desc_en'] ?? '')],
+        'desc_ar' => (string)($p['desc_ar'] ?? ''), 'desc_en' => (string)($p['desc_en'] ?? ''),
+        'cat' => $p['cat'] ?? null, 'size' => $p['size'] ?? null, 'soldout' => (bool)(int)($p['soldout'] ?? 0)],
         // ?preview=1: the menu as it will look with the bowls switched on (no Mini), for the owner's check before launch
         !empty($_GET['preview'])
             ? q("SELECT * FROM products WHERE (active = 1 OR kind IN ('bowl','build')) AND name_en NOT LIKE 'Mini %' ORDER BY sort, id")->fetchAll()
             : q('SELECT * FROM products WHERE active = 1 ORDER BY sort, id')->fetchAll()));
+
+case 'cats':       // public: menu sections (Karak Dose), in order
+    out(shop_cats());
 
 case 'toppings':   // public: what can go on a "build your bowl"
     out(array_map(fn($t) => ['id' => (int)$t['id'], 'k' => $t['k'], 'name_ar' => $t['name_ar'], 'name_en' => $t['name_en'], 'price' => promo_price((float)$t['price'])],
@@ -161,7 +181,7 @@ case 'toppings':   // public: what can go on a "build your bowl"
 
 case 'shop_info':    // public: how customers can reach the shop
     $pr = promo();
-    out(['whatsapp' => setting('shop_whatsapp', SHOP_PHONE), 'promo' => $pr ? ['pct' => (float)$pr['pct'], 'ar' => (string)($pr['ar'] ?? ''), 'en' => (string)($pr['en'] ?? '')] : null]);
+    out(['biz' => BIZ, 'whatsapp' => setting('shop_whatsapp', SHOP_PHONE), 'promo' => $pr ? ['pct' => (float)$pr['pct'], 'ar' => (string)($pr['ar'] ?? ''), 'en' => (string)($pr['en'] ?? '')] : null]);
 
 case 'place_order':
     $post();
@@ -236,7 +256,17 @@ case 'logout':
     $post(); start_session(); $_SESSION = []; session_destroy(); out(['ok' => true]);
 
 case 'me':
-    $u = user(); out($u ? ['username' => $u['username'], 'role' => $u['role']] : null);
+    $u = user(); out($u ? ['username' => $u['username'], 'role' => $u['role'], 'biz' => BIZ] : null);
+
+case 'pos_config':   // staff devices: which shop this is, its delivery apps and menu sections
+    need('staff');
+    out(['biz' => BIZ, 'name_en' => BIZ === 'karak' ? 'Karak Dose' : 'Açaí Dose', 'name_ar' => BIZ === 'karak' ? 'كرك دوز' : 'أساي دوز',
+         'channels' => channel_list(), 'cats' => shop_cats(), 'sizes' => array_map(fn($v) => ['en' => $v[0], 'ar' => $v[1]], SIZE_NAMES)]);
+
+case 'soldout':      // staff: an item ran out (hidden from the order page, greyed on the till) or is back
+    $post(); need('staff');
+    q('UPDATE products SET soldout = ? WHERE id = ?', [!empty($in['soldout']) ? 1 : 0, (int)($in['id'] ?? 0)]);
+    out(['ok' => true]);
 
 // ---------------- staff: orders screen ----------------
 case 'active_orders':
@@ -269,12 +299,12 @@ case 'order_status':
 case 'pos_sale':
     $post(); $u = need('staff');
     $pay = $in['payment'] ?? '';
-    if (!in_array($pay, PAYMENTS, true)) fail('bad_payment');
+    if (!in_array($pay, payments(), true)) fail('bad_payment');
     // Delivery-app orders (Talabat, Snoonu, Khedmah) always go in at full price: the day offer is for our own customers
-    [$lines, $total] = price_items($in['items'] ?? null, !in_array($pay, CHANNELS, true));
+    [$lines, $total] = price_items($in['items'] ?? null, !in_array($pay, channels(), true));
     // App orders: snapshot today's commission so later rate changes don't rewrite history
     $commission = 0.0;
-    if (in_array($pay, CHANNELS, true)) {
+    if (in_array($pay, channels(), true)) {
         $pct = (float)(q('SELECT pct FROM channel_commissions WHERE channel = ?', [$pay])->fetch()['pct'] ?? 0);
         $commission = money($total * $pct / 100);
     }
@@ -289,7 +319,7 @@ case 'pos_sale':
         }
     }
     $no = insert_order([
-        'source' => 'pos', 'customer_name' => in_array($pay, CHANNELS, true) ? ucfirst($pay) : 'Walk-in', 'phone' => $cphone,
+        'source' => 'pos', 'customer_name' => in_array($pay, channels(), true) ? CHANNEL_NAMES[$pay][0] : 'Walk-in', 'phone' => $cphone,
         'items' => json_encode($lines, JSON_UNESCAPED_UNICODE), 'total' => $total, 'status' => 'done', 'payment' => $pay,
         'commission' => $commission, 'created_by' => (int)$u['id'], 'free_cups' => $free, 'discount' => money($discount),
     ]);
@@ -346,11 +376,11 @@ case 'range':
     $exps = q('SELECT * FROM expenses WHERE expense_date BETWEEN ? AND ? ORDER BY expense_date DESC, id DESC', [$from, $to])->fetchAll();
     foreach ($apps as &$r) { foreach (['gross', 'commission', 'commission_pct'] as $k) $r[$k] = (float)$r[$k]; $r['id'] = (int)$r['id']; $r['orders_count'] = $r['orders_count'] === null ? null : (int)$r['orders_count']; }
     foreach ($exps as &$r) { $r['amount'] = (float)$r['amount']; $r['id'] = (int)$r['id']; }
-    out(['orders' => array_map('order_row', $orders), 'apps' => $apps, 'exps' => $exps]);
+    out(['orders' => array_map('order_row', $orders), 'apps' => $apps, 'exps' => $exps, 'channels' => channel_list()]);
 
 case 'add_sale':
     $post(); need('owner');
-    $ch = $in['channel'] ?? ''; if (!in_array($ch, CHANNELS, true)) fail('bad_channel');
+    $ch = $in['channel'] ?? ''; if (!in_array($ch, channels(), true)) fail('bad_channel');
     $gross = (float)($in['gross'] ?? -1); if ($gross < 0) fail('bad_amount');
     $pct = (float)($in['commission_pct'] ?? 0); if ($pct < 0 || $pct > 100) fail('bad_pct');
     $cnt = isset($in['orders_count']) && $in['orders_count'] !== null && $in['orders_count'] !== '' ? max(0, (int)$in['orders_count']) : null;
@@ -406,7 +436,7 @@ case 'import_sales':  // owner loads old sales from the Excel template, all rows
         $line = $i + 1;
         $d = $r['date'] ?? '';
         if (!is_string($d) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) || !strtotime($d) || $d > $today || $d < '2020-01-01') fail("row_$line:bad_date");
-        $pay = $r['payment'] ?? ''; if (!in_array($pay, PAYMENTS, true)) fail("row_$line:bad_payment");
+        $pay = $r['payment'] ?? ''; if (!in_array($pay, payments(), true)) fail("row_$line:bad_payment");
         $amt = (float)($r['amount'] ?? 0); if ($amt <= 0 || $amt > 100000) fail("row_$line:bad_amount");
         $n = isset($r['orders']) && $r['orders'] !== '' && $r['orders'] !== null ? (int)$r['orders'] : 1;
         if ($n < 1 || $n > 10000) fail("row_$line:bad_orders");
@@ -422,7 +452,7 @@ case 'import_sales':  // owner loads old sales from the Excel template, all rows
         $prepared[] = [$d, [
             'source' => 'pos', 'customer_name' => 'Imported', 'phone' => '', 'notes' => clean($r['note'] ?? '', 300) ?: null,
             'items' => json_encode($items, JSON_UNESCAPED_UNICODE), 'total' => money($amt), 'status' => 'done', 'payment' => $pay,
-            'commission' => in_array($pay, CHANNELS, true) ? money($amt * $c / 100) : 0, 'n_orders' => $n,
+            'commission' => in_array($pay, channels(), true) ? money($amt * $c / 100) : 0, 'n_orders' => $n,
             'created_at' => $d . ' 12:00:00', 'updated_at' => now(),
         ]];
     }
@@ -504,14 +534,15 @@ case 'settings':
     need('owner');
     $c = []; foreach (q('SELECT * FROM channel_commissions')->fetchAll() as $r) $c[$r['channel']] = (float)$r['pct'];
     $p = array_map(fn($r) => ['id' => (int)$r['id'], 'name_ar' => $r['name_ar'], 'name_en' => $r['name_en'], 'price' => (float)$r['price'], 'active' => (int)$r['active'],
-        'kind' => $r['kind'] ?? 'cup', 'desc_ar' => (string)($r['desc_ar'] ?? ''), 'desc_en' => (string)($r['desc_en'] ?? '')],
+        'kind' => $r['kind'] ?? 'cup', 'desc_ar' => (string)($r['desc_ar'] ?? ''), 'desc_en' => (string)($r['desc_en'] ?? ''),
+        'cat' => $r['cat'] ?? null, 'size' => $r['size'] ?? null, 'soldout' => (int)($r['soldout'] ?? 0)],
         q('SELECT * FROM products ORDER BY sort, id')->fetchAll());
     $tp = array_map(fn($r) => ['id' => (int)$r['id'], 'k' => $r['k'], 'name_ar' => $r['name_ar'], 'name_en' => $r['name_en'], 'price' => (float)$r['price'], 'active' => (int)$r['active']],
         q('SELECT * FROM toppings ORDER BY sort, id')->fetchAll());
     $u = array_map(fn($r) => ['id' => (int)$r['id'], 'username' => $r['username'], 'role' => $r['role'], 'active' => (int)$r['active']],
         q('SELECT id, username, role, active FROM users ORDER BY id')->fetchAll());
     require_once __DIR__ . '/gwallet_lib.php';
-    out(['commissions' => $c, 'products' => $p, 'toppings' => $tp, 'users' => $u, 'loyalty' => loyalty_cfg(), 'wallet' => wallet_status(), 'gwallet' => gw_status(),
+    out(['biz' => BIZ, 'channels' => channel_list(), 'cats' => shop_cats(), 'commissions' => $c, 'products' => $p, 'toppings' => $tp, 'users' => $u, 'loyalty' => loyalty_cfg(), 'wallet' => wallet_status(), 'gwallet' => gw_status(),
          'whatsapp' => setting('shop_whatsapp', SHOP_PHONE), 'design' => setting('site_design', 'old') === 'new' ? 'new' : 'old',
          'location' => ['coords' => setting('shop_lat') !== '' ? setting('shop_lat') . ', ' . setting('shop_lng') : '', 'text' => setting('nearby_text')]]);
 
@@ -579,7 +610,7 @@ case 'save_loyalty':
 
 case 'save_commissions':
     $post(); need('owner');
-    foreach (CHANNELS as $ch) {
+    foreach (channels() as $ch) {
         $v = (float)($in[$ch] ?? 0); if ($v < 0 || $v > 100) fail('bad_pct');
         q('UPDATE channel_commissions SET pct = ? WHERE channel = ?', [$v, $ch]);
     }
@@ -592,6 +623,21 @@ case 'save_product':
     q('UPDATE products SET price = ?, active = ? WHERE id = ?', [money($price), !empty($in['active']) ? 1 : 0, (int)($in['id'] ?? 0)]);
     if (array_key_exists('desc_ar', $in) || array_key_exists('desc_en', $in))
         q('UPDATE products SET desc_ar = ?, desc_en = ? WHERE id = ?', [clean((string)($in['desc_ar'] ?? ''), 300) ?: null, clean((string)($in['desc_en'] ?? ''), 300) ?: null, (int)($in['id'] ?? 0)]);
+    out(['ok' => true]);
+
+case 'product_add':   // owner: a new menu item (Karak Dose: in a section, optionally one row per size)
+    $post(); need('owner');
+    $ar = clean((string)($in['name_ar'] ?? ''), 120); $en = clean((string)($in['name_en'] ?? ''), 120) ?: $ar;
+    if ($ar === '') fail('bad_name');
+    $cat = clean((string)($in['cat'] ?? ''), 20) ?: null;
+    $prices = is_array($in['prices'] ?? null) ? $in['prices'] : ['' => $in['price'] ?? 0];
+    $sort = (int)(q('SELECT MAX(sort) m FROM products' . ($cat ? ' WHERE cat = ?' : ''), $cat ? [$cat] : [])->fetch()['m'] ?? 0) + 10;
+    foreach ($prices as $size => $pr) {
+        $size = (string)$size; if ($size !== '' && !isset(SIZE_NAMES[$size])) fail('bad_size');
+        $pr = (float)$pr; if ($pr < 0) fail('bad_amount');
+        q("INSERT INTO products (name_ar, name_en, img, price, sort, active, kind, cat, size) VALUES (?,?,'',?,?,?,?,?,?)",
+          [$ar, $en, money($pr), $sort++, $pr > 0 ? 1 : 0, BIZ === 'karak' ? 'item' : 'cup', $cat, $size === '' ? null : $size]);
+    }
     out(['ok' => true]);
 
 case 'costing':   // owner: ingredients with their price per gram, and every product's recipe and cost

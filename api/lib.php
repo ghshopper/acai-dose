@@ -1,7 +1,20 @@
 <?php
 declare(strict_types=1);
 date_default_timezone_set('Asia/Muscat');
-const SHOP_PHONE = '+96872612311';   // shop number: WhatsApp button default, wallet cards
+// Which shop this request belongs to. Karak Dose lives under /karak/ on the same site and keeps its own
+// tables (same names with a kd_ prefix), so menus, sales, staff and customers never mix.
+define('BIZ', (preg_match('~^/karak(/|$)~', (string)parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH)) || getenv('ACAI_TEST_BIZ') === 'karak') ? 'karak' : 'acai');
+define('SHOP_PHONE', BIZ === 'karak' ? '+96898558386' : '+96872612311');   // shop number: WhatsApp button default, wallet cards
+const BIZ_TABLES = 'users|products|orders|day_counters|channel_commissions|channel_sales|expenses|hits|ingredients|recipe_items|purchases|stock_counts|toppings|customers|settings|wallet_devices|wallet_regs';
+/** Points table names in a statement at this shop's tables. */
+function tp(string $sql): string {
+    if (BIZ === 'acai') return $sql;
+    $t = BIZ_TABLES;
+    $sql = preg_replace("/\b(FROM|JOIN|INTO|UPDATE|TABLE|EXISTS|ON)(\s+)($t)\b/i", '$1$2kd_$3', $sql);
+    $sql = preg_replace("/\btable_info\(($t)\)/", 'table_info(kd_$1)', $sql);
+    return preg_replace('/\bINDEX\s+(\w+)\s+ON\b/i', 'INDEX kd_$1 ON', $sql);
+}
+function xq(string $sql): void { db()->exec(tp($sql)); }
 // Database settings live outside the website folder (survives updates), with api/config.php as a fallback.
 $__base = dirname(__DIR__, 3);
 $__cfg = is_file("$__base/acai-config.php") ? "$__base/acai-config.php" : (is_file("$__base/config.php") ? "$__base/config.php" : __DIR__ . '/config.php');
@@ -22,7 +35,7 @@ function db(): PDO {
 }
 function is_mysql(): bool { return db()->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql'; }
 
-function q(string $sql, array $p = []): PDOStatement { $s = db()->prepare($sql); $s->execute($p); return $s; }
+function q(string $sql, array $p = []): PDOStatement { $s = db()->prepare(tp($sql)); $s->execute($p); return $s; }
 function now(): string { return date('Y-m-d H:i:s'); }
 
 function out($data, int $code = 200): never {
@@ -42,7 +55,7 @@ function body(): array {
 
 function start_session(): void {
     if (session_status() === PHP_SESSION_ACTIVE) return;
-    session_name('acai_sid');
+    session_name(BIZ === 'karak' ? 'kd_sid' : 'acai_sid');
     session_set_cookie_params([
         'lifetime' => 60 * 60 * 24 * 30, 'path' => '/', 'secure' => !empty($_SERVER['HTTPS']),
         'httponly' => true, 'samesite' => 'Strict',
@@ -83,7 +96,9 @@ function clean(?string $s, int $max): string { return mb_substr(trim((string)$s)
 /** Adds new columns on first request after an update, so re-running setup is not needed. */
 function ensure_schema(): void {
     try { q('SELECT source, car_plate, token, commission, n_orders FROM orders LIMIT 0'); q('SELECT id, card_token, pass_updated, gwallet, stamp_adj FROM customers LIMIT 0'); q('SELECT free_cups FROM orders LIMIT 0'); q('SELECT k FROM settings LIMIT 0'); q('SELECT serial FROM wallet_regs LIMIT 0'); q('SELECT id FROM stock_counts LIMIT 0');
-          if (!q("SELECT 1 FROM settings WHERE k = 'mini_prices_set'")->fetch() || !q("SELECT 1 FROM settings WHERE k = 'bowls_added'")->fetch() || !q("SELECT 1 FROM settings WHERE k = 'costing_added'")->fetch()) throw new RuntimeException('mini cups missing'); }
+          q('SELECT cat, size, soldout FROM products LIMIT 0');
+          $flags = BIZ === 'karak' ? ['karak_menu'] : ['mini_prices_set', 'bowls_added', 'costing_added'];
+          foreach ($flags as $f) if (!q('SELECT 1 FROM settings WHERE k = ?', [$f])->fetch()) throw new RuntimeException("$f missing"); }
     catch (Throwable $e) { require_once __DIR__ . '/schema.php'; create_schema(); }
 }
 

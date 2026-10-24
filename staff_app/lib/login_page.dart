@@ -55,7 +55,21 @@ class _LoginPageState extends State<LoginPage> {
                 padding: const EdgeInsets.all(28),
                 child: AutofillGroup(
                   child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                    Image.asset('assets/logo-purple.png', height: 70),
+                    SegmentedButton<String>(
+                      segments: const [
+                        ButtonSegment(value: 'acai', label: Text('Açaí Dose')),
+                        ButtonSegment(value: 'karak', label: Text('Karak Dose')),
+                      ],
+                      selected: {Api.I.shop.id},
+                      onSelectionChanged: _busy
+                          ? null
+                          : (v) async {
+                              await Api.I.setShop(Shop.byId(v.first));
+                              setState(() => _err = '');
+                            },
+                    ),
+                    const SizedBox(height: 18),
+                    ShopLogo(shop: Api.I.shop, dark: false, height: 70),
                     const SizedBox(height: 14),
                     const Text('Staff login', textAlign: TextAlign.center, style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: kPurple)),
                     const SizedBox(height: 20),

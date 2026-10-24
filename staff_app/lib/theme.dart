@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'api.dart';
+
 const Color kPurple = Color(0xFF470D43);
 const Color kPurple2 = Color(0xFF5E1A55);
 const Color kCream = Color(0xFFFAF3E0);
@@ -55,3 +57,26 @@ ButtonStyle bigButton(Color bg, Color fg) => FilledButton.styleFrom(
       textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
     );
+
+/// The shop's logo: Açaí Dose's picture, or Karak Dose's name set in type.
+class ShopLogo extends StatelessWidget {
+  const ShopLogo({super.key, required this.shop, required this.dark, required this.height});
+  final Shop shop;
+  final bool dark; // true = on the purple bar (light logo)
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!shop.isKarak) return Image.asset(dark ? 'assets/logo-cream.png' : 'assets/logo-purple.png', height: height);
+    final c = dark ? kCream : const Color(0xFF3A3A3C);
+    return SizedBox(
+      height: height,
+      child: FittedBox(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text('كرك دوز', style: TextStyle(color: c, fontSize: 30, fontWeight: FontWeight.w800, height: 1.1)),
+          Text('K A R A K   D O S E', style: TextStyle(color: c, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1.5)),
+        ]),
+      ),
+    );
+  }
+}

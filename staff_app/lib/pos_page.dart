@@ -32,6 +32,8 @@ class _PosPageState extends State<PosPage> {
   String _err = '';
   String _menuErr = '';
   Timer? _lookup;
+  String _cat = ''; // menu section shown on the till ('' = first section, or everything when the shop has none)
+  final _search = TextEditingController();
 
   @override
   void initState() {
@@ -47,6 +49,7 @@ class _PosPageState extends State<PosPage> {
   void dispose() {
     _given.dispose();
     _phone.dispose();
+    _search.dispose();
     _lookup?.cancel();
     super.dispose();
   }
@@ -95,6 +98,16 @@ class _PosPageState extends State<PosPage> {
     return parts[1].split('.').map(int.parse).toList();
   }
 
+  /// Kitchen note on a line ("Less sugar"), kept as the third part of the key: id:toppings:note
+  String _keyNote(String k) {
+    final parts = k.split(':');
+    return parts.length > 2 ? parts.sublist(2).join(':') : '';
+  }
+
+  List<Map<String, dynamic>> get _items => _cart.entries
+      .map((e) => {'product_id': _keyPid(e.key), 'qty': e.value, 'toppings': _keyTops(e.key), if (_keyNote(e.key).isNotEmpty) 'note': _keyNote(e.key)})
+      .toList();
+
   List<Map<String, dynamic>> _topsOf(String k) => [
         for (final id in _keyTops(k))
           for (final t in _toppings)
@@ -119,8 +132,11 @@ class _PosPageState extends State<PosPage> {
         for (final t in _toppings)
           if ((t['id'] as num).toInt() == e.key) '${ar ? t['name_ar'] : t['name_en']}${e.value > 1 ? ' x${e.value}' : ''}'
     ];
-    final base = '${ar ? p['name_ar'] : p['name_en']}';
-    return tops.isEmpty ? base : '$base (${tops.join(ar ? '، ' : ', ')})';
+    final size = p['size'] == null ? '' : (ar ? '${ShopConfig.I.sizes[p['size']]?['ar'] ?? ''}' : ShopConfig.I.sizeName(p['size'] as String?));
+    var base = '${ar ? p['name_ar'] : p['name_en']}${size.isEmpty ? '' : ' ($size)'}';
+    if (tops.isNotEmpty) base = '$base (${tops.join(ar ? '، ' : ', ')})';
+    final note = _keyNote(k);
+    return note.isEmpty ? base : '$base · $note';
   }
 
   int _qtyOf(int pid) => _cart.entries.where((e) => _keyPid(e.key) == pid).fold<int>(0, (s, e) => s + e.value);
@@ -231,7 +247,7 @@ class _PosPageState extends State<PosPage> {
       return;
     }
     final shop = payment == 'cash' || payment == 'card';
-    final items = _cart.entries.map((e) => {'product_id': _keyPid(e.key), 'qty': e.value, 'toppings': _keyTops(e.key)}).toList();
+    final items = _items;
     setState(() {
       _busy = true;
       _err = '';
@@ -264,7 +280,8 @@ class _PosPageState extends State<PosPage> {
         });
       }
       if (!mounted) return;
-      var msg = 'Sale #${r['ref']} saved · ${money(r['total'])} OMR ($payment)';
+      final payName = payment == 'cash' ? 'Cash' : payment == 'card' ? 'Card' : ShopConfig.I.channelName(payment);
+      var msg = 'Sale #${r['ref']} saved · ${money(r['total'])} OMR ($payName)';
       if (loy != null) msg += ' · Stamps ${loy['stamps']}/${loy['need']}${((loy['free'] as num?) ?? 0) > 0 ? ' · FREE cup ready' : ''}';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(backgroundColor: kOk, content: Text(msg, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700))));
       _loadToday();
@@ -327,7 +344,7 @@ class _PosPageState extends State<PosPage> {
     });
     try {
       final r = Map<String, dynamic>.from(await Api.I.post('curb_order', {
-        'items': _cart.entries.map((e) => {'product_id': _keyPid(e.key), 'qty': e.value, 'toppings': _keyTops(e.key)}).toList(),
+        'items': _items,
         'car_plate': plate.text.trim().toUpperCase(),
         'car_desc': desc.text.trim(),
         'notes': note.text.trim(),
@@ -380,56 +397,224 @@ class _PosPageState extends State<PosPage> {
 
   // ---------- widgets ----------
 
+  static const _drinkCats = {'karak', 'milk', 'drinks', 'juices', 'mojito', 'passion', 'roob'};
+  static const _drinkNotes = ['Less sugar', 'No sugar', 'Extra sugar', 'Extra strong', 'Cold'];
+  static const _foodNotes = ['Spicy', 'No spice', 'Extra cheese', 'No onion', 'No mayo'];
+
+  /// Items on the till: sizes of the same item (Karak Small / Large) share one tile.
+  List<List<Map<String, dynamic>>> get _tiles {
+    final out = <String, List<Map<String, dynamic>>>{};
+    final q = _search.text.trim().toLowerCase();
+    for (final p in _products) {
+      if (q.isNotEmpty) {
+        if (!'${p['name_en']} ${p['name_ar']}'.toLowerCase().contains(q)) continue;
+      } else if (_cats.isNotEmpty && p['cat'] != _currentCat) {
+        continue;
+      }
+      out.putIfAbsent('${p['cat'] ?? ''}|${p['name_en']}', () => []).add(p);
+    }
+    return out.values.toList();
+  }
+
+  List<Map<String, dynamic>> get _cats => ShopConfig.I.cats.where((c) => _products.any((p) => p['cat'] == c['k'])).toList();
+  String get _currentCat => _cat.isNotEmpty ? _cat : (_cats.isEmpty ? '' : '${_cats.first['k']}');
+
+  /// Size and kitchen note for a tile, then into the sale.
+  Future<void> _pick(List<Map<String, dynamic>> variants) async {
+    final first = variants.first;
+    if (variants.every((v) => v['soldout'] == true)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sold out. Long-press the item to bring it back.')));
+      return;
+    }
+    if (first['kind'] == 'build') {
+      await _buildBowl(first);
+      return;
+    }
+    if (!Api.I.shop.isKarak) {
+      _add('${_id(first)}', 1);
+      return;
+    }
+    var size = variants.firstWhere((v) => v['soldout'] != true);
+    String note = '';
+    final notes = _drinkCats.contains(first['cat']) ? _drinkNotes : _foodNotes;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => StatefulBuilder(
+        builder: (c, set) => AlertDialog(
+          title: Text('${first['name_en']}', style: const TextStyle(fontWeight: FontWeight.w900)),
+          content: SizedBox(
+            width: 460,
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              if (variants.length > 1) ...[
+                Row(children: [
+                  for (final (i, v) in variants.indexed) ...[
+                    if (i > 0) const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton(
+                        style: bigButton(identical(v, size) ? kPurple : Colors.white, identical(v, size) ? kCream : kPurple)
+                            .copyWith(minimumSize: const WidgetStatePropertyAll(Size(64, 74))),
+                        onPressed: v['soldout'] == true ? null : () => set(() => size = v),
+                        child: Column(mainAxisSize: MainAxisSize.min, children: [
+                          Text(ShopConfig.I.sizeName(v['size'] as String?)),
+                          Text(v['soldout'] == true ? 'Sold out' : money(v['price']), style: const TextStyle(fontSize: 15)),
+                        ]),
+                      ),
+                    ),
+                  ],
+                ]),
+                const SizedBox(height: 14),
+              ],
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                for (final n in notes)
+                  ChoiceChip(
+                    label: Text(n, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                    selected: note == n,
+                    onSelected: (on) => set(() => note = on ? n : ''),
+                  ),
+              ]),
+            ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(c, true), child: Text('Add · ${money(size['price'])}')),
+          ],
+        ),
+      ),
+    );
+    if (ok != true) return;
+    _add(note.isEmpty ? '${_id(size)}' : '${_id(size)}::$note', 1);
+  }
+
+  /// Staff mark an item as run out (it disappears from the order page) or back in stock.
+  Future<void> _toggleSoldOut(List<Map<String, dynamic>> variants) async {
+    final out = variants.every((v) => v['soldout'] == true);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(out ? '${variants.first['name_en']} is back?' : '${variants.first['name_en']} sold out?'),
+        content: Text(out ? 'It shows again on the till and the order page.' : 'It is hidden from the order page and greyed out here until you bring it back.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+          FilledButton(style: FilledButton.styleFrom(backgroundColor: out ? kOk : kBad), onPressed: () => Navigator.pop(c, true), child: Text(out ? 'Back in stock' : 'Sold out')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      for (final v in variants) {
+        await Api.I.post('soldout', {'id': _id(v), 'soldout': !out});
+      }
+      await _loadMenu();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errText(e))));
+    }
+  }
+
+  String _priceLabel(List<Map<String, dynamic>> vs) => vs.map((v) => money(v['price'])).join(' / ');
+
   Widget _grid(bool wide) {
     if (_menuErr.isNotEmpty) {
       return Padding(padding: const EdgeInsets.all(20), child: Column(children: [Text(_menuErr), const SizedBox(height: 10), FilledButton(onPressed: _loadMenu, child: const Text('Retry'))]));
     }
     if (_products.isEmpty) return const Padding(padding: EdgeInsets.all(30), child: Center(child: CircularProgressIndicator()));
-    return GridView.count(
-      crossAxisCount: wide ? 3 : 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: 0.95,
-      children: [
-        for (final p in _products)
-          Material(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(18),
-              onTap: () => p['kind'] == 'build' ? _buildBowl(p) : _add('${_id(p)}', 1),
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Column(children: [
-                  Expanded(
+    final karak = Api.I.shop.isKarak;
+    final tiles = _tiles;
+    final cats = _cats;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (karak) ...[
+        TextField(
+          controller: _search,
+          decoration: InputDecoration(
+            hintText: 'Search the menu',
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: _search.text.isEmpty ? null : IconButton(icon: const Icon(Icons.close), onPressed: () => setState(_search.clear)),
+          ),
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: 10),
+      ],
+      if (cats.isNotEmpty && _search.text.trim().isEmpty) ...[
+        SizedBox(
+          height: 50,
+          child: ListView(scrollDirection: Axis.horizontal, children: [
+            for (final c in cats)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  label: Text('${c['en']}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                  selected: _currentCat == c['k'],
+                  showCheckmark: false,
+                  selectedColor: kOrange,
+                  onSelected: (_) => setState(() => _cat = '${c['k']}'),
+                ),
+              ),
+          ]),
+        ),
+        const SizedBox(height: 10),
+      ],
+      if (tiles.isEmpty) const Padding(padding: EdgeInsets.all(24), child: Text('Nothing matches', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w700))),
+      GridView.count(
+        crossAxisCount: karak ? (wide ? 4 : 2) : (wide ? 3 : 2),
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: karak ? 1.45 : 0.95,
+        children: [
+          for (final vs in tiles)
+            Builder(builder: (_) {
+              final p = vs.first;
+              final out = vs.every((v) => v['soldout'] == true);
+              final n = vs.fold<int>(0, (s, v) => s + _qtyOf(_id(v)));
+              final img = '${p['img'] ?? ''}';
+              return Material(
+                color: out ? const Color(0xFFE6E0E4) : Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () => _pick(vs),
+                  onLongPress: karak ? () => _toggleSoldOut(vs) : null,
+                  child: Padding(
+                    padding: const EdgeInsets.all(10),
                     child: Stack(clipBehavior: Clip.none, children: [
-                      Center(
-                        child: Image.network('$kSite/assets/${p['img'] ?? 'cup-smoothie.png'}',
-                            fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.local_drink, size: 64, color: kPurple)),
-                      ),
-                      if (_qtyOf(_id(p)) > 0)
+                      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                        if (img.isNotEmpty || !karak)
+                          Expanded(
+                            child: Center(
+                              child: Image.network('$kSite/assets/${img.isEmpty ? 'cup-smoothie.png' : img}',
+                                  fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.local_drink, size: 64, color: kPurple)),
+                            ),
+                          )
+                        else
+                          const Spacer(),
+                        const SizedBox(height: 6),
+                        Text('${p['name_en']}',
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            style: TextStyle(fontWeight: FontWeight.w800, fontSize: karak ? 17 : 15, decoration: out ? TextDecoration.lineThrough : null)),
+                        if (karak) Text('${p['name_ar']}', textAlign: TextAlign.center, maxLines: 1, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black54)),
+                        Text(out ? 'SOLD OUT' : _priceLabel(vs),
+                            textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: out ? kBad : kPurple)),
+                        if (karak) const Spacer(),
+                      ]),
+                      if (n > 0)
                         Positioned(
                           top: 0,
                           right: 0,
                           child: CircleAvatar(
                             radius: 18,
                             backgroundColor: kOrange,
-                            child: Text('${_qtyOf(_id(p))}', style: const TextStyle(color: kPurple, fontWeight: FontWeight.w900, fontSize: 16)),
+                            child: Text('$n', style: const TextStyle(color: kPurple, fontWeight: FontWeight.w900, fontSize: 16)),
                           ),
                         ),
                     ]),
                   ),
-                  const SizedBox(height: 6),
-                  Text('${p['name_en']}', textAlign: TextAlign.center, maxLines: 2, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-                  Text(money(p['price']), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: kPurple)),
-                ]),
-              ),
-            ),
-          ),
-      ],
-    );
+                ),
+              );
+            }),
+        ],
+      ),
+    ]);
   }
 
   Widget _ticket() {
@@ -549,9 +734,9 @@ class _PosPageState extends State<PosPage> {
           const Text('Delivery app order', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.black54)),
           const SizedBox(height: 6),
           Row(children: [
-            for (final a in const [['talabat', 'Talabat'], ['snoonu', 'Snoonu'], ['khedmah', 'Khedmah']]) ...[
-              Expanded(child: OutlinedButton(onPressed: can ? () => _sell(a[0]) : null, child: Text(a[1]))),
-              if (a[0] != 'khedmah') const SizedBox(width: 8),
+            for (final (i, a) in ShopConfig.I.channels.indexed) ...[
+              if (i > 0) const SizedBox(width: 8),
+              Expanded(child: OutlinedButton(onPressed: can ? () => _sell('${a['k']}') : null, child: FittedBox(child: Text('${a['en']}')))),
             ],
           ]),
           if (_err.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: Text(_err, style: const TextStyle(color: kBad, fontWeight: FontWeight.w800))),

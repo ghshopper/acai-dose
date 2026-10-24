@@ -54,7 +54,9 @@ struct RootView: View {
                 MainTabs { Task { await logout() } }
             }
         }
-        .task { await check() }
+        // Switching shop starts over: its own login, numbers and settings
+        .id(BizStore.shared.current)
+        .task(id: BizStore.shared.current) { await check() }
     }
 
     private func check() async {
@@ -72,7 +74,7 @@ struct RootView: View {
     private func logout() async {
         _ = try? await API.shared.post("logout")
         API.shared.clearSession()
-        await Live.shared.signOut()
+        if BizStore.shared.current == .acai { await Live.shared.signOut() }
         gate = .signedOut
     }
 }
@@ -103,6 +105,25 @@ struct MainTabs: View {
                 if phase == .active { await live.refresh() }
                 try? await Task.sleep(for: .seconds(60))
             }
+        }
+    }
+}
+
+/// Picks which shop the app shows (Açaí Dose or Karak Dose).
+struct BizSwitcher: View {
+    var body: some View {
+        Menu {
+            Picker("المحل", selection: Binding(get: { BizStore.shared.current }, set: { b in Haptics.tap(); BizStore.shared.current = b })) {
+                ForEach(Biz.allCases) { b in Text(b.name).tag(b) }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(BizStore.shared.current.name).font(.subheadline.weight(.bold))
+                Image(systemName: "chevron.down").font(.caption2.weight(.bold))
+            }
+            .foregroundStyle(Color.ink)
+            .padding(.horizontal, 10).padding(.vertical, 5)
+            .background(Color.ink.opacity(0.12), in: Capsule())
         }
     }
 }

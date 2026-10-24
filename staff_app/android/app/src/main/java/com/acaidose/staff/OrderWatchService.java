@@ -42,7 +42,6 @@ import java.util.concurrent.TimeUnit;
 public class OrderWatchService extends Service {
 
     static final String HOST = "order.acaiee.com";
-    static final String API = "https://" + HOST + "/api/api.php?a=active_orders";
     static final String PREFS = "watch";
     static final String CH_RUN = "watch";
     static final String CH_ALERT = "orders_v1";
@@ -65,6 +64,15 @@ public class OrderWatchService extends Service {
     static String cookie(Context c) {
         return c.getSharedPreferences(PREFS, MODE_PRIVATE).getString("cookie", "");
     }
+    /** Which shop this device is signed in to: "" for Açaí Dose, "/karak" for Karak Dose. */
+    static void saveShop(Context c, String base, String title) {
+        c.getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("base", base == null ? "" : base).putString("title", title == null ? "" : title).apply();
+    }
+    static String base(Context c) { return c.getSharedPreferences(PREFS, MODE_PRIVATE).getString("base", ""); }
+    static String title(Context c) {
+        String t = c.getSharedPreferences(PREFS, MODE_PRIVATE).getString("title", "");
+        return t.isEmpty() ? "Açaí Dose" : t;
+    }
 
     static void start(Context c) {
         if (cookie(c).isEmpty()) return;
@@ -79,7 +87,7 @@ public class OrderWatchService extends Service {
         super.onCreate();
         makeChannels();
         Notification n = base(CH_RUN)
-                .setContentTitle("Açaí Dose")
+                .setContentTitle(title(this))
                 .setContentText("Listening for new orders")
                 .setOngoing(true)
                 .addAction(new Notification.Action.Builder(null, "Stop", stopIntent()).build())
@@ -118,7 +126,7 @@ public class OrderWatchService extends Service {
         try {
             String cookie = cookie(this);
             if (cookie.isEmpty()) { stopAlarm(); stopSelf(); return; }
-            HttpURLConnection c = (HttpURLConnection) new URL(API).openConnection();
+            HttpURLConnection c = (HttpURLConnection) new URL("https://" + HOST + base(this) + "/api/api.php?a=active_orders").openConnection();
             c.setConnectTimeout(8000); c.setReadTimeout(8000);
             c.setRequestProperty("Cookie", cookie);
             c.setRequestProperty("User-Agent", "AcaiDoseApp/1.0 watcher");

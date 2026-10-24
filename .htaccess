@@ -9,6 +9,11 @@ RewriteRule ^wallet/(.*)$ api/wallet.php?p=$1 [QSA,L]
 # Short link to the staff app download: order.acaiee.com/app
 RewriteRule ^app/?$ https://github.com/ghshopper/acai-dose/releases/download/app-latest/acai-dose-staff.apk [R=302,L]
 RewriteRule ^orders/?$ https://github.com/ghshopper/acai-dose/releases/download/orders-latest/acai-dose-orders.apk [R=302,L]
+# Karak Dose: same site under /karak/ (its own tables; the API knows from the address)
+RewriteRule ^karak/?$ karak.html [L]
+RewriteRule ^karak/api/(api|setup)\.php$ api/$1.php [QSA,L]
+RewriteRule ^karak/(pos|screen|dashboard)(\.html)?/?$ $1.html [L]
+RewriteRule ^karak/(assets/.+)$ $1 [L]
 # Short links: /pos -> pos.html, /screen -> screen.html, /dashboard -> dashboard.html
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d

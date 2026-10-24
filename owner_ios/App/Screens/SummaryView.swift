@@ -33,7 +33,7 @@ struct SummaryView: View {
                             SectionHeader(title: "المبيعات اليومية", note: "\(money(s.sales)) ر.ع")
                             chart(s)
                         }
-                        SectionHeader(title: "الأكثر طلباً", note: "عدد الأكواب")
+                        SectionHeader(title: "الأكثر طلباً", note: BizStore.shared.current == .karak ? "العدد" : "عدد الأكواب")
                         products(s)
                     } else if let err {
                         EmptyNote(text: err, icon: "wifi.exclamationmark")
@@ -49,7 +49,7 @@ struct SummaryView: View {
         .navigationTitle("الملخص")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                if loading { ProgressView() } else { Image("logo-purple").resizable().scaledToFit().frame(height: 20) }
+                if loading { ProgressView() } else { BizSwitcher() }
             }
         }
         .refreshable { await load() }
@@ -74,6 +74,7 @@ struct SummaryView: View {
             async let a = API.shared.get("range", ["from": period.fromStr, "to": period.toStr])
             async let b = API.shared.get("range", ["from": ymd(pFrom), "to": ymd(pTo)])
             let (r1, r2) = try await (a, b)
+            BizStore.shared.absorb(r1)
             s = Stats(r1, days: days)
             prev = Stats(r2, days: pDays)
             err = nil
@@ -155,9 +156,10 @@ struct SummaryView: View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
             stat("chart.bar.fill", "إجمالي المبيعات", s.sales, "\(s.orderCount) طلب · متوسط \(money(s.avg))", before: prev?.sales)
             stat("creditcard.fill", "المصاريف", s.exp, "\(s.expCount) مصروف", before: prev?.exp, lowerIsBetter: true)
-            stat("globe", "الموقع", s.site, "\(s.siteOrders) طلب · \(s.siteCups) كوب", share: s.pct(s.site))
-            stat("house.fill", "المحل", s.shop, "\(s.shopOrders) عملية · \(s.shopCups) كوب", share: s.pct(s.shop))
-            stat("bag.fill", "التطبيقات", s.appGross, "طلبات وسنونو وخدمة", share: s.pct(s.appGross))
+            let unit = BizStore.shared.current == .karak ? "صنف" : "كوب"
+            stat("globe", "الموقع", s.site, "\(s.siteOrders) طلب · \(s.siteCups) \(unit)", share: s.pct(s.site))
+            stat("house.fill", "المحل", s.shop, "\(s.shopOrders) عملية · \(s.shopCups) \(unit)", share: s.pct(s.shop))
+            stat("bag.fill", "التطبيقات", s.appGross, kChannels.map(\.1).joined(separator: " و"), share: s.pct(s.appGross))
             stat("percent", "العمولات", s.comm, "تخصمها التطبيقات")
         }
     }

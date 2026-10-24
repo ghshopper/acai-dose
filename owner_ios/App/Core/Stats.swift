@@ -1,10 +1,16 @@
 import Foundation
 
-let kChannels: [(String, String)] = [("talabat", "طلبات"), ("snoonu", "سنونو"), ("khedmah", "خدمة")]
-let kChannelNames: [String: String] = Dictionary(uniqueKeysWithValues: kChannels)
-let kCats = ["مواد خام (آساي وفواكه)", "أكواب وتغليف", "رواتب", "إيجار", "كهرباء وماء", "تسويق وإعلانات", "صيانة", "أخرى"]
+/// Delivery apps of the shop on screen (from the server), in order.
+var kChannels: [(String, String)] { BizStore.shared.channels }
+/// Every delivery app either shop uses, to tell app orders from shop sales.
+let kChannelNames: [String: String] = ["talabat": "طلبات", "tmdone": "تم دن", "snoonu": "سنونو", "khedmah": "خدمة"]
+var kCats: [String] {
+    BizStore.shared.current == .karak
+        ? ["مواد خام", "خبز ومعجنات", "أكواب وتغليف", "رواتب", "إيجار", "كهرباء وماء وغاز", "تسويق وإعلانات", "صيانة", "أخرى"]
+        : ["مواد خام (آساي وفواكه)", "أكواب وتغليف", "رواتب", "إيجار", "كهرباء وماء", "تسويق وإعلانات", "صيانة", "أخرى"]
+}
 let kStatusNames = ["new": "جديد", "preparing": "يتحضر", "ready": "جاهز", "done": "مستلم", "cancelled": "ملغي"]
-let kPayNames = ["cash": "نقد", "card": "بطاقة", "talabat": "طلبات", "snoonu": "سنونو", "khedmah": "خدمة"]
+let kPayNames = ["cash": "نقد", "card": "بطاقة", "talabat": "طلبات", "tmdone": "تم دن", "snoonu": "سنونو", "khedmah": "خدمة"]
 
 struct NameCount: Identifiable { let id: String; let n: Int }
 struct DayValue: Identifiable { let id: Date; let v: Double }

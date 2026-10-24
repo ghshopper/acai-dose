@@ -78,6 +78,7 @@ const _payNames = {
   'cash': 'Cash · نقد',
   'card': 'Card · بطاقة',
   'talabat': 'Talabat · طلبات',
+  'tmdone': 'TM Done · تم دن',
   'snoonu': 'Snoonu · سنونو',
   'khedmah': 'Khedmah · خدمة',
 };
@@ -134,7 +135,11 @@ Future<Uint8List> renderReceipt(ReceiptData d, int width) async {
   }
 
   // Logo
-  try {
+  final karak = Api.I.shop.isKarak;
+  if (karak) {
+    center('كرك دوز', 34, weight: FontWeight.w900, gap: 0);
+    center('KARAK DOSE', 18, weight: FontWeight.w800);
+  } else try {
     final data = await rootBundle.load('assets/logo-black.png');
     final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
     final img = (await codec.getNextFrame()).image;
@@ -215,8 +220,13 @@ Future<Uint8List> renderReceipt(ReceiptData d, int width) async {
 
   // Footer
   center('Thank you! · شكراً لك', 19, weight: FontWeight.w900);
-  center('order.acaiee.com', 16, weight: FontWeight.w700, gap: 2);
-  center('@acaidose.om', 16, weight: FontWeight.w700);
+  if (karak) {
+    center('order.acaiee.com/karak', 16, weight: FontWeight.w700, gap: 2);
+    center('98558386', 16, weight: FontWeight.w700);
+  } else {
+    center('order.acaiee.com', 16, weight: FontWeight.w700, gap: 2);
+    center('@acaidose.om', 16, weight: FontWeight.w700);
+  }
   y += s(10);
 
   final pic = rec.endRecording();

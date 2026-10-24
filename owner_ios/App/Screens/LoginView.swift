@@ -13,9 +13,22 @@ struct LoginView: View {
             Color.brand.ignoresSafeArea()
             ScrollView {
                 VStack(spacing: 10) {
-                    Image("logo-cream").resizable().scaledToFit().frame(height: 72).padding(.top, 70)
+                    Picker("المحل", selection: Binding(get: { BizStore.shared.current }, set: { BizStore.shared.current = $0 })) {
+                        ForEach(Biz.allCases) { b in Text(b.name).tag(b) }
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.top, 24)
+                    if BizStore.shared.current == .karak {
+                        VStack(spacing: 0) {
+                            Text("كرك دوز").font(.system(size: 46, weight: .heavy))
+                            Text("K A R A K   D O S E").font(.caption.weight(.bold))
+                        }
+                        .foregroundStyle(Color.cream).padding(.top, 40)
+                    } else {
+                        Image("logo-cream").resizable().scaledToFit().frame(height: 72).padding(.top, 40)
+                    }
                     Text("الداش بورد").font(.largeTitle.bold()).foregroundStyle(Color.cream).padding(.top, 18)
-                    Text("سجّل دخول بحساب صاحب المحل").foregroundStyle(Color.lilac)
+                    Text(BizStore.shared.current == .karak ? "نفس اسم المستخدم وكلمة السر حق أساي دوز" : "سجّل دخول بحساب صاحب المحل").foregroundStyle(Color.lilac)
 
                     VStack(spacing: 0) {
                         TextField("اسم المستخدم", text: $user)

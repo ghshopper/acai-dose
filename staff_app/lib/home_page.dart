@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'api.dart';
 import 'orders_controller.dart';
 import 'orders_page.dart';
 import 'pos_page.dart';
@@ -143,7 +144,7 @@ class _HomePageState extends State<HomePage> {
             toolbarHeight: 68,
             titleSpacing: 12,
             title: Row(children: [
-              Image.asset('assets/logo-cream.png', height: 34),
+              ShopLogo(shop: Api.I.shop, dark: true, height: 38),
               const SizedBox(width: 10),
               Icon(Icons.circle, size: 12, color: _orders.online ? const Color(0xFF7BD389) : const Color(0xFFE06C6C)),
             ]),
@@ -187,7 +188,7 @@ class _HomePageState extends State<HomePage> {
                     padding: const EdgeInsets.all(14),
                     child: Text(
                       _orders.newCount > 0
-                          ? 'New website order (${_orders.newCount}) — tap to open Orders and Accept'
+                          ? 'New order (${_orders.newCount}) — tap to open Orders and Accept'
                           : 'A customer is waiting outside — tap to open Orders',
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: kPurple, fontSize: 18, fontWeight: FontWeight.w800),

@@ -63,6 +63,8 @@ let kErrors: [String: String] = [
     "username_taken": "اسم المستخدم مأخوذ",
     "cannot_change_self": "ما تقدر تغير حسابك من هنا",
     "server_error": "مشكلة في السيرفر، جرب بعد شوي",
+    "bad_size": "الحجم غلط",
+    "sold_out": "الصنف خالص",
 ]
 
 func errText(_ code: String) -> String { kErrors[code] ?? "صار خطأ، جرب مرة ثانية" }
@@ -71,7 +73,9 @@ func errText(_ e: Error) -> String { (e as? APIError).map { errText($0.code) } ?
 /// Client for api/api.php that keeps the login session cookie (like the web pages).
 final class API {
     static let shared = API()
-    private let base = URL(string: "\(SharedStore.site)/api/api.php")!
+    /// The shop on screen decides the address and which saved login is used.
+    private var base: URL { URL(string: "\(BizStore.shared.current.site)/api/api.php")! }
+    private var biz: Biz { BizStore.shared.current }
     private let session: URLSession
 
     private init() {
@@ -84,8 +88,8 @@ final class API {
     }
 
     private(set) var cookie: String? {
-        get { UserDefaults.standard.string(forKey: "cookie") }
-        set { UserDefaults.standard.set(newValue, forKey: "cookie") }
+        get { UserDefaults.standard.string(forKey: biz.cookieKey) }
+        set { UserDefaults.standard.set(newValue, forKey: biz.cookieKey) }
     }
 
     func clearSession() { cookie = nil }
@@ -125,9 +129,9 @@ final class API {
 
     private func keepCookie(_ r: HTTPURLResponse?) {
         guard let sc = r?.value(forHTTPHeaderField: "Set-Cookie"),
-              let range = sc.range(of: #"acai_sid=([^;,]*)"#, options: .regularExpression) else { return }
-        let v = String(sc[range]).replacingOccurrences(of: "acai_sid=", with: "")
-        cookie = (v.isEmpty || v == "deleted") ? nil : "acai_sid=\(v)"
+              let range = sc.range(of: "\(biz.cookieName)=([^;,]*)", options: .regularExpression) else { return }
+        let v = String(sc[range]).replacingOccurrences(of: "\(biz.cookieName)=", with: "")
+        cookie = (v.isEmpty || v == "deleted") ? nil : "\(biz.cookieName)=\(v)"
     }
 }
 

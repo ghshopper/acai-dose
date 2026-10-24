@@ -22,7 +22,8 @@ final class Live {
 
     /// After login: get a read-only key for the widget (once per device).
     func ensureKey() async {
-        if SharedStore.widgetKey != nil { return }
+        // The widget shows Açaí Dose; a key is only made while signed in to it
+        if SharedStore.widgetKey != nil || BizStore.shared.current != .acai { return }
         if let r = try? await API.shared.post("widget_token"), !r["token"].string.isEmpty {
             SharedStore.widgetKey = r["token"].string
         }

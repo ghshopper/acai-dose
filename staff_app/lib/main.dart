@@ -18,7 +18,7 @@ class AcaiApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Açaí Dose Staff',
+      title: 'Dose Staff',
       debugShowCheckedModeBanner: false,
       theme: appTheme(),
       home: const Gate(),
@@ -57,13 +57,15 @@ class _GateState extends State<Gate> {
       _me = null;
       if (e.code == 'network') _error = 'No internet connection';
     }
-    if (_me != null && Api.I.cookie != null) Native.startWatch(Api.I.cookie!);
+    if (_me != null) await ShopConfig.load();
+    if (_me != null && Api.I.cookie != null) Native.startWatch(Api.I.cookie!, Api.I.shop);
     if (mounted) setState(() => _loading = false);
   }
 
-  void _loggedIn(Map<String, dynamic> me) {
-    if (Api.I.cookie != null) Native.startWatch(Api.I.cookie!);
-    setState(() => _me = me);
+  Future<void> _loggedIn(Map<String, dynamic> me) async {
+    await ShopConfig.load();
+    if (Api.I.cookie != null) Native.startWatch(Api.I.cookie!, Api.I.shop);
+    if (mounted) setState(() => _me = me);
   }
 
   Future<void> _logout() async {

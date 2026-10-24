@@ -10,10 +10,18 @@ struct MoreView: View {
     var body: some View {
         List {
             Section {
+                HStack {
+                    row("building.2.fill", .brand, "المحل", "بدّل بين أساي دوز وكرك دوز")
+                    Spacer()
+                    BizSwitcher()
+                }
+            }
+            Section {
                 NavigationLink { SettingsView() } label: { row("gearshape.fill", .gray, "الإعدادات", "الأسعار، الولاء، العمولات، حسابات العمال") }
                 NavigationLink { CostView() } label: { row("shippingbox.fill", .good, "التكلفة والمخزون", "تكلفة كل كوب، الجرد، المشتريات") }
-                Button { sale = true } label: { row("bag.fill", .accent2, "مبيعات التطبيقات", "أدخل مبيعات طلبات وسنونو وخدمة") }
+                Button { sale = true } label: { row("bag.fill", .accent2, "مبيعات التطبيقات", "أدخل مبيعات " + kChannels.map(\.1).joined(separator: " و")) }
             }
+            if BizStore.shared.current == .acai {
             Section {
                 Toggle(isOn: Binding(get: { live.activityOn }, set: { on in Task { @MainActor in if on { live.start() } else { await live.stop() } } })) {
                     row("bolt.fill", .brand, "تابع الطلبات على شاشة القفل", live.canUseActivities ? "مبيعات وطلبات اليوم في الجزيرة الديناميكية" : "شغّل Live Activities من إعدادات الآيفون")
@@ -27,11 +35,17 @@ struct MoreView: View {
             } header: { Text("شاشة القفل والويدجت") } footer: {
                 Text("أضف ويدجت «أساي دوز» من الشاشة الرئيسية: اضغط مطوّل على الشاشة ← + ← أساي دوز.")
             }
+            }
             Section("على الموقع") {
-                link("creditcard.fill", .black, "المحفظة والموقع", "Apple و Google Wallet وموقع المحل", "\(SharedStore.site)/dashboard")
-                link("square.and.arrow.down.fill", .blue, "استيراد وتصفير", "المبيعات القديمة من إكسل", "\(SharedStore.site)/dashboard")
-                link("link", .brand, "صفحة الطلب", "order.acaiee.com", "\(SharedStore.site)/")
-                link("eye.fill", .indigo, "معاينة المنيو", "المنيو مع الباول قبل لا تطلقه", "\(SharedStore.site)/index.html?preview=1")
+                let site = BizStore.shared.current.site
+                if BizStore.shared.current == .acai {
+                    link("creditcard.fill", .black, "المحفظة والموقع", "Apple و Google Wallet وموقع المحل", "\(site)/dashboard")
+                }
+                link("square.and.arrow.down.fill", .blue, "استيراد وتصفير", "المبيعات القديمة من إكسل", "\(site)/dashboard")
+                link("link", .brand, "صفحة الطلب", site.replacingOccurrences(of: "https://", with: ""), "\(site)/")
+                if BizStore.shared.current == .acai {
+                    link("eye.fill", .indigo, "معاينة المنيو", "المنيو مع الباول قبل لا تطلقه", "\(site)/index.html?preview=1")
+                }
             }
             Section {
                 Button(role: .destructive) { askLogout = true } label: { row("rectangle.portrait.and.arrow.right", .bad, "خروج", "تسجيل الخروج من التطبيق", destructive: true) }
@@ -39,7 +53,7 @@ struct MoreView: View {
             Section {
                 VStack(spacing: 6) {
                     Image("logo-purple").resizable().scaledToFit().frame(height: 30).opacity(0.35)
-                    Text("Açaí Dose · Owner \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")")
+                    Text("\(BizStore.shared.current == .karak ? "Karak Dose" : "Açaí Dose") · Owner \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")")
                         .font(.caption).foregroundStyle(.tertiary)
                 }
                 .frame(maxWidth: .infinity)

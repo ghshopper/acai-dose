@@ -46,6 +46,26 @@ button{cursor:pointer}
 .hero p{margin:0;font-size:14px;line-height:1.6;opacity:.85;position:relative;max-width:30ch}
 .promo,.note{margin-top:12px;border-radius:16px;padding:12px 14px;font-weight:600;font-size:14px;background:#FBEBD6;color:var(--ink)}
 
+.h2{font-size:20px;font-weight:800;margin:22px 0 10px}
+.hero.again{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.hero.again b{display:block;font-size:20px;margin-top:6px;position:relative}
+.hero.again small{display:block;font-size:13px;opacity:.8;margin-top:4px;line-height:1.5;position:relative}
+.hero .go{flex:none;position:relative;z-index:1;border:0;background:var(--o);color:var(--ink);border-radius:999px;padding:12px 18px;font-weight:700;font-size:15px}
+.fav{display:flex;gap:10px;overflow-x:auto;margin:0 -16px;padding:0 16px 4px;scrollbar-width:none}
+.fav::-webkit-scrollbar{display:none}
+.fv{flex:none;width:132px;border:0;background:var(--card);border-radius:18px;padding:12px;text-align:start;display:flex;flex-direction:column;gap:4px}
+.fv .ic{width:36px;height:36px;border-radius:50%;background:#fff;color:var(--o);display:flex;align-items:center;justify-content:center}
+.fv .ic svg{width:22px;height:22px}
+.fv b{font-size:15px;font-weight:600;line-height:1.35}
+.fv .num{font-size:13px;color:var(--sub)}
+.cg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.cc{border:0;background:var(--card);border-radius:20px;padding:16px 6px 14px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+.cc .ic{width:56px;height:56px;border-radius:50%;background:#fff;color:var(--char);display:flex;align-items:center;justify-content:center}
+.cc .ic svg{width:30px;height:30px}
+.cc b{font-size:14px;font-weight:600}
+.cc span:last-child{font-size:11px;color:var(--sub)}
+.cc:active,.fv:active,.item:active{transform:scale(.97)}
+.cath{flex:1;margin:0;font-size:24px;font-weight:800}
 .cats{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;gap:8px;overflow-x:auto;padding:12px 0 10px;margin:8px -16px 0;padding-inline:16px;scrollbar-width:none}
 .cats::-webkit-scrollbar{display:none}
 .cat{flex:none;min-height:40px;padding:0 16px;border-radius:999px;border:1.5px solid var(--line);background:#fff;font-weight:600;font-size:14px;white-space:nowrap}
@@ -178,7 +198,8 @@ const T = {
   ar: {
     en: 'EN', eyebrow: 'CURBSIDE PICKUP · AL QURUM 29', h1: 'كرك على كيفك', lead: 'اطلب من هنا واستلم وانت في سيارتك. الدفع عند الاستلام. نفتح من ٦ الصبح لين ١٢ الليل.',
     omr: 'ر.ع', view: 'عرض الطلب', yours: 'طلبك', cont: 'أكمل الطلب', more: 'أضف شي ثاني', total: 'المجموع', empty: 'السلة فاضية',
-    size: 'الحجم', kind: 'النوع', notes: 'ملاحظة', addTo: t => `أضف للطلب · ${t}`, out: 'خلص',
+    size: 'الحجم', kind: 'النوع', popular: 'الأكثر طلباً', menu: 'المنيو', count: n => `${arNum(n)} ${n === 1 ? 'صنف' : n === 2 ? 'صنفين' : n <= 10 ? 'أصناف' : 'صنف'}`,
+    sameQ: 'نفس طلبك آخر مرة؟', sameGo: 'اطلبه', notes: 'ملاحظة', addTo: t => `أضف للطلب · ${t}`, out: 'خلص',
     details: 'بيانات الاستلام', detLead: 'عشان نعرف سيارتك ونطلع لك الطلب', car: 'رقم السيارة', cardesc: 'نوع ولون السيارة', cardescPh: 'لاندكروزر أبيض',
     name: 'الاسم', phone: 'رقم الجوال', time: 'وقت الاستلام', now: 'الحين', later: 'وقت ثاني', note: 'ملاحظة (اختياري)', notePh: 'مثلاً: بدون ثلج',
     where: 'المحل في القرم ٢٩، بناية مسقط جاليري. لما توصل اضغط «وصلت» ونطلع لك الطلب للسيارة.', map: 'افتح الخريطة',
@@ -193,7 +214,8 @@ const T = {
   en: {
     en: 'عربي', eyebrow: 'CURBSIDE PICKUP · AL QURUM 29', h1: 'Karak your way', lead: 'Order here and pick it up from your car. Pay on pickup. Open 6 AM to midnight.',
     omr: 'OMR', view: 'View order', yours: 'Your order', cont: 'Continue', more: 'Add something else', total: 'Total', empty: 'Your order is empty',
-    size: 'Size', kind: 'Flavour', notes: 'Note', addTo: t => `Add to order · ${t}`, out: 'Sold out',
+    size: 'Size', kind: 'Flavour', popular: 'Most ordered', menu: 'Menu', count: n => `${n} ${n === 1 ? 'item' : 'items'}`,
+    sameQ: 'Same as last time?', sameGo: 'Order it', notes: 'Note', addTo: t => `Add to order · ${t}`, out: 'Sold out',
     details: 'Pickup details', detLead: 'So we can find your car and bring it out', car: 'Car plate', cardesc: 'Car model & colour', cardescPh: 'White Land Cruiser',
     name: 'Name', phone: 'Mobile', time: 'Pickup time', now: 'Now', later: 'Later', note: 'Note (optional)', notePh: 'e.g. no ice',
     where: 'We are at Al Qurum 29, Muscat Gallery Building. When you arrive, tap “I’m here” and we bring it to your car.', map: 'Open map',
@@ -209,6 +231,7 @@ const T = {
 let lang = store.get('kd_lang') || ((navigator.language || '').toLowerCase().startsWith('ar') ? 'ar' : 'en');
 let L = T[lang];
 
+let popular = [];
 let products = [], cats = [], promo = null, shopWa = '', openFrom = 6;
 const cart = new Map();   // key "<product id>::<note>" -> { pid, qty, note }
 let view = 'menu', cat = '', track = null, trackToken = null, trackTimer = null, sending = false;
@@ -258,23 +281,57 @@ function header(back) {
   </div>`;
 }
 
+const CICON = {
+  cup: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z"/><path d="M16 10h1.5a2.5 2.5 0 0 1 0 5H16M8 3c0 1.5 1 1.5 1 3M11.5 3c0 1.5 1 1.5 1 3"/></svg>',
+  glass: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6h12l-1.5 14h-9z"/><path d="M6.6 11h10.8M14 6l2-4"/></svg>',
+  bread: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 10a3 3 0 0 1 0-6h14a3 3 0 0 1 0 6v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1z"/></svg>',
+  burger: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11a8 6 0 0 1 16 0zM3 14h18M4 17h16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2"/></svg>',
+  wrap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 21 17 3l3 2L10 21z"/><path d="M9 17l-2-1M12 12l-2-1M15 7l-2-1"/></svg>',
+  bowl: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11h18a9 7 0 0 1-18 0zM8 8c0-2 2-2 2-4M13 8c0-2 2-2 2-4"/></svg>',
+};
+const CAT_ICON = { karak: 'cup', milk: 'cup', drinks: 'cup', toast: 'bread', samoon: 'bread', rakhal: 'bread', salalah: 'bread', croissant: 'bread', chapati: 'bread',
+  burger: 'burger', club: 'burger', wrap: 'wrap', sarookh: 'wrap', snacks: 'bowl', dishes: 'bowl', juices: 'glass', mojito: 'glass', passion: 'glass', roob: 'glass' };
+const catIcon = k => CICON[CAT_ICON[k] || 'bowl'];
+const shownCats = () => cats.filter(c => products.some(p => p.cat === c.k));
+
+/** Last order on this phone, if everything in it can still be ordered. */
+function lastOrder() {
+  let l; try { l = JSON.parse(store.get('kd_last') || 'null'); } catch { l = null; }
+  if (!Array.isArray(l) || !l.length) return null;
+  return l.every(x => { const p = prod(x.pid); return p && !p.soldout; }) ? l : null;
+}
+
+function itemRow(vs) {
+  const p = vs[0], out = vs.every(v => v.soldout), n = inCart(vs);
+  const price = [...new Set(vs.map(v => money(v.price)))].join(' / ');
+  return `<button type="button" class="item${out ? ' out' : ''}" data-g="${esc(p.name_en)}" data-c="${esc(p.cat)}"${out ? ' aria-disabled="true"' : ''}>
+    <span class="t"><span class="nm">${esc(nm(p))}${out ? `<span class="tag">${L.out}</span>` : ''}</span>${lang === 'ar' ? `<span class="en" style="display:block">${esc(p.name_en)}</span>` : ''}</span>
+    <span class="pr">${price}<small>${L.omr}</small></span>
+    ${n ? `<span class="q">${n}</span>` : '<span class="add" aria-hidden="true">+</span>'}
+  </button>`;
+}
+
 function viewMenu() {
-  const cur = cat || (cats[0] && cats[0].k) || '';
-  const shown = cats.filter(c => products.some(p => p.cat === c.k));
+  const last = lastOrder();
+  const pop = popular.map(x => products.filter(p => p.cat === x.cat && p.name_en === x.name_en)).filter(vs => vs.length && !vs.every(v => v.soldout)).slice(0, 8);
   return `${header(false)}
-  <div class="hero"><span class="eyebrow">${L.eyebrow}</span><h1>${L.h1}</h1><p>${L.lead}</p></div>
+  ${last ? `<div class="hero again"><div><b>${L.sameQ}</b><small>${esc(last.map(l => (l.qty > 1 ? l.qty + '× ' : '') + lineName(l)).join(' + '))}</small></div>
+    <button type="button" class="go" id="sameAgain">${L.sameGo}</button></div>`
+    : `<div class="hero"><span class="eyebrow">${L.eyebrow}</span><h1>${L.h1}</h1><p>${L.lead}</p></div>`}
   ${promo ? `<div class="promo">${esc(lang === 'ar' ? promo.ar : promo.en)}</div>` : ''}
-  <nav class="cats" aria-label="Menu">${shown.map(c => `<button type="button" class="cat" data-cat="${esc(c.k)}" aria-pressed="${c.k === cur}">${esc(catName(c))}</button>`).join('')}</nav>
-  ${shown.map(c => `<section class="sec" id="sec-${esc(c.k)}"><h2>${esc(catName(c))}<span class="eyebrow">${esc(c.en)}</span></h2>
-    ${groups(c.k).map(vs => {
-      const p = vs[0], out = vs.every(v => v.soldout), n = inCart(vs);
-      const price = [...new Set(vs.map(v => money(v.price)))].join(' / ');
-      return `<button type="button" class="item${out ? ' out' : ''}" data-g="${esc(p.name_en)}" data-c="${esc(c.k)}"${out ? ' aria-disabled="true"' : ''}>
-        <span class="t"><span class="nm">${esc(nm(p))}${out ? `<span class="tag">${L.out}</span>` : ''}</span>${lang === 'ar' ? `<span class="en" style="display:block">${esc(p.name_en)}</span>` : ''}</span>
-        <span class="pr">${price}<small>${L.omr}</small></span>
-        ${n ? `<span class="q">${n}</span>` : '<span class="add" aria-hidden="true">+</span>'}
-      </button>`;
-    }).join('')}</section>`).join('')}`;
+  ${pop.length ? `<h2 class="h2">${L.popular}</h2><div class="fav">${pop.map(vs => `<button type="button" class="fv" data-g="${esc(vs[0].name_en)}" data-c="${esc(vs[0].cat)}">
+    <span class="ic">${catIcon(vs[0].cat)}</span><b>${esc(nm(vs[0]))}</b><span class="num">${money(Math.min(...vs.map(v => v.price)))}</span></button>`).join('')}</div>` : ''}
+  <h2 class="h2">${L.menu}</h2>
+  <div class="cg">${shownCats().map(c => `<button type="button" class="cc" data-cat="${esc(c.k)}"><span class="ic">${catIcon(c.k)}</span><b>${esc(catName(c))}</b><span>${L.count(groups(c.k).length)}</span></button>`).join('')}</div>`;
+}
+
+function viewCat() {
+  const c = cats.find(x => x.k === cat) || shownCats()[0];
+  if (!c) return viewMenu();
+  return `<div class="top"><button class="iconbtn back" type="button" id="toHome" aria-label="${L.back}">${ICON.back}</button>
+    <h1 class="cath">${esc(catName(c))}</h1><button class="pill" type="button" id="lang">${L.en}</button></div>
+  <nav class="cats" aria-label="Menu">${shownCats().map(x => `<button type="button" class="cat" data-cat="${esc(x.k)}" aria-pressed="${x.k === c.k}">${esc(catName(x))}</button>`).join('')}</nav>
+  <div style="margin-top:6px">${groups(c.k).map(itemRow).join('')}</div>`;
 }
 
 function viewDetails() {
@@ -433,6 +490,7 @@ async function placeOrder() {
     });
     store.set('kd_name', form.name); store.set('kd_phone', form.phone); store.set('kd_car', form.car); store.set('kd_cardesc', form.cardesc);
     store.set('kd_track', r.token);
+    store.set('kd_last', JSON.stringify([...cart.values()].map(l => ({ pid: l.pid, qty: l.qty, note: l.note }))));
     cart.clear(); form.notes = '';
     showTrack(r.token);
   } catch (ex) {
@@ -460,9 +518,10 @@ function showTrack(token) {
 function render() {
   document.documentElement.lang = lang;
   document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
-  $('#app').innerHTML = view === 'details' ? viewDetails() : view === 'track' ? viewTrack() : viewMenu();
+  $('#app').innerHTML = view === 'details' ? viewDetails() : view === 'track' ? viewTrack() : view === 'cat' ? viewCat() : viewMenu();
   const { n, t } = totals(), bar = $('#bar');
-  if (view === 'menu') {
+  if (view === 'menu' || view === 'cat') {
+    if (view === 'cat') document.querySelector('.cat[aria-pressed="true"]')?.scrollIntoView({ block: 'nearest', inline: 'center' });
     bar.classList.toggle('off', n === 0);
     bar.innerHTML = `<span>${L.view}<span class="cnt">${n}</span></span><span class="num">${money(t)} ${L.omr}</span>`;
     bar.onclick = openCart;
@@ -475,7 +534,12 @@ function render() {
 
 $('#app').addEventListener('click', e => {
   const c = e.target.closest('[data-cat]');
-  if (c) { cat = c.dataset.cat; document.querySelectorAll('.cat').forEach(b => b.setAttribute('aria-pressed', String(b === c))); const sec = document.getElementById('sec-' + cat); if (sec) window.scrollTo({ top: sec.getBoundingClientRect().top + scrollY - 64, behavior: 'smooth' }); return; }
+  if (c) { cat = c.dataset.cat; view = 'cat'; render(); window.scrollTo(0, 0); return; }
+  if (e.target.closest('#toHome')) { view = 'menu'; render(); window.scrollTo(0, 0); return; }
+  if (e.target.closest('#sameAgain')) {
+    for (const l of lastOrder() || []) { const key = `${l.pid}::${l.note || ''}`, cur = cart.get(key); cart.set(key, { pid: l.pid, qty: Math.min(20, (cur ? cur.qty : 0) + l.qty), note: l.note || '' }); }
+    render(); openCart(); return;
+  }
   const g = e.target.closest('[data-g]');
   if (g) return openItem(products.filter(p => p.cat === g.dataset.c && p.name_en === g.dataset.g));
   if (e.target.closest('[data-time]')) { saveForm(); form.time = 'ASAP'; return render(); }
@@ -488,7 +552,7 @@ $('#app').addEventListener('click', e => {
 // The section chip follows the list while scrolling
 let spyTick = false;
 window.addEventListener('scroll', () => {
-  if (view !== 'menu' || spyTick) return;
+  if (view !== 'menu' || spyTick || !document.querySelector('.sec')) return;
   spyTick = true;
   requestAnimationFrame(() => {
     spyTick = false;
@@ -509,11 +573,15 @@ $('#app').addEventListener('input', e => {
 $('#app').addEventListener('change', e => { if (e.target.id === 'later') { saveForm(); form.time = e.target.value || 'ASAP'; render(); } });
 
 async function loadMenu() {
-  const [m, c, s] = await Promise.all([api('menu'), api('cats').catch(() => []), api('shop_info').catch(() => ({}))]);
+  const [m, c, s, pp] = await Promise.all([api('menu'), api('cats').catch(() => []), api('shop_info').catch(() => ({})), api('popular').catch(() => [])]);
+  // Best sellers from real orders, topped up with house favourites while there are few orders
+  const fallback = ['Karak', 'Saffron Karak', 'Cardamom Karak', 'Toast Cheese', 'Chapati Egg Cheese', 'Zinger Burger', 'Avocado'].map(n => ({ name_en: n, cat: (m.find(p => p.name_en === n) || {}).cat }));
+  popular = (Array.isArray(pp) ? pp : []).slice(0, 8);
+  for (const f of fallback) if (popular.length < 6 && !popular.some(x => x.name_en === f.name_en && x.cat === f.cat)) popular.push(f);
   products = m; cats = Array.isArray(c) ? c : []; promo = s.promo || null; shopWa = s.whatsapp || ''; if (Number.isInteger(s.open_from)) openFrom = s.open_from;
   // Items not in a known section still show, at the end
   for (const p of products) if (p.cat && !cats.some(x => x.k === p.cat)) cats.push({ k: p.cat, en: p.cat, ar: p.cat });
-  if (view === 'menu') render();
+  if (view === 'menu' || view === 'cat') render();
 }
 
 (async () => {

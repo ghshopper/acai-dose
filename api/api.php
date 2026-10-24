@@ -190,6 +190,18 @@ case 'menu':
 case 'cats':       // public: menu sections (Karak Dose), in order
     out(shop_cats());
 
+case 'popular':    // public: the most ordered items of the last 30 days (item names, sizes together)
+    $n = [];
+    foreach (q("SELECT items FROM orders WHERE day >= ? AND status <> 'cancelled'", [date('Y-m-d', strtotime('-30 days'))])->fetchAll() as $o)
+        foreach (json_decode($o['items'], true) ?: [] as $it) if (empty($it['custom'])) $n[(int)($it['product_id'] ?? 0)] = ($n[(int)($it['product_id'] ?? 0)] ?? 0) + (int)($it['qty'] ?? 0);
+    $by = [];
+    foreach (q('SELECT id, name_en, cat FROM products WHERE active = 1')->fetchAll() as $p) {
+        if (!isset($n[(int)$p['id']])) continue;
+        $k = $p['cat'] . '|' . $p['name_en']; $by[$k] = ($by[$k] ?? 0) + $n[(int)$p['id']];
+    }
+    arsort($by);
+    out(array_map(fn($k) => ['cat' => explode('|', $k, 2)[0], 'name_en' => explode('|', $k, 2)[1]], array_slice(array_keys($by), 0, 8)));
+
 case 'toppings':   // public: what can go on a "build your bowl"
     out(array_map(fn($t) => ['id' => (int)$t['id'], 'k' => $t['k'], 'name_ar' => $t['name_ar'], 'name_en' => $t['name_en'], 'price' => promo_price((float)$t['price'])],
         q('SELECT * FROM toppings WHERE active = 1 ORDER BY sort, id')->fetchAll()));

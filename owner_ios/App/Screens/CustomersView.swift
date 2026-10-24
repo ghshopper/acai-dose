@@ -100,7 +100,7 @@ struct CustomersView: View {
 
     private func kpi(_ v: String, _ l: String) -> some View {
         VStack(spacing: 2) {
-            Text(v).font(.title2.bold()).foregroundStyle(Color.brand).monospacedDigit()
+            Text(v).font(.title2.bold()).foregroundStyle(Color.ink).monospacedDigit()
             Text(l).font(.caption).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity).padding(.vertical, 10)
@@ -113,8 +113,8 @@ struct CustomersView: View {
         let stamps = c["stamps"].int, free = c["free"].int
         return HStack(spacing: 12) {
             Text(name.isEmpty ? "؟" : String(name.prefix(1)))
-                .font(.headline).foregroundStyle(Color.brand)
-                .frame(width: 44, height: 44).background(Color.brand.opacity(0.08), in: Circle())
+                .font(.headline).foregroundStyle(Color.ink)
+                .frame(width: 44, height: 44).background(Color.ink.opacity(0.14), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(name.isEmpty ? "بدون اسم" : name).font(.headline).lineLimit(1)
@@ -125,7 +125,7 @@ struct CustomersView: View {
                 Text("\(c["orders"].int) طلب · \(money(c["spent"])) ر.ع · \(ago(c["last_at"].string))").font(.caption).foregroundStyle(.secondary)
                 HStack(spacing: 8) {
                     ThinBar(value: need > 0 ? Double(stamps) / Double(need) : 0)
-                    Text("\(stamps)/\(need)").font(.caption2.bold()).monospacedDigit().foregroundStyle(Color.brand).environment(\.layoutDirection, .leftToRight)
+                    Text("\(stamps)/\(need)").font(.caption2.bold()).monospacedDigit().foregroundStyle(Color.ink).environment(\.layoutDirection, .leftToRight)
                 }
             }
         }
@@ -260,7 +260,7 @@ struct CustomerDetail: View {
 
     private func num(_ v: String, _ l: String) -> some View {
         VStack(spacing: 2) {
-            Text(v).font(.title3.bold()).monospacedDigit().foregroundStyle(Color.brand).minimumScaleFactor(0.6).lineLimit(1)
+            Text(v).font(.title3.bold()).monospacedDigit().foregroundStyle(Color.ink).minimumScaleFactor(0.6).lineLimit(1)
             Text(l).font(.caption2).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity).padding(.vertical, 12)

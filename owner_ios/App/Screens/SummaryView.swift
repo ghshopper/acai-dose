@@ -165,12 +165,12 @@ struct SummaryView: View {
     private func stat(_ icon: String, _ label: String, _ v: Double, _ sub: String, share: Int? = nil, before: Double? = nil, lowerIsBetter: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                Image(systemName: icon).font(.caption).foregroundStyle(Color.brand)
+                Image(systemName: icon).font(.caption).foregroundStyle(Color.ink)
                 Text(label).font(.footnote.weight(.semibold)).foregroundStyle(.secondary).lineLimit(1)
                 Spacer(minLength: 0)
                 if let before { DeltaBadge(now: v, before: before, lowerIsBetter: lowerIsBetter) }
             }
-            Text(money(v)).font(.title2.bold()).monospacedDigit().foregroundStyle(Color.brand)
+            Text(money(v)).font(.title2.bold()).monospacedDigit().foregroundStyle(Color.ink)
             Text(share == nil ? sub : "\(sub) · \(share!)%").font(.caption2.weight(.medium)).foregroundStyle(.secondary).lineLimit(2)
             if let share { ThinBar(value: Double(share) / 100) }
         }
@@ -184,9 +184,9 @@ struct SummaryView: View {
                     HStack {
                         Text(m.name).font(.headline)
                         Spacer()
-                        Tag(text: m.isApp ? "تحويل" : "بالدرج", bg: m.isApp ? Color.accent2.opacity(0.18) : Color.brand.opacity(0.08))
+                        Tag(text: m.isApp ? "تحويل" : "بالدرج", bg: m.isApp ? Color.accent2.opacity(0.18) : Color.ink.opacity(0.14))
                     }
-                    Text(money(m.net)).font(.title2.bold()).monospacedDigit().foregroundStyle(Color.brand)
+                    Text(money(m.net)).font(.title2.bold()).monospacedDigit().foregroundStyle(Color.ink)
                     row("المبيعات", money(m.gross))
                     if m.isApp { row("العمولة", money(m.comm)) }
                     row("الطلبات", "\(m.n)")
@@ -196,7 +196,7 @@ struct SummaryView: View {
             if s.unpaidCount > 0 {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("طلبات موقع غير مستلمة").font(.subheadline.weight(.semibold))
-                    Text(money(s.unpaidTotal)).font(.title2.bold()).monospacedDigit().foregroundStyle(Color.brand)
+                    Text(money(s.unpaidTotal)).font(.title2.bold()).monospacedDigit().foregroundStyle(Color.ink)
                     row("الطلبات", "\(s.unpaidCount)")
                 }
                 .card(14)
@@ -216,7 +216,7 @@ struct SummaryView: View {
         let today = muscat.startOfDay(for: .now)
         return Chart(s.daily) { d in
             BarMark(x: .value("اليوم", d.id, unit: .day), y: .value("المبيعات", d.v))
-                .foregroundStyle(muscat.isDate(d.id, inSameDayAs: today) ? Color.accent2 : Color.brand)
+                .foregroundStyle(muscat.isDate(d.id, inSameDayAs: today) ? Color.accent2 : Color.ink)
                 .cornerRadius(5)
         }
         .chartXAxis {
@@ -238,7 +238,7 @@ struct SummaryView: View {
                     ForEach(s.products) { p in
                         HStack(spacing: 10) {
                             Text(p.id).font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity, alignment: .leading)
-                            ThinBar(value: Double(p.n) / top, color: .brand, height: 10).frame(width: 120)
+                            ThinBar(value: Double(p.n) / top, color: .ink, height: 10).frame(width: 120)
                             Text("\(p.n)").font(.subheadline.bold()).monospacedDigit().frame(width: 36, alignment: .trailing)
                         }
                     }

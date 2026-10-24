@@ -10,6 +10,10 @@ extension Color {
     static let lilac = Color(red: 0xD9 / 255, green: 0xBC / 255, blue: 0xDB / 255)
     static let good = Color(red: 0x24 / 255, green: 0x8A / 255, blue: 0x3D / 255)
     static let bad = Color(red: 0xE5 / 255, green: 0x34 / 255, blue: 0x2B / 255)
+    /// Brand purple for text and icons: deep purple in light mode, soft lilac in dark mode so it stays readable.
+    static let ink = Color(uiColor: UIColor { t in
+        t.userInterfaceStyle == .dark ? UIColor(red: 0.86, green: 0.68, blue: 0.86, alpha: 1) : UIColor(red: 0x47 / 255, green: 0x0D / 255, blue: 0x43 / 255, alpha: 1)
+    })
     static let pageBG = Color(uiColor: .systemGroupedBackground)
     static let cardBG = Color(uiColor: .secondarySystemGroupedBackground)
 }
@@ -47,8 +51,8 @@ struct SectionHeader: View {
 /// Small rounded label.
 struct Tag: View {
     let text: String
-    var bg: Color = Color.brand.opacity(0.1)
-    var fg: Color = .brand
+    var bg: Color = Color.ink.opacity(0.14)
+    var fg: Color = .ink
     var icon: String? = nil
     var body: some View {
         HStack(spacing: 3) {
@@ -89,7 +93,7 @@ struct DeltaBadge: View {
 struct ThinBar: View {
     let value: Double
     var color: Color = .accent2
-    var track: Color = Color.brand.opacity(0.08)
+    var track: Color = Color.ink.opacity(0.14)
     var height: CGFloat = 6
     var body: some View {
         GeometryReader { g in

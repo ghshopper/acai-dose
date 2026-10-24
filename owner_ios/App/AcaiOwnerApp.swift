@@ -15,7 +15,7 @@ struct AcaiOwnerApp: App {
             // .toasts() reads the Toaster from the environment, so it must sit inside .environment(toaster)
             RootView()
                 .toasts()
-                .tint(.brand)
+                .tint(.ink)
                 .environment(toaster)
                 .environment(period)
                 .environment(Live.shared)

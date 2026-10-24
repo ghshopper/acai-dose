@@ -95,7 +95,7 @@ struct AppSaleSheet: View {
                 TextField("ملاحظة (اختياري)", text: $note)
             }
             if g > 0 {
-                Section { LabeledContent("يوصلك تقريباً") { Text("\(money(g - g * p / 100)) ر.ع").bold().foregroundStyle(Color.brand) } }
+                Section { LabeledContent("يوصلك تقريباً") { Text("\(money(g - g * p / 100)) ر.ع").bold().foregroundStyle(Color.ink) } }
             }
         }
         .task {

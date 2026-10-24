@@ -152,7 +152,7 @@ struct CostView: View {
                             }
                         }
                         Spacer()
-                        Text(r["expected"].isNull ? "-" : qfmt(r["expected"].double, u)).font(.headline).foregroundStyle(Color.brand)
+                        Text(r["expected"].isNull ? "-" : qfmt(r["expected"].double, u)).font(.headline).foregroundStyle(Color.ink)
                     }
                 }
             }
@@ -176,7 +176,7 @@ struct CostView: View {
                         Spacer()
                         let uc = i["unit_cost"].double
                         Text(uc == 0 ? "-" : (i["unit"].string == "pc" ? "\(money(uc)) / حبة" : "\(money(uc * 1000)) / كغ"))
-                            .font(.subheadline.bold()).foregroundStyle(Color.brand)
+                            .font(.subheadline.bold()).foregroundStyle(Color.ink)
                     }
                     .contentShape(Rectangle())
                 }

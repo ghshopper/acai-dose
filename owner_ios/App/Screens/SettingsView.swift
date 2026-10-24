@@ -82,7 +82,7 @@ struct SettingsView: View {
         Section("بطاقة الولاء") {
             Toggle("نظام الولاء شغال", isOn: Binding(get: { loyOn }, set: { loyOn = $0; loyDirty = true }))
             Stepper(value: Binding(get: { need }, set: { need = $0; loyDirty = true }), in: 2...30) {
-                HStack { Text("عدد الأختام"); Spacer(); Text("\(need)").bold().monospacedDigit().foregroundStyle(Color.brand) }
+                HStack { Text("عدد الأختام"); Spacer(); Text("\(need)").bold().monospacedDigit().foregroundStyle(Color.ink) }
             }
             Text("\(need) \(unit == "cup" ? "أكواب" : "طلبات") والي بعده مجاناً (الـ \(need + 1) علينا)").font(.footnote).foregroundStyle(.secondary)
             StampRow(filled: need / 2, need: need, size: need > 8 ? 20 : 26).padding(.vertical, 4)
@@ -102,8 +102,8 @@ struct SettingsView: View {
                 let owner = u["role"].string == "owner"
                 HStack(spacing: 12) {
                     Image(systemName: owner ? "star.fill" : "person.fill")
-                        .foregroundStyle(owner ? Color.cream : Color.brand)
-                        .frame(width: 36, height: 36).background(owner ? Color.brand : Color.brand.opacity(0.08), in: Circle())
+                        .foregroundStyle(owner ? Color.cream : Color.ink)
+                        .frame(width: 36, height: 36).background(owner ? Color.brand : Color.ink.opacity(0.14), in: Circle())
                     VStack(alignment: .leading) {
                         Text(u["username"].string).font(.body.weight(.semibold))
                         Text(owner ? "صاحب المحل" : (u["active"].int == 1 ? "عامل · شغال" : "عامل · موقوف")).font(.caption).foregroundStyle(.secondary)
@@ -167,7 +167,7 @@ private struct ProductRow: View {
                     Text(p["name_ar"].string).font(.body.weight(.semibold)).foregroundStyle(active ? Color.primary : Color.secondary).strikethrough(!active)
                     if p["kind"].string == "build" { Text("سعر الباول بدون الإضافات").font(.caption2).foregroundStyle(.secondary) }
                     Button { ar = p["desc_ar"].string; en = p["desc_en"].string; editingDesc = true } label: {
-                        Text(p["desc_ar"].string.isEmpty ? "+ أضف وصف" : p["desc_ar"].string).font(.caption).lineLimit(2).foregroundStyle(Color.brand)
+                        Text(p["desc_ar"].string.isEmpty ? "+ أضف وصف" : p["desc_ar"].string).font(.caption).lineLimit(2).foregroundStyle(Color.ink)
                     }
                     .buttonStyle(.borderless)
                 }

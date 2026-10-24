@@ -39,7 +39,7 @@ struct OrdersView: View {
                     Spacer()
                     Text("\(money(sum)) ر.ع").font(.headline).monospacedDigit()
                 }
-                .foregroundStyle(Color.brand)
+                .foregroundStyle(Color.ink)
                 .listRowBackground(Color.clear)
             }
             Section {
@@ -83,10 +83,10 @@ struct OrderRow: View {
         let who = web ? o["customer_name"].string + (plate.isEmpty ? "" : " · \(plate)") : (o["customer_name"].string == "Imported" ? "مبيعات مستوردة" : "المحل")
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                Text("#\(o["ref"].string)").font(.headline).foregroundStyle(Color.brand).environment(\.layoutDirection, .leftToRight)
+                Text("#\(o["ref"].string)").font(.headline).foregroundStyle(Color.ink).environment(\.layoutDirection, .leftToRight)
                 Tag(text: web ? "الموقع" : "المحل", bg: web ? Color.accent2.opacity(0.18) : Color.brand.opacity(0.08))
                 Tag(text: kStatusNames[o["status"].string] ?? o["status"].string,
-                    bg: o["status"].string == "done" ? Color.good.opacity(0.14) : cancelled ? Color.bad.opacity(0.14) : Color.brand.opacity(0.08),
+                    bg: o["status"].string == "done" ? Color.good.opacity(0.14) : cancelled ? Color.bad.opacity(0.14) : Color.ink.opacity(0.14),
                     fg: o["status"].string == "done" ? .good : cancelled ? .bad : .brand)
                 Spacer()
                 Text(money(o["total"])).font(.headline).monospacedDigit().strikethrough(cancelled)
@@ -151,8 +151,8 @@ struct OrderDetail: View {
                     ForEach(o["items"].array.indices, id: \.self) { i in
                         let it = o["items"].array[i]
                         HStack(spacing: 10) {
-                            Text("\(it["qty"].int)").font(.subheadline.bold()).foregroundStyle(Color.brand)
-                                .frame(width: 30, height: 30).background(Color.brand.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+                            Text("\(it["qty"].int)").font(.subheadline.bold()).foregroundStyle(Color.ink)
+                                .frame(width: 30, height: 30).background(Color.ink.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
                             Text(it["name_ar"].string.isEmpty ? it["name_en"].string : it["name_ar"].string).font(.subheadline.weight(.semibold))
                             Spacer()
                             if !it["price"].isNull { Text(money(it["price"].double * Double(max(it["qty"].int, 1)))).foregroundStyle(.secondary).monospacedDigit() }
@@ -163,7 +163,7 @@ struct OrderDetail: View {
                     HStack {
                         Text("الإجمالي").font(.headline)
                         Spacer()
-                        Text("\(money(o["total"])) ر.ع").font(.title3.bold()).foregroundStyle(Color.brand).strikethrough(cancelled)
+                        Text("\(money(o["total"])) ر.ع").font(.title3.bold()).foregroundStyle(Color.ink).strikethrough(cancelled)
                     }
                     Text(o["payment"].string.isEmpty ? "ما انستلم للحين" : "الدفع: \(kPayNames[o["payment"].string] ?? o["payment"].string)")
                         .font(.footnote).foregroundStyle(.secondary)

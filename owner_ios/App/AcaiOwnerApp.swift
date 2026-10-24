@@ -12,14 +12,15 @@ struct AcaiOwnerApp: App {
 
     var body: some Scene {
         WindowGroup {
+            // .toasts() reads the Toaster from the environment, so it must sit inside .environment(toaster)
             RootView()
+                .toasts()
+                .tint(.brand)
                 .environment(toaster)
                 .environment(period)
                 .environment(Live.shared)
                 .environment(\.layoutDirection, .rightToLeft)
                 .environment(\.locale, Locale(identifier: "ar_OM"))
-                .tint(.brand)
-                .toasts()
         }
         .onChange(of: phase) { _, p in
             if p == .background { Live.schedule() }

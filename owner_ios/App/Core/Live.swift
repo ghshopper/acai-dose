@@ -78,7 +78,11 @@ final class Live {
 
     // MARK: background refresh (iOS decides when; roughly every 15 minutes at best)
 
+    private static var registered = false
+
     static func register() {
+        if registered { return }   // registering the same task twice crashes
+        registered = true
         BGTaskScheduler.shared.register(forTaskWithIdentifier: refreshTask, using: nil) { task in
             schedule()
             let work = Task { @MainActor in

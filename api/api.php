@@ -161,7 +161,7 @@ case 'toppings':   // public: what can go on a "build your bowl"
 
 case 'shop_info':    // public: how customers can reach the shop
     $pr = promo();
-    out(['whatsapp' => setting('shop_whatsapp'), 'promo' => $pr ? ['pct' => (float)$pr['pct'], 'ar' => (string)($pr['ar'] ?? ''), 'en' => (string)($pr['en'] ?? '')] : null]);
+    out(['whatsapp' => setting('shop_whatsapp', SHOP_PHONE), 'promo' => $pr ? ['pct' => (float)$pr['pct'], 'ar' => (string)($pr['ar'] ?? ''), 'en' => (string)($pr['en'] ?? '')] : null]);
 
 case 'place_order':
     $post();
@@ -495,7 +495,7 @@ case 'settings':
         q('SELECT id, username, role, active FROM users ORDER BY id')->fetchAll());
     require_once __DIR__ . '/gwallet_lib.php';
     out(['commissions' => $c, 'products' => $p, 'toppings' => $tp, 'users' => $u, 'loyalty' => loyalty_cfg(), 'wallet' => wallet_status(), 'gwallet' => gw_status(),
-         'whatsapp' => setting('shop_whatsapp'),
+         'whatsapp' => setting('shop_whatsapp', SHOP_PHONE),
          'location' => ['coords' => setting('shop_lat') !== '' ? setting('shop_lat') . ', ' . setting('shop_lng') : '', 'text' => setting('nearby_text')]]);
 
 case 'gw_setup':      // owner: Google Wallet service-account key + Issuer ID

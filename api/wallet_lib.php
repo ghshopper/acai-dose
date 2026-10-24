@@ -118,6 +118,7 @@ function wallet_pass_json(array $c): array {
                 ['key' => 'how', 'label' => 'كيف تشتغل البطاقة', 'value' => $how],
                 ['key' => 'order', 'label' => 'اطلب من موقعنا', 'value' => $site . '/', 'attributedValue' => "<a href='$site/'>order.acaiee.com</a>"],
                 ['key' => 'where', 'label' => 'الاستلام', 'value' => 'القرم ٢٩، مسقط', 'attributedValue' => "<a href='https://maps.app.goo.gl/YEWkdU1vi8ZtnJua8'>القرم ٢٩، مسقط (الخريطة)</a>"],
+                ['key' => 'contact', 'label' => 'تواصل معنا', 'value' => '7261 2311', 'attributedValue' => "<a href='tel:" . SHOP_PHONE . "'>7261 2311</a>"],
                 ['key' => 'phone', 'label' => 'مربوطة برقم', 'value' => '•••• ' . substr($c['phone'], -4)],
             ],
         ],

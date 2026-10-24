@@ -103,7 +103,7 @@ function gw_object(array $c): array {
             ['id' => 'left', 'header' => $st['free'] > 0 ? 'مبروك' : 'باقي لك', 'body' => $left],
             ['id' => 'how', 'header' => 'كيف تشتغل البطاقة', 'body' => 'كل ' . ($st['unit'] === 'cup' ? 'كوب' : 'طلب') . ' من موقعنا = ختم. كل ' . $st['need'] . ' أختام = كوب مجاني ينخصم تلقائياً في طلبك الجاي.'],
         ],
-        'linksModuleData' => ['uris' => [['uri' => $site . '/', 'description' => 'اطلب من موقعنا', 'id' => 'order']]],
+        'linksModuleData' => ['uris' => [['uri' => $site . '/', 'description' => 'اطلب من موقعنا', 'id' => 'order'], ['uri' => 'tel:' . SHOP_PHONE, 'description' => 'اتصل بنا 7261 2311', 'id' => 'call']]],
     ];
 }
 

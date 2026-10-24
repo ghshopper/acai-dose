@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 date_default_timezone_set('Asia/Muscat');
+const SHOP_PHONE = '+96872612311';   // shop number: WhatsApp button default, wallet cards
 // Database settings live outside the website folder (survives updates), with api/config.php as a fallback.
 $__base = dirname(__DIR__, 3);
 $__cfg = is_file("$__base/acai-config.php") ? "$__base/acai-config.php" : (is_file("$__base/config.php") ? "$__base/config.php" : __DIR__ . '/config.php');

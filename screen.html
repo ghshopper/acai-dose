@@ -147,8 +147,9 @@ function card(o) {
     <div class="hd"><span class="no">#${esc(o.ref)}</span>
       ${o.arrived_at ? '<span class="badge">Customer is here</span>' : `<span class="age ${late ? 'late' : ''}">${a.text}</span>`}</div>
     ${o.car_plate ? `<div class="car"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 16h14M6 16l1.5-5h9L18 16M5 16v3h2v-2h10v2h2v-3"/><circle cx="8" cy="14.5" r=".8"/><circle cx="16" cy="14.5" r=".8"/></svg><b>${esc(o.car_plate)}</b>${o.car_desc ? `<span dir="auto">${esc(o.car_desc)}</span>` : ''}</div>` : ''}
-    <div class="nm"><bdi>${esc(o.customer_name)}</bdi> &middot; <a href="tel:${esc(o.phone)}" dir="ltr" style="color:inherit;unicode-bidi:isolate">${esc(o.phone)}</a></div>
-    <div class="meta">Pickup: ${pickupLabel(o.pickup_time)}</div>
+    ${o.source === 'curb' ? `<div class="nm"><b style="background:#470D43;color:#fff;border-radius:6px;padding:2px 8px">CAR ORDER</b> taken outside${o.phone ? ` &middot; <span dir="ltr">${esc(o.phone)}</span>` : ''}</div>`
+      : `<div class="nm"><bdi>${esc(o.customer_name)}</bdi> &middot; <a href="tel:${esc(o.phone)}" dir="ltr" style="color:inherit;unicode-bidi:isolate">${esc(o.phone)}</a></div>
+    <div class="meta">Pickup: ${pickupLabel(o.pickup_time)}</div>`}
     <ul>${o.items.map(i => `<li><b>${i.qty}×</b><span>${esc(i.name_en)}</span></li>`).join('')}</ul>
     ${o.notes ? `<div class="note" dir="auto">Note: ${esc(o.notes)}</div>` : ''}
     ${o.free_cups ? `<div style="background:var(--o);color:var(--p);border-radius:10px;padding:6px 10px;font-weight:800;margin-bottom:8px">Loyalty: 1 cup FREE (−${money(o.discount)})</div>` : ''}

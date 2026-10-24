@@ -22,7 +22,7 @@ function loyalty_state(string $phone): array {
     $cfg = loyalty_cfg();
     $earned = 0; $used = 0;
     if ($phone !== '') {
-        $rows = q("SELECT items, status, payment, free_cups FROM orders WHERE phone = ? AND status <> 'cancelled' AND (source = 'web' OR (source = 'pos' AND payment IN ('cash','card')))", [$phone])->fetchAll();
+        $rows = q("SELECT items, status, payment, free_cups FROM orders WHERE phone = ? AND status <> 'cancelled' AND (source = 'web' OR (source IN ('pos','curb') AND payment IN ('cash','card')))", [$phone])->fetchAll();
         foreach ($rows as $o) {
             $free = (int)$o['free_cups'];
             $used += $free;

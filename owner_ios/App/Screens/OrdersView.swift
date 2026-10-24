@@ -16,8 +16,8 @@ struct OrdersView: View {
     private var list: [J] {
         orders.filter {
             switch filter {
-            case "web": return $0["source"].string != "pos"
-            case "shop": return $0["source"].string == "pos"
+            case "web": return $0["source"].string == "web"
+            case "shop": return $0["source"].string != "web"
             default: return true
             }
         }
@@ -84,10 +84,10 @@ struct OrderRow: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Text("#\(o["ref"].string)").font(.headline).foregroundStyle(Color.ink).environment(\.layoutDirection, .leftToRight)
-                Tag(text: web ? "الموقع" : "المحل", bg: web ? Color.accent2.opacity(0.18) : Color.brand.opacity(0.08))
+                Tag(text: o["source"].string == "curb" ? "من السيارة" : web ? "الموقع" : "المحل", bg: web ? Color.accent2.opacity(0.18) : Color.ink.opacity(0.14))
                 Tag(text: kStatusNames[o["status"].string] ?? o["status"].string,
                     bg: o["status"].string == "done" ? Color.good.opacity(0.14) : cancelled ? Color.bad.opacity(0.14) : Color.ink.opacity(0.14),
-                    fg: o["status"].string == "done" ? .good : cancelled ? .bad : .brand)
+                    fg: o["status"].string == "done" ? .good : cancelled ? .bad : .ink)
                 Spacer()
                 Text(money(o["total"])).font(.headline).monospacedDigit().strikethrough(cancelled)
             }
@@ -126,7 +126,7 @@ struct OrderDetail: View {
             List {
                 Section {
                     HStack(spacing: 6) {
-                        Tag(text: web ? "الموقع" : (imported ? "مستورد" : "المحل"))
+                        Tag(text: o["source"].string == "curb" ? "من السيارة" : web ? "الموقع" : (imported ? "مستورد" : "المحل"))
                         Tag(text: kStatusNames[o["status"].string] ?? o["status"].string)
                         if when.count >= 16 { Tag(text: String(when.prefix(16)), icon: "clock") }
                     }

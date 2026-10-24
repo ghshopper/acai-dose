@@ -249,8 +249,8 @@ async function refresh() {
 function drawSum({ orders, apps, exps }) {
   const valid = orders.filter(o => o.status !== 'cancelled');
   const isApp = o => o.source === 'pos' && CH[o.payment];
-  const webO = valid.filter(o => o.source !== 'pos');
-  const shopO = valid.filter(o => o.source === 'pos' && !CH[o.payment]);
+  const webO = valid.filter(o => o.source === 'web');   // car orders taken outside count as shop sales
+  const shopO = valid.filter(o => o.source !== 'web' && !CH[o.payment]);
   const appO = valid.filter(isApp);
   const sumT = list => list.reduce((s, o) => s + +o.total, 0);
   const cnt = list => list.reduce((s, o) => s + (o.n_orders || 1), 0);

@@ -242,12 +242,12 @@ case 'me':
 case 'active_orders':
     need('staff');
     $since = date('Y-m-d H:i:s', time() - 36 * 3600);
-    $rows = q("SELECT * FROM orders WHERE source = 'web' AND status IN ('new','preparing','ready') AND created_at >= ? ORDER BY id", [$since])->fetchAll();
+    $rows = q("SELECT * FROM orders WHERE source IN ('web','curb') AND status IN ('new','preparing','ready') AND created_at >= ? ORDER BY id", [$since])->fetchAll();
     out(array_map(fn($o) => order_row($o) + ['track' => $o['token']], $rows));   // staff can send the customer their tracking link
 
 case 'web_today':   // staff phones: today's website orders that are finished (handed over or cancelled)
     need('staff');
-    $rows = q("SELECT * FROM orders WHERE source = 'web' AND day = ? AND status IN ('done','cancelled') ORDER BY updated_at DESC, id DESC", [date('Y-m-d')])->fetchAll();
+    $rows = q("SELECT * FROM orders WHERE source IN ('web','curb') AND day = ? AND status IN ('done','cancelled') ORDER BY updated_at DESC, id DESC", [date('Y-m-d')])->fetchAll();
     out(array_map(fn($o) => order_row($o) + ['track' => $o['token']], $rows));
 
 case 'order_status':
@@ -296,6 +296,23 @@ case 'pos_sale':
     $loy = null;
     if ($cphone !== '') { save_customer($cphone, clean((string)($in['name'] ?? ''), 60)); loyalty_changed($cphone); $loy = loyalty_state($cphone); }
     out(['order_no' => $no, 'ref' => order_ref(date('Y-m-d'), $no), 'total' => $total, 'free_cups' => $free, 'loyalty' => $loy]);
+
+case 'curb_order':  // staff outside takes an order at the car; it goes to the orders screen inside, paid on hand-over
+    $post(); $u = need('staff');
+    $car = clean($in['car_plate'] ?? '', 20);
+    if (mb_strlen($car) < 1) fail('invalid_car');
+    $carDesc = clean($in['car_desc'] ?? '', 40);
+    $name = clean($in['name'] ?? '', 60);
+    $cphone = '';
+    if (!empty($in['phone'])) { $cphone = norm_phone($in['phone']); if ($cphone === '') fail('invalid_phone'); }
+    [$lines, $total] = price_items($in['items'] ?? null);
+    $no = insert_order([
+        'source' => 'curb', 'customer_name' => $name !== '' ? $name : 'Car order', 'phone' => $cphone, 'car_plate' => $car, 'car_desc' => $carDesc ?: null,
+        'pickup_time' => 'ASAP', 'notes' => clean($in['notes'] ?? '', 300) ?: null, 'items' => json_encode($lines, JSON_UNESCAPED_UNICODE),
+        'total' => $total, 'status' => 'new', 'arrived_at' => now(), 'created_by' => (int)$u['id'],
+    ]);
+    if ($cphone !== '') save_customer($cphone, $name, $car, $carDesc, null);
+    out(['order_no' => $no, 'ref' => order_ref(date('Y-m-d'), $no), 'total' => $total]);
 
 case 'pos_customer':  // staff: loyalty status for a mobile typed at the till
     need('staff');

@@ -200,8 +200,18 @@ class _OrderCardState extends State<OrderCard> {
             if (carDesc.isNotEmpty) Expanded(child: Text(carDesc, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
           ]),
           const SizedBox(height: 8),
-          Text('${o['customer_name'] ?? ''} · ${o['phone'] ?? ''}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-          Text('Pickup: ${_pickup(o['pickup_time'])}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          if (o['source'] == 'curb')
+            Container(
+              margin: const EdgeInsets.only(bottom: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(color: kPurple, borderRadius: BorderRadius.circular(8)),
+              child: Text('CAR ORDER · taken outside${'${o['phone'] ?? ''}'.isNotEmpty ? ' · ${o['phone']}' : ''}',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+            )
+          else ...[
+            Text('${o['customer_name'] ?? ''} · ${o['phone'] ?? ''}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            Text('Pickup: ${_pickup(o['pickup_time'])}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          ],
           const Divider(height: 18),
           for (final i in items)
             Padding(

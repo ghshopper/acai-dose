@@ -279,6 +279,79 @@ class _PosPageState extends State<PosPage> {
     }
   }
 
+  /// Order taken at the car: goes to the orders screen inside, paid when it is handed over.
+  Future<void> _sendCurb() async {
+    final ph = _phone.text;
+    if (ph.isNotEmpty && !RegExp(r'^[279]\d{7}$').hasMatch(ph)) {
+      setState(() => _err = 'Customer mobile must be 8 digits (or leave it empty)');
+      return;
+    }
+    final plate = TextEditingController();
+    final desc = TextEditingController();
+    final note = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => StatefulBuilder(
+        builder: (c, set) => AlertDialog(
+          title: const Text('Car order'),
+          content: SizedBox(
+            width: 420,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              TextField(
+                controller: plate,
+                autofocus: true,
+                textCapitalization: TextCapitalization.characters,
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 1),
+                decoration: const InputDecoration(labelText: 'Car plate', hintText: '12345 A'),
+                onChanged: (_) => set(() {}),
+              ),
+              const SizedBox(height: 8),
+              TextField(controller: desc, decoration: const InputDecoration(labelText: 'Car model & colour (optional)', hintText: 'White Land Cruiser')),
+              const SizedBox(height: 8),
+              TextField(controller: note, decoration: const InputDecoration(labelText: 'Note (optional)', hintText: 'No ice')),
+              const SizedBox(height: 10),
+              Text('${money(_subtotal)} OMR · paid when you hand it over', style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.black54)),
+            ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+            FilledButton(onPressed: plate.text.trim().isEmpty ? null : () => Navigator.pop(c, true), child: const Text('Send inside')),
+          ],
+        ),
+      ),
+    );
+    if (ok != true) return;
+    setState(() {
+      _busy = true;
+      _err = '';
+    });
+    try {
+      final r = Map<String, dynamic>.from(await Api.I.post('curb_order', {
+        'items': _cart.entries.map((e) => {'product_id': _keyPid(e.key), 'qty': e.value, 'toppings': _keyTops(e.key)}).toList(),
+        'car_plate': plate.text.trim().toUpperCase(),
+        'car_desc': desc.text.trim(),
+        'notes': note.text.trim(),
+        'phone': ph.isNotEmpty ? '+968$ph' : '',
+        'name': _cust != null ? '${_cust!['name'] ?? ''}' : '',
+      }) as Map);
+      _reset();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        backgroundColor: kOk,
+        content: Text('Order #${r['ref']} sent inside · car ${plate.text.trim().toUpperCase()} · collect ${money(r['total'])} OMR',
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+      ));
+    } on ApiError catch (e) {
+      if (e.code == 'login_required') {
+        widget.onLoggedOut();
+        return;
+      }
+      setState(() => _err = errText(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _void(Map<String, dynamic> r) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -463,6 +536,15 @@ class _PosPageState extends State<PosPage> {
             const SizedBox(width: 10),
             Expanded(child: FilledButton(style: bigButton(kOrange, kPurple), onPressed: can ? () => _sell('card') : null, child: const Text('Card'))),
           ]),
+          const SizedBox(height: 12),
+          const Text('Car order · pay on hand-over', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.black54)),
+          const SizedBox(height: 6),
+          FilledButton.icon(
+            style: bigButton(kOk, Colors.white),
+            onPressed: can ? _sendCurb : null,
+            icon: const Icon(Icons.directions_car),
+            label: const Text('Send to inside'),
+          ),
           const SizedBox(height: 12),
           const Text('Delivery app order', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.black54)),
           const SizedBox(height: 6),

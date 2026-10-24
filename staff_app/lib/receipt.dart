@@ -156,7 +156,7 @@ Future<Uint8List> renderReceipt(ReceiptData d, int width) async {
   final h12 = ((t.hour + 11) % 12) + 1;
   final when = '${two(t.day)}/${two(t.month)}/${t.year}  $h12:${two(t.minute)} ${t.hour < 12 ? 'AM' : 'PM'}';
   center(when, 16);
-  center(d.source == 'pos' ? 'In shop · في المحل' : 'Online order · طلب من الموقع', 16, weight: FontWeight.w800);
+  center(d.source == 'pos' ? 'In shop · في المحل' : d.source == 'curb' ? 'Car order · طلب من السيارة' : 'Online order · طلب من الموقع', 16, weight: FontWeight.w800);
 
   if (d.source != 'pos') {
     if (d.customer.isNotEmpty) center(d.customer, 18, weight: FontWeight.w800);

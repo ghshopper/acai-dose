@@ -274,7 +274,7 @@ struct CustomerDetail: View {
         return VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Text(String(when.prefix(16))).font(.caption.weight(.semibold)).foregroundStyle(.secondary).environment(\.layoutDirection, .leftToRight)
-                Tag(text: o["source"].string == "pos" ? "المحل" : "الموقع")
+                Tag(text: o["source"].string == "web" ? "الموقع" : o["source"].string == "curb" ? "من السيارة" : "المحل")
                 if o["free_cups"].int > 0 { Tag(text: "مجاني", bg: .accent2) }
                 Spacer()
                 Text(money(o["total"])).font(.subheadline.bold()).monospacedDigit().strikethrough(cancelled)

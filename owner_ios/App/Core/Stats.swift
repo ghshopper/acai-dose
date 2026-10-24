@@ -36,8 +36,8 @@ struct Stats {
         let exps = data["exps"].array
         let valid = orders.filter { $0["status"].string != "cancelled" }
         func isApp(_ o: J) -> Bool { o["source"].string == "pos" && kChannelNames[o["payment"].string] != nil }
-        let web = valid.filter { $0["source"].string != "pos" }
-        let shopO = valid.filter { $0["source"].string == "pos" && kChannelNames[$0["payment"].string] == nil }
+        let web = valid.filter { $0["source"].string == "web" }   // car orders taken outside count as shop sales
+        let shopO = valid.filter { $0["source"].string != "web" && kChannelNames[$0["payment"].string] == nil }
         let appO = valid.filter(isApp)
 
         func sumT(_ l: [J]) -> Double { l.reduce(0) { $0 + $1["total"].double } }

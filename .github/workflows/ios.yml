@@ -51,14 +51,18 @@ jobs:
           KEY="$RUNNER_TEMP/AuthKey_$ASC_KEY_ID.p8"
           printf '%s\n' "$ASC_KEY_P8" > "$KEY"
           AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$KEY" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
-          # Ad-hoc signature keeps the entitlements (App Group for the widget) in the archive;
-          # the export step re-signs everything for the App Store with cloud-managed signing.
+          # Archive unsigned (cloud signing happens at export), then stamp the entitlements (App Group
+          # for the widget) on with a local ad-hoc signature so the export keeps them when it re-signs.
           xcodebuild -project AcaiOwner.xcodeproj -scheme AcaiOwner -configuration Release \
             -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/Owner.xcarchive" archive \
             DEVELOPMENT_TEAM="$TEAM_ID" CURRENT_PROJECT_VERSION=$BUILD_NO \
-            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=YES PROVISIONING_PROFILE_SPECIFIER="" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
             > ../archive.log 2>&1 || { grep -E "error:|\*\* ARCHIVE" ../archive.log | head -60 >> ../build.log; tail -40 ../archive.log >> ../build.log; exit 1; }
           grep -E "\*\* ARCHIVE" ../archive.log >> ../build.log
+          APP="$RUNNER_TEMP/Owner.xcarchive/Products/Applications/AcaiOwner.app"
+          codesign --force --sign - --entitlements Widgets/Widgets.entitlements "$APP/PlugIns/AcaiWidgets.appex" 2>&1 | tee -a ../build.log
+          codesign --force --sign - --entitlements App/App.entitlements "$APP" 2>&1 | tee -a ../build.log
+          codesign -d --entitlements - "$APP" 2>&1 | tail -8 >> ../build.log
           cat > "$RUNNER_TEMP/export.plist" <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

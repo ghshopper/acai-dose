@@ -9,6 +9,7 @@ struct ExpensesView: View {
     @State private var loading = false
     @State private var adding = false
     @State private var toDelete: J?
+    @State private var editing: J?
 
     var body: some View {
         let total = exps.reduce(0) { $0 + $1["amount"].double }
@@ -40,15 +41,21 @@ struct ExpensesView: View {
                 if exps.isEmpty && !loading { EmptyNote(text: "ما فيه مصاريف في هالفترة", icon: "creditcard").listRowBackground(Color.clear) }
                 ForEach(exps.indices, id: \.self) { i in
                     let r = exps[i]
+                    Button { editing = r } label: {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(r["category"].string).font(.subheadline.weight(.semibold))
+                            Text(r["category"].string).font(.subheadline.weight(.semibold)).foregroundStyle(Color.primary)
                             Text(r["expense_date"].string + (r["note"].string.isEmpty ? "" : " · \(r["note"].string)")).font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Text(money(r["amount"])).font(.headline).monospacedDigit()
+                        Text(money(r["amount"])).font(.headline).monospacedDigit().foregroundStyle(Color.primary)
+                        Image(systemName: "chevron.left").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
                     }
-                    .swipeActions { Button(role: .destructive) { toDelete = r } label: { Label("احذف", systemImage: "trash") } }
+                    }
+                    .swipeActions {
+                        Button(role: .destructive) { toDelete = r } label: { Label("احذف", systemImage: "trash") }
+                        Button { editing = r } label: { Label("عدّل", systemImage: "pencil") }.tint(.accent2)
+                    }
                 }
             }
         }
@@ -61,6 +68,9 @@ struct ExpensesView: View {
         .refreshable { await load() }
         .task(id: period.version) { await load() }
         .sheet(isPresented: $adding) { AddExpenseSheet { toaster.show("انحفظ المصروف"); Task { await load() } } }
+        .sheet(item: Binding(get: { editing.map { EditBox(j: $0) } }, set: { editing = $0?.j })) { b in
+            AddExpenseSheet(existing: b.j) { toaster.show("انعدّل المصروف"); Task { await load() } }
+        }
         .confirmationDialog("تحذف هذا المصروف؟", isPresented: Binding(get: { toDelete != nil }, set: { if !$0 { toDelete = nil } }), titleVisibility: .visible) {
             Button("احذف", role: .destructive) { if let r = toDelete { Task { await delete(r) } } }
             Button("إلغاء", role: .cancel) {}
@@ -81,3 +91,6 @@ struct ExpensesView: View {
         await load()
     }
 }
+
+/// Wraps a row so a sheet can be opened for it.
+struct EditBox: Identifiable { let j: J; var id: Int { j["id"].int } }

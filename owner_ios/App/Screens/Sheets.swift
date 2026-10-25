@@ -31,6 +31,8 @@ struct FormSheet<Content: View>: View {
 }
 
 struct AddExpenseSheet: View {
+    /// An expense to change; nil adds a new one
+    var existing: J? = nil
     let onDone: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var date = Date.now
@@ -41,10 +43,12 @@ struct AddExpenseSheet: View {
     @State private var err = ""
 
     var body: some View {
-        FormSheet(title: "مصروف جديد", busy: busy, err: err, canSave: Double(amount) ?? 0 > 0, onSave: { Task { await save() } }) {
+        FormSheet(title: existing == nil ? "مصروف جديد" : "عدّل المصروف", busy: busy, err: err, canSave: Double(amount) ?? 0 > 0, onSave: { Task { await save() } }) {
             Section {
                 DatePicker("التاريخ", selection: $date, in: ...Date.now, displayedComponents: .date)
-                Picker("النوع", selection: $cat) { ForEach(kCats, id: \.self) { Text($0).tag($0) } }
+                Picker("النوع", selection: $cat) {
+                    ForEach(kCats.contains(cat) ? kCats : kCats + [cat], id: \.self) { Text($0).tag($0) }
+                }
             }
             Section {
                 HStack {
@@ -54,13 +58,24 @@ struct AddExpenseSheet: View {
                 TextField("ملاحظة (اختياري)", text: $note)
             }
         }
+        .onAppear {
+            guard let e = existing else { return }
+            let f = DateFormatter(); f.calendar = Calendar(identifier: .gregorian); f.locale = Locale(identifier: "en_US_POSIX")
+            f.timeZone = TimeZone(identifier: "Asia/Muscat"); f.dateFormat = "yyyy-MM-dd"
+            date = f.date(from: e["expense_date"].string) ?? .now
+            cat = e["category"].string.isEmpty ? kCats[0] : e["category"].string
+            amount = shortNumber(e["amount"].double)
+            note = e["note"].string
+        }
     }
 
     private func save() async {
         guard let a = Double(amount), a > 0 else { err = "اكتب المبلغ"; return }
         busy = true; err = ""
+        var body: [String: Any] = ["expense_date": ymd(date), "category": cat, "amount": a, "note": note.trimmingCharacters(in: .whitespaces)]
+        if let e = existing { body["id"] = e["id"].int }
         do {
-            try await API.shared.post("add_expense", ["expense_date": ymd(date), "category": cat, "amount": a, "note": note.trimmingCharacters(in: .whitespaces)])
+            try await API.shared.post(existing == nil ? "add_expense" : "expense_update", body)
             onDone(); dismiss()
         } catch { err = errText(error); busy = false }
     }

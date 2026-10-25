@@ -423,6 +423,14 @@ case 'add_expense':
       [valid_date($in['expense_date'] ?? ''), $cat, money($amt), clean($in['note'] ?? '', 120) ?: null, now()]);
     out(['ok' => true]);
 
+case 'expense_update':  // owner fixes an expense (date, type, amount, note)
+    $post(); need('owner');
+    $amt = (float)($in['amount'] ?? -1); if ($amt < 0) fail('bad_amount');
+    $cat = clean($in['category'] ?? '', 60); if ($cat === '') fail('bad_category');
+    q('UPDATE expenses SET expense_date = ?, category = ?, amount = ?, note = ? WHERE id = ?',
+      [valid_date($in['expense_date'] ?? ''), $cat, money($amt), clean($in['note'] ?? '', 120) ?: null, (int)($in['id'] ?? 0)]);
+    out(['ok' => true]);
+
 case 'delete':
     $post(); need('owner');
     $t = ['sale' => 'channel_sales', 'expense' => 'expenses'][$in['type'] ?? ''] ?? fail('bad_type');

@@ -9,6 +9,11 @@ on:
 permissions:
   contents: write
 
+# A newer push replaces a build still running
+concurrency:
+  group: staff-app
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -67,20 +72,21 @@ jobs:
             --out karak-dose-staff.apk karak-unsigned.apk 2>&1 | tee -a build.log
           "$BT/apksigner" verify karak-dose-staff.apk 2>&1 | tee -a build.log
 
-      - name: Publish to the "app-latest" release
+      - name: Publish to the "app-latest" and "karak-latest" releases
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete app-latest --yes --cleanup-tag || true
-          gh release create app-latest acai-dose-staff.apk \
-            --title "Açaí Dose staff app" \
-            --notes "Install on the Sunmi device. Built from ${GITHUB_SHA::7}." \
-            --latest
-          gh release delete karak-latest --yes --cleanup-tag || true
-          gh release create karak-latest karak-dose-staff.apk \
-            --title "Karak Dose staff app" \
-            --notes "Install on the Karak Dose Sunmi device. Built from ${GITHUB_SHA::7}." \
-            --latest=false
+          # Replace the file in place (no delete and re-create, so two builds close together can't trip over each other)
+          publish() {
+            if gh release view "$1" >/dev/null 2>&1; then
+              gh release upload "$1" "$2" --clobber
+              gh release edit "$1" --notes "$3 Built from ${GITHUB_SHA::7}."
+            else
+              gh release create "$1" "$2" --title "$4" --notes "$3 Built from ${GITHUB_SHA::7}." --latest=false
+            fi
+          }
+          publish app-latest acai-dose-staff.apk "Install on the Açaí Dose Sunmi device." "Açaí Dose staff app"
+          publish karak-latest karak-dose-staff.apk "Install on the Karak Dose Sunmi device." "Karak Dose staff app"
 
       - name: Keep the build log on the ci-logs branch
         if: always()

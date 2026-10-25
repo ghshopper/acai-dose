@@ -10,6 +10,7 @@ struct AccountsView: View {
     @State private var editingOpening = false
     @State private var opening = ""
     @State private var toDelete: J?
+    @State private var editingMove: EditBox?
 
     var body: some View {
         Group {
@@ -22,6 +23,9 @@ struct AccountsView: View {
         .task { await load() }
         .sheet(item: $payFor) { b in
             PayoutSheet(channel: b.j) { toaster.show("انسجّل التحويل"); Task { await load() } }
+        }
+        .sheet(item: $editingMove) { b in
+            MoveEditSheet(move: b.j) { toaster.show("انعدّلت"); Task { await load() } }
         }
         .sheet(item: Binding(get: { moveKind.map { KindBox(kind: $0) } }, set: { moveKind = $0?.kind })) { b in
             BankMoveSheet(kind: b.kind) { toaster.show("انحفظ"); Task { await load() } }
@@ -97,11 +101,12 @@ struct AccountsView: View {
                 }
             } header: { Text("حساب الشركة") } footer: { Text("المصاريف اللي تسجلها في تبويب المصاريف تنقص من الحساب. الكاش يظل في الدرج لين تودعه، سجّله «إيداع» لما توديه البنك") }
 
-            Section("آخر الحركات") {
+            Section {
                 let moves = r["moves"].array
                 if moves.isEmpty { Text("ما فيه حركات للحين").foregroundStyle(.secondary) }
                 ForEach(moves, id: \.self) { m in
                     let out = m["type"].string == "out"
+                    Button { editingMove = EditBox(j: m) } label: {
                     HStack {
                         Image(systemName: out ? "arrow.up.right.circle.fill" : "arrow.down.left.circle.fill").foregroundStyle(out ? Color.bad : Color.good)
                         VStack(alignment: .leading, spacing: 2) {
@@ -111,9 +116,14 @@ struct AccountsView: View {
                         Spacer()
                         Text((out ? "− " : "+ ") + money(m["amount"])).font(.subheadline.bold()).monospacedDigit().foregroundStyle(out ? Color.bad : Color.good)
                     }
-                    .swipeActions { Button(role: .destructive) { toDelete = m } label: { Label("احذف", systemImage: "trash") } }
+                    .foregroundStyle(Color.primary)
+                    }
+                    .swipeActions {
+                        Button(role: .destructive) { toDelete = m } label: { Label("احذف", systemImage: "trash") }
+                        Button { editingMove = EditBox(j: m) } label: { Label("عدّل", systemImage: "pencil") }.tint(.accent2)
+                    }
                 }
-            }
+            } header: { Text("آخر الحركات") } footer: { Text("اضغط على أي حركة عشان تعدّل المبلغ أو التاريخ") }
         }
         .listStyle(.insetGrouped)
     }
@@ -206,6 +216,56 @@ struct BankMoveSheet: View {
         busy = true; err = ""
         do {
             try await API.shared.post("bank_move_add", ["kind": kind, "amount": a, "date": ymd(date), "note": note.trimmingCharacters(in: .whitespaces)])
+            onDone(); dismiss()
+        } catch { err = errText(error); busy = false }
+    }
+}
+
+/// Change a recorded transfer, deposit or withdrawal.
+struct MoveEditSheet: View {
+    let move: J
+    let onDone: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var amount = ""
+    @State private var date = Date.now
+    @State private var note = ""
+    @State private var channel = ""
+    @State private var kind = "in"
+    @State private var busy = false
+    @State private var err = ""
+
+    private var isPayout: Bool { move["type"].string == "payout" }
+
+    var body: some View {
+        FormSheet(title: isPayout ? "عدّل التحويل" : "عدّل الحركة", busy: busy, err: err, canSave: (Double(amount) ?? 0) > 0, onSave: { Task { await save() } }) {
+            Section {
+                if isPayout {
+                    Picker("التطبيق", selection: $channel) { ForEach(kChannels.map { $0.0 }, id: \.self) { k in Text(kChannelNames[k] ?? k).tag(k) } }
+                } else {
+                    Picker("النوع", selection: $kind) { Text("إيداع").tag("in"); Text("سحب / دفع").tag("out") }.pickerStyle(.segmented)
+                }
+                HStack { TextField("المبلغ", text: $amount).keyboardType(.decimalPad).font(.title2.bold()); Text("ر.ع").foregroundStyle(.secondary) }
+                DatePicker("التاريخ", selection: $date, in: ...Date.now, displayedComponents: .date)
+                TextField("ملاحظة (اختياري)", text: $note)
+            }
+        }
+        .onAppear {
+            let f = DateFormatter(); f.calendar = Calendar(identifier: .gregorian); f.locale = Locale(identifier: "en_US_POSIX")
+            f.timeZone = TimeZone(identifier: "Asia/Muscat"); f.dateFormat = "yyyy-MM-dd"
+            date = f.date(from: move["date"].string) ?? .now
+            amount = shortNumber(move["amount"].double)
+            note = move["note"].string
+            channel = move["channel"].string
+            kind = move["type"].string == "out" ? "out" : "in"
+        }
+    }
+
+    private func save() async {
+        guard let a = Double(amount), a > 0 else { err = "اكتب المبلغ"; return }
+        busy = true; err = ""
+        do {
+            try await API.shared.post("move_update", ["type": move["type"].string, "id": move["id"].int, "amount": a, "date": ymd(date),
+                                                      "note": note.trimmingCharacters(in: .whitespaces), "channel": channel, "kind": kind])
             onDone(); dismiss()
         } catch { err = errText(error); busy = false }
     }

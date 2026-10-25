@@ -475,6 +475,21 @@ case 'bank_opening':   // owner: what was in the account before the app started 
     set_setting('bank_opening', (string)money($v));
     out(['ok' => true]);
 
+case 'move_update':   // owner fixes a transfer, deposit or withdrawal (amount, date, note, app)
+    $post(); need('owner');
+    $id = (int)($in['id'] ?? 0);
+    $amt = (float)($in['amount'] ?? 0); if ($amt <= 0) fail('bad_amount');
+    $d = valid_date($in['date'] ?? ''); $note = clean($in['note'] ?? '', 120) ?: null;
+    $type = (string)($in['type'] ?? '');
+    if ($type === 'payout') {
+        $c = (string)($in['channel'] ?? ''); if (!in_array($c, channels(), true)) fail('bad_channel');
+        q('UPDATE channel_payouts SET channel = ?, amount = ?, paid_date = ?, note = ? WHERE id = ?', [$c, money($amt), $d, $note, $id]);
+    } elseif ($type === 'in' || $type === 'out') {
+        $k = ($in['kind'] ?? $type) === 'out' ? 'out' : 'in';
+        q('UPDATE bank_moves SET kind = ?, amount = ?, move_date = ?, note = ? WHERE id = ?', [$k, money($amt), $d, $note, $id]);
+    } else fail('bad_type');
+    out(['ok' => true]);
+
 case 'move_delete':
     $post(); need('owner');
     $t = ['payout' => 'channel_payouts', 'in' => 'bank_moves', 'out' => 'bank_moves'][$in['type'] ?? ''] ?? fail('bad_type');

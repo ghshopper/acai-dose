@@ -441,6 +441,7 @@ case 'accounts':   // what each app owes (sales after commission minus transfers
     $in = (float)(q("SELECT COALESCE(SUM(amount), 0) s FROM bank_moves WHERE kind = 'in'")->fetch()['s'] ?? 0);
     $outm = (float)(q("SELECT COALESCE(SUM(amount), 0) s FROM bank_moves WHERE kind = 'out'")->fetch()['s'] ?? 0);
     $open = (float)setting('bank_opening', '0');
+    $exp = (float)(q('SELECT COALESCE(SUM(amount), 0) s FROM expenses')->fetch()['s'] ?? 0);   // expenses are paid from the company account
     $moves = [];
     foreach (q('SELECT id, channel, amount, paid_date, note FROM channel_payouts ORDER BY paid_date DESC, id DESC LIMIT 60')->fetchAll() as $r)
         $moves[] = ['type' => 'payout', 'id' => (int)$r['id'], 'date' => $r['paid_date'], 'amount' => (float)$r['amount'], 'channel' => $r['channel'], 'note' => (string)($r['note'] ?? '')];
@@ -448,8 +449,8 @@ case 'accounts':   // what each app owes (sales after commission minus transfers
         $moves[] = ['type' => $r['kind'], 'id' => (int)$r['id'], 'date' => $r['move_date'], 'amount' => (float)$r['amount'], 'note' => (string)($r['note'] ?? '')];
     usort($moves, fn($a, $b) => strcmp($b['date'], $a['date']) ?: $b['id'] <=> $a['id']);
     out(['channels' => array_values($ch), 'owed_total' => money(array_sum(array_column($ch, 'owed'))),
-         'bank' => ['opening' => money($open), 'card' => money($card), 'payouts' => money($paidAll), 'in' => money($in), 'out' => money($outm),
-                    'balance' => money($open + $card + $paidAll + $in - $outm)],
+         'bank' => ['opening' => money($open), 'card' => money($card), 'payouts' => money($paidAll), 'in' => money($in), 'out' => money($outm), 'expenses' => money($exp),
+                    'balance' => money($open + $card + $paidAll + $in - $outm - $exp)],
          'moves' => array_slice($moves, 0, 80)]);
 
 case 'payout_add':   // owner: an app transferred money

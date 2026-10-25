@@ -87,14 +87,15 @@ struct AccountsView: View {
                 line("مبيعات البطاقة", money(bank["card"]))
                 line("تحويلات التطبيقات", money(bank["payouts"]))
                 line("إيداعات", money(bank["in"]))
-                line("سحوبات ومدفوعات", "− " + money(bank["out"]))
+                line("المصاريف", "− " + money(bank["expenses"]))
+                line("سحوبات ومدفوعات أخرى", "− " + money(bank["out"]))
                 HStack(spacing: 16) {
                     Button { moveKind = "in" } label: { Label("إيداع", systemImage: "plus.circle.fill") }.buttonStyle(.borderless)
                     Button { moveKind = "out" } label: { Label("سحب / دفع", systemImage: "minus.circle.fill") }.buttonStyle(.borderless).tint(.bad)
                     Spacer()
                     Button("الافتتاحي") { opening = shortNumber(bank["opening"].double); editingOpening = true }.buttonStyle(.borderless).font(.footnote)
                 }
-            } header: { Text("حساب الشركة") } footer: { Text("الكاش يظل في الدرج لين تودعه، سجّله «إيداع» لما توديه البنك") }
+            } header: { Text("حساب الشركة") } footer: { Text("المصاريف اللي تسجلها في تبويب المصاريف تنقص من الحساب. الكاش يظل في الدرج لين تودعه، سجّله «إيداع» لما توديه البنك") }
 
             Section("آخر الحركات") {
                 let moves = r["moves"].array

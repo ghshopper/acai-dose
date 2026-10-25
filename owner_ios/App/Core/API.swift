@@ -65,6 +65,7 @@ let kErrors: [String: String] = [
     "server_error": "مشكلة في السيرفر، جرب بعد شوي",
     "bad_size": "الحجم غلط",
     "sold_out": "الصنف خالص",
+    "bad_channel": "اختار التطبيق",
 ]
 
 func errText(_ code: String) -> String { kErrors[code] ?? "صار خطأ، جرب مرة ثانية" }

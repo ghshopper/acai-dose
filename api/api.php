@@ -423,6 +423,63 @@ case 'add_expense':
       [valid_date($in['expense_date'] ?? ''), $cat, money($amt), clean($in['note'] ?? '', 120) ?: null, now()]);
     out(['ok' => true]);
 
+// ---------------- owner: delivery app money and the company account ----------------
+case 'accounts':   // what each app owes (sales after commission minus transfers) and the bank balance
+    need('owner');
+    $ch = [];
+    foreach (channels() as $k) $ch[$k] = ['k' => $k, 'en' => CHANNEL_NAMES[$k][0], 'ar' => CHANNEL_NAMES[$k][1], 'gross' => 0.0, 'commission' => 0.0, 'orders' => 0, 'paid' => 0.0, 'last_paid' => null];
+    foreach (q("SELECT payment, SUM(total) g, SUM(COALESCE(commission, 0)) c, SUM(COALESCE(n_orders, 1)) n FROM orders WHERE source = 'pos' AND status <> 'cancelled' GROUP BY payment")->fetchAll() as $r)
+        if (isset($ch[$r['payment']])) { $ch[$r['payment']]['gross'] += (float)$r['g']; $ch[$r['payment']]['commission'] += (float)$r['c']; $ch[$r['payment']]['orders'] += (int)$r['n']; }
+    foreach (q('SELECT channel, SUM(gross) g, SUM(commission) c, SUM(COALESCE(orders_count, 0)) n FROM channel_sales GROUP BY channel')->fetchAll() as $r)
+        if (isset($ch[$r['channel']])) { $ch[$r['channel']]['gross'] += (float)$r['g']; $ch[$r['channel']]['commission'] += (float)$r['c']; $ch[$r['channel']]['orders'] += (int)$r['n']; }
+    foreach (q('SELECT channel, SUM(amount) a, MAX(paid_date) d FROM channel_payouts GROUP BY channel')->fetchAll() as $r)
+        if (isset($ch[$r['channel']])) { $ch[$r['channel']]['paid'] = (float)$r['a']; $ch[$r['channel']]['last_paid'] = $r['d']; }
+    foreach ($ch as &$c) { $c['net'] = money($c['gross'] - $c['commission']); $c['owed'] = money($c['net'] - $c['paid']); $c['gross'] = money($c['gross']); $c['commission'] = money($c['commission']); }
+    unset($c);
+    $card = (float)(q("SELECT COALESCE(SUM(total), 0) s FROM orders WHERE payment = 'card' AND status <> 'cancelled'")->fetch()['s'] ?? 0);
+    $paidAll = array_sum(array_column($ch, 'paid'));
+    $in = (float)(q("SELECT COALESCE(SUM(amount), 0) s FROM bank_moves WHERE kind = 'in'")->fetch()['s'] ?? 0);
+    $outm = (float)(q("SELECT COALESCE(SUM(amount), 0) s FROM bank_moves WHERE kind = 'out'")->fetch()['s'] ?? 0);
+    $open = (float)setting('bank_opening', '0');
+    $moves = [];
+    foreach (q('SELECT id, channel, amount, paid_date, note FROM channel_payouts ORDER BY paid_date DESC, id DESC LIMIT 60')->fetchAll() as $r)
+        $moves[] = ['type' => 'payout', 'id' => (int)$r['id'], 'date' => $r['paid_date'], 'amount' => (float)$r['amount'], 'channel' => $r['channel'], 'note' => (string)($r['note'] ?? '')];
+    foreach (q('SELECT id, kind, amount, move_date, note FROM bank_moves ORDER BY move_date DESC, id DESC LIMIT 60')->fetchAll() as $r)
+        $moves[] = ['type' => $r['kind'], 'id' => (int)$r['id'], 'date' => $r['move_date'], 'amount' => (float)$r['amount'], 'note' => (string)($r['note'] ?? '')];
+    usort($moves, fn($a, $b) => strcmp($b['date'], $a['date']) ?: $b['id'] <=> $a['id']);
+    out(['channels' => array_values($ch), 'owed_total' => money(array_sum(array_column($ch, 'owed'))),
+         'bank' => ['opening' => money($open), 'card' => money($card), 'payouts' => money($paidAll), 'in' => money($in), 'out' => money($outm),
+                    'balance' => money($open + $card + $paidAll + $in - $outm)],
+         'moves' => array_slice($moves, 0, 80)]);
+
+case 'payout_add':   // owner: an app transferred money
+    $post(); need('owner');
+    $c = (string)($in['channel'] ?? ''); if (!in_array($c, channels(), true)) fail('bad_channel');
+    $amt = (float)($in['amount'] ?? 0); if ($amt <= 0) fail('bad_amount');
+    q('INSERT INTO channel_payouts (channel, amount, paid_date, note, created_at) VALUES (?,?,?,?,?)',
+      [$c, money($amt), valid_date($in['date'] ?? date('Y-m-d')), clean($in['note'] ?? '', 120) ?: null, now()]);
+    out(['ok' => true]);
+
+case 'bank_move_add':   // owner: other money in (cash deposited…) or out (rent paid, withdrawal…) of the company account
+    $post(); need('owner');
+    $k = ($in['kind'] ?? '') === 'out' ? 'out' : 'in';
+    $amt = (float)($in['amount'] ?? 0); if ($amt <= 0) fail('bad_amount');
+    q('INSERT INTO bank_moves (move_date, kind, amount, note, created_at) VALUES (?,?,?,?,?)',
+      [valid_date($in['date'] ?? date('Y-m-d')), $k, money($amt), clean($in['note'] ?? '', 120) ?: null, now()]);
+    out(['ok' => true]);
+
+case 'bank_opening':   // owner: what was in the account before the app started counting
+    $post(); need('owner');
+    $v = (float)($in['amount'] ?? 0);
+    set_setting('bank_opening', (string)money($v));
+    out(['ok' => true]);
+
+case 'move_delete':
+    $post(); need('owner');
+    $t = ['payout' => 'channel_payouts', 'in' => 'bank_moves', 'out' => 'bank_moves'][$in['type'] ?? ''] ?? fail('bad_type');
+    q("DELETE FROM $t WHERE id = ?", [(int)($in['id'] ?? 0)]);
+    out(['ok' => true]);
+
 case 'expense_update':  // owner fixes an expense (date, type, amount, note)
     $post(); need('owner');
     $amt = (float)($in['amount'] ?? -1); if ($amt < 0) fail('bad_amount');

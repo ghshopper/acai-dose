@@ -49,6 +49,11 @@ function create_schema(): void {
             card_token VARCHAR(32) NULL, wallet_auth VARCHAR(32) NULL, pass_updated INT NOT NULL DEFAULT 0, gwallet TINYINT NOT NULL DEFAULT 0)$eng",
         "CREATE TABLE IF NOT EXISTS settings (k VARCHAR(40) PRIMARY KEY, v TEXT NOT NULL)$eng",
         "CREATE TABLE IF NOT EXISTS wallet_devices (device_id VARCHAR(100) PRIMARY KEY, push_token VARCHAR(200) NOT NULL, updated_at DATETIME NOT NULL)$eng",
+        // Money the delivery apps transfer to the shop, and other money in / out of the company bank account
+        "CREATE TABLE IF NOT EXISTS channel_payouts (
+            id $id, channel VARCHAR(12) NOT NULL, amount DECIMAL(10,3) NOT NULL, paid_date DATE NOT NULL, note VARCHAR(120) NULL, created_at DATETIME NOT NULL)$eng",
+        "CREATE TABLE IF NOT EXISTS bank_moves (
+            id $id, move_date DATE NOT NULL, kind VARCHAR(4) NOT NULL, amount DECIMAL(10,3) NOT NULL, note VARCHAR(120) NULL, created_at DATETIME NOT NULL)$eng",
         "CREATE TABLE IF NOT EXISTS wallet_regs (device_id VARCHAR(100) NOT NULL, serial VARCHAR(40) NOT NULL, created_at DATETIME NOT NULL, PRIMARY KEY (device_id, serial))$eng",
     ];
     foreach ($sql as $s) xq($s);

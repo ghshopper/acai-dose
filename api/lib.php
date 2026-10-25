@@ -5,7 +5,7 @@ date_default_timezone_set('Asia/Muscat');
 // tables (same names with a kd_ prefix), so menus, sales, staff and customers never mix.
 define('BIZ', (preg_match('~^/karak(/|$)~', (string)parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH)) || getenv('ACAI_TEST_BIZ') === 'karak') ? 'karak' : 'acai');
 define('SHOP_PHONE', BIZ === 'karak' ? '+96898558386' : '+96872612311');   // shop number: WhatsApp button default, wallet cards
-const BIZ_TABLES = 'users|products|orders|day_counters|channel_commissions|channel_sales|expenses|hits|ingredients|recipe_items|purchases|stock_counts|toppings|customers|settings|wallet_devices|wallet_regs';
+const BIZ_TABLES = 'channel_payouts|bank_moves|users|products|orders|day_counters|channel_commissions|channel_sales|expenses|hits|ingredients|recipe_items|purchases|stock_counts|toppings|customers|settings|wallet_devices|wallet_regs';
 /** Points table names in a statement at this shop's tables. */
 function tp(string $sql): string {
     if (BIZ === 'acai') return $sql;
@@ -100,7 +100,7 @@ function clean(?string $s, int $max): string { return mb_substr(trim((string)$s)
 /** Adds new columns on first request after an update, so re-running setup is not needed. */
 function ensure_schema(): void {
     try { q('SELECT source, car_plate, token, commission, n_orders FROM orders LIMIT 0'); q('SELECT id, card_token, pass_updated, gwallet, stamp_adj FROM customers LIMIT 0'); q('SELECT free_cups FROM orders LIMIT 0'); q('SELECT k FROM settings LIMIT 0'); q('SELECT serial FROM wallet_regs LIMIT 0'); q('SELECT id FROM stock_counts LIMIT 0');
-          q('SELECT cat, size, soldout FROM products LIMIT 0');
+          q('SELECT cat, size, soldout FROM products LIMIT 0'); q('SELECT id FROM channel_payouts LIMIT 0'); q('SELECT id FROM bank_moves LIMIT 0');
           $flags = BIZ === 'karak' ? ['karak_menu', 'open_item', 'karak_flavours'] : ['mini_prices_set', 'bowls_added', 'costing_added', 'open_item'];
           foreach ($flags as $f) if (!q('SELECT 1 FROM settings WHERE k = ?', [$f])->fetch()) throw new RuntimeException("$f missing"); }
     catch (Throwable $e) { require_once __DIR__ . '/schema.php'; create_schema(); }

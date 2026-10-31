@@ -18,6 +18,7 @@ struct MoreView: View {
             }
             Section {
                 NavigationLink { SettingsView() } label: { row("gearshape.fill", .gray, "الإعدادات", "الأسعار، الولاء، العمولات، حسابات العمال") }
+                NavigationLink { ReportView() } label: { row("doc.text.magnifyingglass", .brand, "تقرير الشركاء", "المحلين مع بعض، وترسله واتساب بضغطة") }
                 NavigationLink { AccountsView() } label: { row("banknote.fill", .accent2, "الحسابات والتحويلات", "كم باقي على التطبيقات، ورصيد حساب الشركة") }
                 NavigationLink { CostView() } label: { row("shippingbox.fill", .good, "التكلفة والمخزون", "تكلفة كل كوب، الجرد، المشتريات") }
                 Button { sale = true } label: { row("bag.fill", .accent2, "مبيعات التطبيقات", "أدخل مبيعات " + kChannels.map(\.1).joined(separator: " و")) }

@@ -96,6 +96,7 @@ struct AccountsView: View {
                 HStack(spacing: 16) {
                     Button { moveKind = "in" } label: { Label("إيداع", systemImage: "plus.circle.fill") }.buttonStyle(.borderless)
                     Button { moveKind = "out" } label: { Label("سحب / دفع", systemImage: "minus.circle.fill") }.buttonStyle(.borderless).tint(.bad)
+                    Button { moveKind = "cap" } label: { Label("من جيبي", systemImage: "person.crop.circle.badge.plus") }.buttonStyle(.borderless).tint(.good)
                     Spacer()
                     Button("الافتتاحي") { opening = shortNumber(bank["opening"].double); editingOpening = true }.buttonStyle(.borderless).font(.footnote)
                 }
@@ -132,6 +133,7 @@ struct AccountsView: View {
         switch m["type"].string {
         case "payout": return "تحويل من \(kChannelNames[m["channel"].string] ?? m["channel"].string)"
         case "in": return "إيداع"
+        case "cap": return "دفعت من جيبي"
         default: return "سحب / دفع"
         }
     }
@@ -202,11 +204,11 @@ struct BankMoveSheet: View {
     @State private var err = ""
 
     var body: some View {
-        FormSheet(title: kind == "out" ? "سحب أو دفع من الحساب" : "إيداع في الحساب", busy: busy, err: err, canSave: (Double(amount) ?? 0) > 0, onSave: { Task { await save() } }) {
+        FormSheet(title: kind == "out" ? "سحب أو دفع من الحساب" : kind == "cap" ? "دفعت من جيبي للمحل" : "إيداع في الحساب", busy: busy, err: err, canSave: (Double(amount) ?? 0) > 0, onSave: { Task { await save() } }) {
             Section {
                 HStack { TextField("المبلغ", text: $amount).keyboardType(.decimalPad).font(.title2.bold()); Text("ر.ع").foregroundStyle(.secondary) }
                 DatePicker("التاريخ", selection: $date, in: ...Date.now, displayedComponents: .date)
-                TextField(kind == "out" ? "على شنو؟ (إيجار، سحب…)" : "من وين؟ (كاش الدرج…)", text: $note)
+                TextField(kind == "out" ? "على شنو؟ (إيجار، سحب…)" : kind == "cap" ? "على شنو؟ (رواتب، إيجار…)" : "من وين؟ (كاش الدرج…)", text: $note)
             }
         }
     }
@@ -242,7 +244,7 @@ struct MoveEditSheet: View {
                 if isPayout {
                     Picker("التطبيق", selection: $channel) { ForEach(kChannels.map { $0.0 }, id: \.self) { k in Text(kChannelNames[k] ?? k).tag(k) } }
                 } else {
-                    Picker("النوع", selection: $kind) { Text("إيداع").tag("in"); Text("سحب / دفع").tag("out") }.pickerStyle(.segmented)
+                    Picker("النوع", selection: $kind) { Text("إيداع").tag("in"); Text("من جيبي").tag("cap"); Text("سحب / دفع").tag("out") }.pickerStyle(.segmented)
                 }
                 HStack { TextField("المبلغ", text: $amount).keyboardType(.decimalPad).font(.title2.bold()); Text("ر.ع").foregroundStyle(.secondary) }
                 DatePicker("التاريخ", selection: $date, in: ...Date.now, displayedComponents: .date)
@@ -256,7 +258,7 @@ struct MoveEditSheet: View {
             amount = shortNumber(move["amount"].double)
             note = move["note"].string
             channel = move["channel"].string
-            kind = move["type"].string == "out" ? "out" : "in"
+            kind = ["out", "cap"].contains(move["type"].string) ? move["type"].string : "in"
         }
     }
 

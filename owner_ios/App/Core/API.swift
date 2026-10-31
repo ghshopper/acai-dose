@@ -93,6 +93,11 @@ final class API {
         set { UserDefaults.standard.set(newValue, forKey: biz.cookieKey) }
     }
 
+    /// Reads from a given shop whatever shop is on screen (the partners' report reads both).
+    func get(_ action: String, _ query: [String: String] = [:], biz b: Biz) async throws -> J {
+        try await send(action, body: nil, query: query, biz: b)
+    }
+
     func clearSession() { cookie = nil }
 
     func get(_ action: String, _ query: [String: String] = [:]) async throws -> J {
@@ -104,12 +109,13 @@ final class API {
         try await send(action, body: body, query: [:])
     }
 
-    private func send(_ action: String, body: [String: Any]?, query: [String: String]) async throws -> J {
-        var comps = URLComponents(url: base, resolvingAgainstBaseURL: false)!
+    private func send(_ action: String, body: [String: Any]?, query: [String: String], biz forBiz: Biz? = nil) async throws -> J {
+        let b = forBiz ?? biz
+        var comps = URLComponents(url: URL(string: "\(b.site)/api/api.php")!, resolvingAgainstBaseURL: false)!
         comps.queryItems = [URLQueryItem(name: "a", value: action)] + query.map { URLQueryItem(name: $0.key, value: $0.value) }
         var req = URLRequest(url: comps.url!)
         req.setValue("AcaiDoseOwner/2.0 (iOS)", forHTTPHeaderField: "User-Agent")
-        if let c = cookie { req.setValue(c, forHTTPHeaderField: "Cookie") }
+        if let c = UserDefaults.standard.string(forKey: b.cookieKey) { req.setValue(c, forHTTPHeaderField: "Cookie") }
         if let body {
             req.httpMethod = "POST"
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -118,7 +124,7 @@ final class API {
         let data: Data, resp: URLResponse
         do { (data, resp) = try await session.data(for: req) } catch { throw APIError(code: "network") }
         let http = resp as? HTTPURLResponse
-        keepCookie(http)
+        if b == biz { keepCookie(http) }
         let json = J(try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]))
         let status = http?.statusCode ?? 0
         if status >= 400 {

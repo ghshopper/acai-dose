@@ -6,9 +6,11 @@ struct AccountsView: View {
     @State private var r: J?
     @State private var err: String?
     @State private var payFor: EditBox?       // channel row the transfer sheet is for
-    @State private var moveKind: String?      // "in" / "out" sheet
-    @State private var editingOpening = false
+    @State private var moveReq: KindBox?      // money in / out / from my pocket, for one account
+    @State private var openingFor: String?    // account whose opening balance is being set
     @State private var opening = ""
+    @State private var naming: String?        // "" = new account, else the account being renamed
+    @State private var accName = ""
     @State private var toDelete: J?
     @State private var editingMove: EditBox?
 
@@ -22,19 +24,29 @@ struct AccountsView: View {
         .refreshable { await load() }
         .task { await load() }
         .sheet(item: $payFor) { b in
-            PayoutSheet(channel: b.j) { toaster.show("انسجّل التحويل"); Task { await load() } }
+            PayoutSheet(channel: b.j, accounts: r?["accounts"].array ?? []) { toaster.show("انسجّل التحويل"); Task { await load() } }
         }
         .sheet(item: $editingMove) { b in
-            MoveEditSheet(move: b.j) { toaster.show("انعدّلت"); Task { await load() } }
+            MoveEditSheet(move: b.j, accounts: r?["accounts"].array ?? []) { toaster.show("انعدّلت"); Task { await load() } }
         }
-        .sheet(item: Binding(get: { moveKind.map { KindBox(kind: $0) } }, set: { moveKind = $0?.kind })) { b in
-            BankMoveSheet(kind: b.kind) { toaster.show("انحفظ"); Task { await load() } }
+        .sheet(item: $moveReq) { b in
+            BankMoveSheet(kind: b.kind, acct: b.acct, acctName: b.name) { toaster.show("انحفظ"); Task { await load() } }
         }
-        .alert("الرصيد الافتتاحي", isPresented: $editingOpening) {
+        .alert("الرصيد الافتتاحي", isPresented: Binding(get: { openingFor != nil }, set: { if !$0 { openingFor = nil } })) {
             TextField("0.000", text: $opening).keyboardType(.decimalPad)
             Button("إلغاء", role: .cancel) {}
-            Button("احفظ") { Task { await post("bank_opening", ["amount": Double(opening) ?? 0], "انحفظ الرصيد") } }
-        } message: { Text("كم كان في حساب الشركة قبل ما يبدأ التطبيق يحسب") }
+            Button("احفظ") { let k = openingFor ?? "main"; Task { await post("bank_opening", ["acct": k, "amount": Double(opening) ?? 0], "انحفظ الرصيد") } }
+        } message: { Text("كم كان في الحساب قبل ما يبدأ التطبيق يحسب") }
+        .alert(naming == "" ? "حساب جديد" : "اسم الحساب", isPresented: Binding(get: { naming != nil }, set: { if !$0 { naming = nil } })) {
+            TextField("مثلاً: حساب المغسلة", text: $accName)
+            if naming == "" { TextField("الرصيد الحين (اختياري)", text: $opening).keyboardType(.decimalPad) }
+            Button("إلغاء", role: .cancel) {}
+            Button("احفظ") {
+                var b: [String: Any] = ["name": accName.trimmingCharacters(in: .whitespaces)]
+                if let k = naming, !k.isEmpty { b["k"] = k } else { b["opening"] = Double(opening) ?? 0 }
+                Task { await post("bank_account_save", b, "انحفظ الحساب") }
+            }
+        }
         .confirmationDialog("تحذف هذي الحركة؟", isPresented: Binding(get: { toDelete != nil }, set: { if !$0 { toDelete = nil } }), titleVisibility: .visible) {
             Button("احذف", role: .destructive) { if let m = toDelete { Task { await post("move_delete", ["type": m["type"].string, "id": m["id"].int], "انحذفت") } } }
             Button("إلغاء", role: .cancel) {}
@@ -46,10 +58,19 @@ struct AccountsView: View {
         return List {
             Section {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("رصيد حساب الشركة").font(.subheadline.weight(.semibold)).foregroundStyle(Color.lilac)
+                    Text(r["accounts"].array.count > 1 ? "في كل الحسابات" : "رصيد حساب الشركة").font(.subheadline.weight(.semibold)).foregroundStyle(Color.lilac)
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(money(bank["balance"])).font(.system(size: 40, weight: .bold, design: .rounded)).monospacedDigit().foregroundStyle(Color.cream)
+                        Text(money(r["total_balance"].isNull ? bank["balance"] : r["total_balance"])).font(.system(size: 40, weight: .bold, design: .rounded)).monospacedDigit().foregroundStyle(Color.cream)
                         Text("ر.ع").font(.headline).foregroundStyle(Color.lilac)
+                    }
+                    if r["accounts"].array.count > 1 {
+                        ForEach(r["accounts"].array, id: \.self) { a in
+                            HStack {
+                                Text(a["name"].string).font(.footnote.weight(.semibold)).foregroundStyle(Color.lilac)
+                                Spacer()
+                                Text(money(a["balance"])).font(.footnote.bold()).monospacedDigit().foregroundStyle(Color.cream)
+                            }
+                        }
                     }
                     HStack {
                         Text("باقي على التطبيقات").font(.footnote.weight(.semibold)).foregroundStyle(Color.lilac)
@@ -79,6 +100,17 @@ struct AccountsView: View {
                         line("العمولة", "− " + money(c["commission"]))
                         line("المفروض يحولون", money(c["net"]))
                         line("حوّلوا", money(c["paid"]) + (c["last_paid"].string.isEmpty ? "" : " · آخر مرة \(c["last_paid"].string)"))
+                        if r["accounts"].array.count > 1 {
+                            HStack {
+                                Text("يحوّلون على").font(.subheadline).foregroundStyle(.secondary)
+                                Spacer()
+                                Picker("", selection: Binding(get: { c["acct"].string.isEmpty ? "main" : c["acct"].string },
+                                                              set: { v in Task { await post("channel_account", ["channel": c["k"].string, "acct": v], "انحفظ") } })) {
+                                    ForEach(r["accounts"].array, id: \.self) { a in Text(a["name"].string).tag(a["k"].string) }
+                                }
+                                .labelsHidden()
+                            }
+                        }
                         Button { payFor = EditBox(j: c) } label: { Label("سجّل تحويل من \(c["ar"].string)", systemImage: "arrow.down.circle.fill") }
                             .buttonStyle(.borderless).padding(.top, 2)
                     }
@@ -86,21 +118,40 @@ struct AccountsView: View {
                 }
             } header: { Text("التطبيقات") } footer: { Text("المبيعات من الكاشير ومبيعات التطبيقات اللي تدخلها، بعد العمولة، ناقص اللي حولوه") }
 
-            Section {
-                line("الرصيد الافتتاحي", money(bank["opening"]))
-                line("مبيعات البطاقة", money(bank["card"]))
-                line("تحويلات التطبيقات", money(bank["payouts"]))
-                line("إيداعات", money(bank["in"]))
-                line("المصاريف", "− " + money(bank["expenses"]))
-                line("سحوبات ومدفوعات أخرى", "− " + money(bank["out"]))
-                HStack(spacing: 16) {
-                    Button { moveKind = "in" } label: { Label("إيداع", systemImage: "plus.circle.fill") }.buttonStyle(.borderless)
-                    Button { moveKind = "out" } label: { Label("سحب / دفع", systemImage: "minus.circle.fill") }.buttonStyle(.borderless).tint(.bad)
-                    Button { moveKind = "cap" } label: { Label("من جيبي", systemImage: "person.crop.circle.badge.plus") }.buttonStyle(.borderless).tint(.good)
-                    Spacer()
-                    Button("الافتتاحي") { opening = shortNumber(bank["opening"].double); editingOpening = true }.buttonStyle(.borderless).font(.footnote)
+            ForEach(r["accounts"].array, id: \.self) { a in
+                let k = a["k"].string, main = k == "main"
+                Section {
+                    line("الرصيد الافتتاحي", money(a["opening"]))
+                    if main { line("مبيعات البطاقة", money(a["card"])) }
+                    line("تحويلات التطبيقات", money(a["payouts"]))
+                    line("إيداعات ومن جيبي", money(a["in"]))
+                    if main { line("المصاريف", "− " + money(a["expenses"])) }
+                    line("سحوبات ومدفوعات", "− " + money(a["out"]))
+                    HStack {
+                        Text("الرصيد").font(.subheadline.weight(.bold))
+                        Spacer()
+                        Text("\(money(a["balance"])) ر.ع").font(.headline).monospacedDigit().foregroundStyle(a["balance"].double < 0 ? Color.bad : Color.ink)
+                    }
+                    HStack(spacing: 16) {
+                        Button { moveReq = KindBox(kind: "in", acct: k, name: a["name"].string) } label: { Label("إيداع", systemImage: "plus.circle.fill") }.buttonStyle(.borderless)
+                        Button { moveReq = KindBox(kind: "out", acct: k, name: a["name"].string) } label: { Label("سحب / دفع", systemImage: "minus.circle.fill") }.buttonStyle(.borderless).tint(.bad)
+                        Button { moveReq = KindBox(kind: "cap", acct: k, name: a["name"].string) } label: { Label("من جيبي", systemImage: "person.crop.circle.badge.plus") }.buttonStyle(.borderless).tint(.good)
+                    }
+                    HStack(spacing: 16) {
+                        Button("الافتتاحي") { opening = shortNumber(a["opening"].double); openingFor = k }.buttonStyle(.borderless).font(.footnote)
+                        Button("غيّر الاسم") { accName = a["name"].string; naming = k }.buttonStyle(.borderless).font(.footnote)
+                        if !main {
+                            Spacer()
+                            Button("احذف", role: .destructive) { Task { await post("bank_account_delete", ["k": k], "انحذف الحساب") } }.buttonStyle(.borderless).font(.footnote)
+                        }
+                    }
+                } header: { Text(a["name"].string) } footer: {
+                    if main { Text("مبيعات البطاقة تدخله، والمصاريف تنقص منه. الكاش يظل في الدرج لين تسجّله «إيداع».") }
                 }
-            } header: { Text("حساب الشركة") } footer: { Text("المصاريف اللي تسجلها في تبويب المصاريف تنقص من الحساب. الكاش يظل في الدرج لين تودعه، سجّله «إيداع» لما توديه البنك") }
+            }
+            Section {
+                Button { accName = ""; opening = ""; naming = "" } label: { Label("أضف حساب ثاني", systemImage: "building.columns.fill") }
+            } footer: { Text("مثلاً حساب تحوّل عليه طلبات، وتختاره فوق عند التطبيق") }
 
             Section {
                 let moves = r["moves"].array
@@ -112,7 +163,7 @@ struct AccountsView: View {
                         Image(systemName: out ? "arrow.up.right.circle.fill" : "arrow.down.left.circle.fill").foregroundStyle(out ? Color.bad : Color.good)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(title(m)).font(.subheadline.weight(.semibold))
-                            Text(m["date"].string + (m["note"].string.isEmpty ? "" : " · \(m["note"].string)")).font(.caption).foregroundStyle(.secondary)
+                            Text(m["date"].string + (r["accounts"].array.count > 1 && !m["acct_name"].string.isEmpty ? " · \(m["acct_name"].string)" : "") + (m["note"].string.isEmpty ? "" : " · \(m["note"].string)")).font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
                         Text((out ? "− " : "+ ") + money(m["amount"])).font(.subheadline.bold()).monospacedDigit().foregroundStyle(out ? Color.bad : Color.good)
@@ -156,12 +207,25 @@ struct AccountsView: View {
     }
 }
 
-struct KindBox: Identifiable { let kind: String; var id: String { kind } }
+struct KindBox: Identifiable { let kind: String; var acct = "main"; var name = ""; var id: String { kind + acct } }
+
+/// Picker of the shop's accounts, shown only when there is more than one.
+struct AccountPicker: View {
+    let accounts: [J]
+    @Binding var acct: String
+    var body: some View {
+        if accounts.count > 1 {
+            Picker("على حساب", selection: $acct) { ForEach(accounts, id: \.self) { a in Text(a["name"].string).tag(a["k"].string) } }
+        }
+    }
+}
 
 /// Records money a delivery app transferred.
 struct PayoutSheet: View {
     let channel: J
+    var accounts: [J] = []
     let onDone: () -> Void
+    @State private var acct = "main"
     @Environment(\.dismiss) private var dismiss
     @State private var amount = ""
     @State private var date = Date.now
@@ -177,16 +241,18 @@ struct PayoutSheet: View {
                     Button("كل الباقي: \(money(channel["owed"])) ر.ع") { amount = shortNumber(channel["owed"].double) }
                 }
                 DatePicker("تاريخ التحويل", selection: $date, in: ...Date.now, displayedComponents: .date)
+                AccountPicker(accounts: accounts, acct: $acct)
                 TextField("ملاحظة (اختياري)", text: $note)
             } footer: { Text("باقي عليهم الحين \(money(channel["owed"])) ر.ع") }
         }
+        .onAppear { acct = channel["acct"].string.isEmpty ? "main" : channel["acct"].string }
     }
 
     private func save() async {
         guard let a = Double(amount), a > 0 else { err = "اكتب المبلغ"; return }
         busy = true; err = ""
         do {
-            try await API.shared.post("payout_add", ["channel": channel["k"].string, "amount": a, "date": ymd(date), "note": note.trimmingCharacters(in: .whitespaces)])
+            try await API.shared.post("payout_add", ["channel": channel["k"].string, "amount": a, "date": ymd(date), "note": note.trimmingCharacters(in: .whitespaces), "acct": acct])
             onDone(); dismiss()
         } catch { err = errText(error); busy = false }
     }
@@ -195,6 +261,8 @@ struct PayoutSheet: View {
 /// Other money into or out of the company account.
 struct BankMoveSheet: View {
     let kind: String
+    var acct = "main"
+    var acctName = ""
     let onDone: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var amount = ""
@@ -209,7 +277,7 @@ struct BankMoveSheet: View {
                 HStack { TextField("المبلغ", text: $amount).keyboardType(.decimalPad).font(.title2.bold()); Text("ر.ع").foregroundStyle(.secondary) }
                 DatePicker("التاريخ", selection: $date, in: ...Date.now, displayedComponents: .date)
                 TextField(kind == "out" ? "على شنو؟ (إيجار، سحب…)" : kind == "cap" ? "على شنو؟ (رواتب، إيجار…)" : "من وين؟ (كاش الدرج…)", text: $note)
-            }
+            } footer: { if !acctName.isEmpty { Text(acctName) } }
         }
     }
 
@@ -217,7 +285,7 @@ struct BankMoveSheet: View {
         guard let a = Double(amount), a > 0 else { err = "اكتب المبلغ"; return }
         busy = true; err = ""
         do {
-            try await API.shared.post("bank_move_add", ["kind": kind, "amount": a, "date": ymd(date), "note": note.trimmingCharacters(in: .whitespaces)])
+            try await API.shared.post("bank_move_add", ["kind": kind, "amount": a, "date": ymd(date), "note": note.trimmingCharacters(in: .whitespaces), "acct": acct])
             onDone(); dismiss()
         } catch { err = errText(error); busy = false }
     }
@@ -226,7 +294,9 @@ struct BankMoveSheet: View {
 /// Change a recorded transfer, deposit or withdrawal.
 struct MoveEditSheet: View {
     let move: J
+    var accounts: [J] = []
     let onDone: () -> Void
+    @State private var acct = "main"
     @Environment(\.dismiss) private var dismiss
     @State private var amount = ""
     @State private var date = Date.now
@@ -248,10 +318,12 @@ struct MoveEditSheet: View {
                 }
                 HStack { TextField("المبلغ", text: $amount).keyboardType(.decimalPad).font(.title2.bold()); Text("ر.ع").foregroundStyle(.secondary) }
                 DatePicker("التاريخ", selection: $date, in: ...Date.now, displayedComponents: .date)
+                AccountPicker(accounts: accounts, acct: $acct)
                 TextField("ملاحظة (اختياري)", text: $note)
             }
         }
         .onAppear {
+            acct = move["acct"].string.isEmpty ? "main" : move["acct"].string
             let f = DateFormatter(); f.calendar = Calendar(identifier: .gregorian); f.locale = Locale(identifier: "en_US_POSIX")
             f.timeZone = TimeZone(identifier: "Asia/Muscat"); f.dateFormat = "yyyy-MM-dd"
             date = f.date(from: move["date"].string) ?? .now
@@ -267,7 +339,7 @@ struct MoveEditSheet: View {
         busy = true; err = ""
         do {
             try await API.shared.post("move_update", ["type": move["type"].string, "id": move["id"].int, "amount": a, "date": ymd(date),
-                                                      "note": note.trimmingCharacters(in: .whitespaces), "channel": channel, "kind": kind])
+                                                      "note": note.trimmingCharacters(in: .whitespaces), "channel": channel, "kind": kind, "acct": acct])
             onDone(); dismiss()
         } catch { err = errText(error); busy = false }
     }

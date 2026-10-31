@@ -98,7 +98,10 @@ struct ReportView: View {
                 ForEach(r["one_off"].dict.sorted { $0.value.double > $1.value.double }, id: \.key) { k, v in row("   \(k)", -v.double) }
                 row("الصافي بعدها", r["net"].double, bold: true)
             }
-            row("في حساب الشركة", r["bank"].double, bold: true)
+            if r["accounts"].array.count > 1 {
+                ForEach(r["accounts"].array, id: \.self) { a in row("في \(a["name"].string)", a["balance"].double) }
+            }
+            row(r["accounts"].array.count > 1 ? "في كل الحسابات" : "في حساب الشركة", r["bank"].double, bold: true)
             ForEach(r["owed"].array, id: \.self) { o in row("باقي عند \(o["ar"].string)", o["owed"].double) }
             if r["owner_in"].double > 0 { row("دفعت من جيبك", r["owner_in"].double) }
             if r["withdrawn"].double > 0 { row("سحوبات", -r["withdrawn"].double) }
@@ -145,7 +148,9 @@ struct ReportView: View {
                 lines.append("مصاريف مرة وحدة: \(m(r["one_off_total"].double))\n  \(once)")
                 lines.append("الصافي بعدها: \(m(r["net"].double))")
             }
-            lines.append("💳 في حساب الشركة: \(m(r["bank"].double))")
+            let accs = r["accounts"].array
+            if accs.count > 1 { for a in accs { lines.append("💳 \(a["name"].string): \(m(a["balance"].double))") } }
+            else { lines.append("💳 في حساب الشركة: \(m(r["bank"].double))") }
             let owed = r["owed"].array.map { "\($0["ar"].string) \(m($0["owed"].double))" }.joined(separator: " · ")
             if !owed.isEmpty { lines.append("⏳ باقي عند التطبيقات: \(owed)") }
             if r["owner_in"].double > 0 { lines.append("دفعت من جيبي: \(m(r["owner_in"].double))") }

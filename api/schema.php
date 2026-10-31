@@ -179,6 +179,13 @@ function create_schema(): void {
         q("INSERT INTO settings (k, v) VALUES ('open_item', '1')");
     }
 
+    // Several bank accounts: transfers and moves say which one ('main' = the company account)
+    foreach (['channel_payouts', 'bank_moves'] as $t) {
+        $have = [];
+        foreach (q(is_mysql() ? "SHOW COLUMNS FROM $t" : "PRAGMA table_info($t)")->fetchAll() as $c) $have[] = $c['Field'] ?? $c['name'];
+        if (!in_array('acct', $have, true)) xq("ALTER TABLE $t ADD COLUMN acct VARCHAR(20) NOT NULL DEFAULT 'main'");
+    }
+
     // Delivery apps this shop sells through (each with its commission, set by the owner)
     foreach ((BIZ === 'karak' ? ['talabat', 'tmdone', 'khedmah', 'snoonu'] : ['talabat', 'snoonu', 'khedmah']) as $c) {
         if (!q('SELECT 1 FROM channel_commissions WHERE channel = ?', [$c])->fetch())

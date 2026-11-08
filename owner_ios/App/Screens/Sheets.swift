@@ -62,13 +62,14 @@ struct AddExpenseSheet: View {
                 Picker("طريقة الدفع", selection: $pay) {
                     Text("تحويل").tag("bank")
                     Text("كاش").tag("cash")
+                    Text("من العهدة").tag("custody")
                 }
                 .pickerStyle(.segmented)
-            } header: { Text("طريقة الدفع") } footer: { Text(pay == "bank" ? "ينقص من رصيد حساب الشركة" : "انصرف كاش، وما ينقص من رصيد الحساب") }
+            } header: { Text("طريقة الدفع") } footer: { Text(pay == "bank" ? "ينقص من رصيد حساب الشركة" : pay == "custody" ? "انصرف من العهدة اللي حولتها لموظف المشتريات" : "انصرف كاش، وما ينقص من رصيد الحساب") }
         }
         .onAppear {
             guard let e = existing else { return }
-            pay = e["paid_from"].string == "cash" ? "cash" : "bank"
+            pay = ["cash", "custody"].contains(e["paid_from"].string) ? e["paid_from"].string : "bank"
             let f = DateFormatter(); f.calendar = Calendar(identifier: .gregorian); f.locale = Locale(identifier: "en_US_POSIX")
             f.timeZone = TimeZone(identifier: "Asia/Muscat"); f.dateFormat = "yyyy-MM-dd"
             date = f.date(from: e["expense_date"].string) ?? .now

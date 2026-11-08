@@ -500,6 +500,18 @@ case 'custody_delete':
     q('DELETE FROM custody_moves WHERE id = ?', [(int)($in['id'] ?? 0)]);
     out(['ok' => true]);
 
+case 'ai_key_status':  // owner: is invoice reading on (never returns the key itself)
+    need('owner');
+    $k = ai_key();
+    out(['on' => $k !== '', 'hint' => $k !== '' ? '…' . substr($k, -4) : '']);
+
+case 'ai_key_save':  // owner: paste the Anthropic API key ('' turns invoice reading off)
+    $post(); need('owner');
+    $k = trim((string)($in['key'] ?? ''));
+    if ($k !== '' && (!preg_match('/^sk-ant-[A-Za-z0-9_\-]{20,200}$/', $k) || !ai_key_works($k))) fail('bad_key');
+    ai_key_set($k);
+    out(['ok' => true, 'on' => $k !== '']);
+
 case 'pos_invoice_read':  // staff: photo of an invoice → saved, and read by Claude to fill the expense form
     $post(); need('staff');
     rate_limit('invoice', 60, 3600);

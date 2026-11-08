@@ -416,6 +416,28 @@ function drawOrders({ orders }) {
 
 // ---------- settings ----------
 let lastSettings = null;
+/** Invoice reading: the owner pastes the Anthropic API key here (one key for both shops). */
+async function drawAi() {
+  const box = $('#aiBox'); if (!box) return;
+  let s;
+  try { s = await api('ai_key_status'); } catch { box.innerHTML = '<p style="margin:0">ما قدرت أحمّل.</p>'; return; }
+  box.innerHTML = `
+    <p style="margin:0;line-height:1.7">${s.on ? `<span class="ok">شغالة ✓</span> المفتاح ينتهي بـ <span dir="ltr" class="num">${esc(s.hint)}</span>. لما الموظف يصوّر الفاتورة في صفحة المصاريف، تنقرا لحالها.` : 'مطفية. حط مفتاح Anthropic (يبدأ بـ sk-ant-) عشان تنقرا الفواتير لحالها في صفحة المصاريف. نفس المفتاح للمحلين.'}</p>
+    <form class="formrow" id="aiF" style="padding:0">
+      <div class="field" style="flex:1;min-width:260px"><label for="aik">مفتاح Anthropic API</label><input id="aik" type="password" dir="ltr" autocomplete="off" placeholder="sk-ant-..."></div>
+      <button class="btn" type="submit">احفظ</button>
+      ${s.on ? '<button class="btn ghost" type="button" id="aiOff">شيل المفتاح</button>' : ''}
+      <div class="err" id="aierr" role="status"></div>
+    </form>`;
+  $('#aiF').onsubmit = async e => {
+    e.preventDefault();
+    const err = $('#aierr'); err.style.color = ''; err.textContent = 'جاري التأكد من المفتاح…';
+    try { await api('ai_key_save', { key: $('#aik').value.trim() }); drawAi(); }
+    catch (ex) { err.textContent = ex.message === 'bad_key' ? 'المفتاح غلط أو ما يشتغل. انسخه كامل من console.anthropic.com' : msg(ex); }
+  };
+  const off = $('#aiOff');
+  if (off) off.onclick = async () => { if (!confirm('تشيل المفتاح؟ الفواتير بتنحفظ بس بدون قراءة.')) return; try { await api('ai_key_save', { key: '' }); drawAi(); } catch (ex) { alert(msg(ex)); } };
+}
 /** The buyer's float: what the owner handed them, what they spent from it, what is left; record a new transfer. */
 async function drawCustody() {
   const box = $('#custBox'); if (!box) return;
@@ -485,6 +507,9 @@ async function drawSettings() {
   try { st = await api('settings'); } catch (ex) { if (ex.message === 'login_required') location.reload(); return; }
   lastSettings = st;
   $('[data-panel="set"]').innerHTML = `
+    <h3 class="lal">قراءة الفواتير</h3>
+    <div class="card" id="aiBox" style="display:grid;gap:10px;padding:18px"><p style="margin:0">جاري التحميل…</p></div>
+
     <h3 class="lal">ربط نظام الإدارة</h3>
     <div class="card" id="extBox" style="display:grid;gap:10px;padding:18px"><p style="margin:0">جاري التحميل…</p></div>
 
@@ -609,6 +634,7 @@ async function drawSettings() {
 
   drawExt();
   drawCustody();
+  drawAi();
   $('#cf').onsubmit = async e => {
     e.preventDefault();
     const vals = Object.fromEntries(Object.keys(CH).map(k => [k, +$('#c_' + k).value || 0]));

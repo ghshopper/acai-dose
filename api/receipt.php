@@ -1,8 +1,8 @@
 <?php
 declare(strict_types=1);
 // Invoice photos for expenses: kept outside the website folder, read by Claude (Anthropic API) to fill the expense form.
-// The API key goes in the same config file as the database settings:  define('ANTHROPIC_API_KEY', 'sk-ant-...');
-// Without a key the photo is still saved with the expense and staff type the details themselves.
+// The owner pastes the API key in the dashboard (Settings → invoice reading); one key serves both shops.
+// (A define('ANTHROPIC_API_KEY', ...) in the config file also works.) Without a key the photo is still saved and staff type the details.
 
 const RECEIPT_MAX_BYTES = 6 * 1024 * 1024;
 const RECEIPT_MODEL = 'claude-haiku-4-5-20251001';
@@ -35,7 +35,23 @@ function receipt_save(string $b64): string {
 
 function ai_key(): string {
     if (defined('ANTHROPIC_API_KEY')) return (string)constant('ANTHROPIC_API_KEY');
-    return (string)(getenv('ANTHROPIC_API_KEY') ?: '');
+    if ($e = getenv('ANTHROPIC_API_KEY')) return (string)$e;
+    // Kept in Açaí Dose's settings table (no kd_ prefix) so Karak Dose uses the same key
+    $s = db()->prepare("SELECT v FROM settings WHERE k = 'ai_key'"); $s->execute();
+    return (string)($s->fetchColumn() ?: '');
+}
+function ai_key_set(string $v): void {
+    $pdo = db();
+    $pdo->prepare("DELETE FROM settings WHERE k = 'ai_key'")->execute();
+    if ($v !== '') $pdo->prepare("INSERT INTO settings (k, v) VALUES ('ai_key', ?)")->execute([$v]);
+}
+/** Checks a key with Anthropic before saving it. */
+function ai_key_works(string $key): bool {
+    if (!function_exists('curl_init')) return true;
+    $c = curl_init('https://api.anthropic.com/v1/models?limit=1');
+    curl_setopt_array($c, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 15, CURLOPT_HTTPHEADER => ['x-api-key: ' . $key, 'anthropic-version: 2023-06-01']]);
+    curl_exec($c); $code = (int)curl_getinfo($c, CURLINFO_HTTP_CODE); curl_close($c);
+    return $code === 200;
 }
 
 /** Asks Claude to read the invoice; returns the fields it found, or null when it could not. */

@@ -107,7 +107,7 @@ function ext_close_days(): void {
 
 function ext_envelope(array $e): array {
     return ['event_id' => (int)$e['id'], 'shop' => ext_shop(), 'type' => $e['kind'] . '.' . $e['action'],
-            'created_at' => (string)$e['created_at'], 'data' => json_decode((string)$e['data'], true)];
+            'created_at' => (string)$e['created_at'], 'data' => json_decode((string)$e['data'])];   // objects, so an empty {} stays {}
 }
 
 /** POSTs a signed JSON body; returns [http code (0 = no answer), error text]. */

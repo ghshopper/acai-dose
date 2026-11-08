@@ -172,14 +172,15 @@ function ext_after_request(): void {
         if (!ext_on()) return;
         $hook = setting('ext_hook_url', '') !== '';
         $closeDays = setting('ext_day_done', '') < date('Y-m-d', strtotime('-1 day'));
-        $retry = $hook && mt_rand(1, 15) === 1;
+        // Keep sending while a backlog waits (e.g. after "send old"), else retry now and then
+        $retry = $hook && (mt_rand(1, 15) === 1 || q('SELECT 1 FROM ext_events WHERE pushed_at IS NULL AND tries < ? AND (next_try IS NULL OR next_try <= ?) LIMIT 1', [EXT_MAX_TRIES, now()])->fetch());
         if (empty($GLOBALS['ext_new']) && !$closeDays && !$retry) return;
         $async = false;
         if (function_exists('litespeed_finish_request')) { litespeed_finish_request(); $async = true; }
         elseif (function_exists('fastcgi_finish_request')) { fastcgi_finish_request(); $async = true; }
         ignore_user_abort(true);
         ext_close_days();
-        if ($hook) $async ? ext_flush(25, 5) : ext_flush(3, 2);
+        if ($hook) { if ($async) { @set_time_limit(180); ext_flush(150, 5); } else ext_flush(3, 2); }
         if (mt_rand(1, 50) === 1) q('DELETE FROM ext_events WHERE created_at < ?', [date('Y-m-d H:i:s', time() - EXT_KEEP_DAYS * 86400)]);
     } catch (Throwable $e) { /* never break a sale */ }
 }
@@ -302,6 +303,36 @@ function ext_handle(string $a, array $in, callable $post): bool {
         $env = ['event_id' => 0, 'shop' => ext_shop(), 'type' => 'ping', 'created_at' => now(), 'data' => ['message' => 'test']];
         [$code, $err] = ext_post($url, $secret, 'ping', 0, json_encode($env, JSON_UNESCAPED_UNICODE), 8);
         out(['ok' => $code >= 200 && $code < 300, 'code' => $code, 'error' => $err]);
+
+    case 'ext_backfill':   // owner: send everything from before the link was on (orders, app sales, expenses, day summaries) as events
+        $post(); need('owner');
+        if (!ext_on()) fail('not_on');
+        $first = min(array_filter([
+            q('SELECT MIN(day) d FROM orders')->fetch()['d'] ?? null,
+            q('SELECT MIN(sale_date) d FROM channel_sales')->fetch()['d'] ?? null,
+            q('SELECT MIN(expense_date) d FROM expenses')->fetch()['d'] ?? null,
+        ]) ?: [date('Y-m-d')]);
+        $f = isset($in['from']) ? valid_date($in['from']) : $first;
+        $t = isset($in['to']) ? valid_date($in['to']) : date('Y-m-d');
+        if ($f > $t) [$f, $t] = [$t, $f];
+        // Only what happened before the link was switched on: newer things were already sent
+        $since = (string)(q("SELECT MIN(created_at) m FROM ext_events WHERE kind <> 'day'")->fetch()['m'] ?? '') ?: now();
+        @set_time_limit(300);
+        $n = ['orders' => 0, 'app_sales' => 0, 'expenses' => 0, 'days' => 0];
+        $pdo = db(); $pdo->beginTransaction();
+        try {
+            foreach (q('SELECT * FROM orders WHERE day BETWEEN ? AND ? AND created_at < ? ORDER BY id', [$f, $t, $since])->fetchAll() as $r) { ext_emit('order', (int)$r['id'], 'created', ext_order($r)); $n['orders']++; }
+            foreach (q('SELECT * FROM channel_sales WHERE sale_date BETWEEN ? AND ? AND created_at < ? ORDER BY id', [$f, $t, $since])->fetchAll() as $r) { ext_emit('app_sale', (int)$r['id'], 'created', ext_app_sale($r)); $n['app_sales']++; }
+            foreach (q('SELECT * FROM expenses WHERE expense_date BETWEEN ? AND ? AND created_at < ? ORDER BY id', [$f, $t, $since])->fetchAll() as $r) { ext_emit('expense', (int)$r['id'], 'created', ext_expense($r)); $n['expenses']++; }
+            // A summary for each past day that had anything (today's comes after midnight)
+            $days = [];
+            foreach ([['day', 'orders'], ['sale_date', 'channel_sales'], ['expense_date', 'expenses']] as [$c, $tb])
+                foreach (q("SELECT DISTINCT $c d FROM $tb WHERE $c BETWEEN ? AND ? AND $c < ?", [$f, $t, date('Y-m-d')])->fetchAll() as $r) $days[$r['d']] = true;
+            ksort($days);
+            foreach (array_keys($days) as $d) { ext_emit('day', (int)str_replace('-', '', $d), 'closed', ext_day($d)); $n['days']++; }
+            $pdo->commit();
+        } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
+        out(['ok' => true, 'from' => $f, 'to' => $t] + $n);
 
     case 'ext_off':   // turn the link off: key and webhook stop working
         $post(); need('owner');

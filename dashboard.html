@@ -145,7 +145,7 @@ const app = $('#app');
 const me = await requireLogin(app, 'الداشبورد');
 if (me.role !== 'owner') { location.href = 'screen.html'; throw 0; }
 
-const CH = { talabat: 'طلبات', snoonu: 'سنونو', khedmah: 'خدمة' };
+const CH = { talabat: 'طلبات', snoonu: 'سنونو', khedmah: 'خدمة' };   // replaced at start by this shop's apps (Karak Dose also has TM Done)
 const CATS = ['مواد خام (آساي وفواكه)', 'أكواب وتغليف', 'رواتب', 'إيجار', 'كهرباء وماء', 'تسويق وإعلانات', 'صيانة', 'أخرى'];
 
 app.innerHTML = `
@@ -295,7 +295,7 @@ function drawSum({ orders, apps, exps }) {
   const chan = [
     { l: 'الموقع', v: site, s: `${cnt(webO)} طلب · ${cupsOf(webO)} كوب`, ic: '<path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/><circle cx="12" cy="12" r="9"/>' },
     { l: 'المحل', v: shop, s: `${cnt(shopO)} عملية · ${cupsOf(shopO)} كوب`, ic: '<path d="M3 9l1.5-5h15L21 9M4 9v11h16V9M9 20v-6h6v6"/>' },
-    { l: 'التطبيقات', v: appGross, s: 'طلبات وسنونو وخدمة', ic: '<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>' },
+    { l: 'التطبيقات', v: appGross, s: Object.values(CH).join(' و'), ic: '<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>' },
   ];
   const svg = d => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">${d}</svg>`;
   const maxP = prodRows.length ? prodRows[0][1] : 1;
@@ -402,7 +402,7 @@ function drawExp({ exps }) {
 // ---------- website orders ----------
 const ST = { new: 'جديد', preparing: 'يتحضر', ready: 'جاهز', done: 'تم الاستلام', cancelled: 'ملغي' };
 function drawOrders({ orders }) {
-  const SRC = { web: 'الموقع', pos: 'الكاشير' }, PAY = { cash: 'نقد', card: 'بطاقة', talabat: 'طلبات', snoonu: 'سنونو', khedmah: 'خدمة' };
+  const SRC = { web: 'الموقع', pos: 'الكاشير' }, PAY = { cash: 'نقد', card: 'بطاقة', talabat: 'طلبات', snoonu: 'سنونو', khedmah: 'خدمة', tmdone: 'تم دن' };
   $('[data-panel="orders"]').innerHTML = orders.length ? `<div class="tbl-wrap"><table>
     <thead><tr><th>الوقت</th><th>رقم</th><th>المصدر</th><th>الزبون</th><th>السيارة</th><th>الطلب</th><th>المبلغ</th><th>الدفع</th><th>الحالة</th></tr></thead>
     <tbody>${orders.map(o => `<tr><td class="num">${o.created_at.slice(5, 16).replace('-', '/')}</td><td class="num">#${esc(o.ref)}</td>
@@ -416,11 +416,46 @@ function drawOrders({ orders }) {
 
 // ---------- settings ----------
 let lastSettings = null;
+/** Management-system link: status, and "send old" (everything from before the link was on). */
+async function drawExt() {
+  const box = $('#extBox'); if (!box) return;
+  let c;
+  try { c = await api('ext_config'); } catch { box.innerHTML = '<p style="margin:0">ما قدرت أحمّل حالة الربط.</p>'; return; }
+  if (!c.on) { box.innerHTML = '<p style="margin:0;line-height:1.7">الربط مطفي. شغّله من تطبيق الآيفون: المزيد ← ربط نظام الإدارة.</p>'; return; }
+  box.innerHTML = `
+    <div style="display:flex;gap:18px;flex-wrap:wrap;font-weight:700">
+      <span>الرابط: <span dir="ltr">${esc(c.hook_url || '—')}</span></span>
+      <span>ينتظر الإرسال: <b class="num">${c.pending}</b></span>
+      ${c.failed ? `<span style="color:var(--bad)">ما وصل: <b class="num">${c.failed}</b></span>` : ''}
+      ${c.last_ok ? `<span>آخر إرسال: <span class="num">${esc(c.last_ok)}</span></span>` : ''}
+    </div>
+    ${c.last_error ? `<div class="err">آخر خطأ: ${esc(c.last_error)}</div>` : ''}
+    <p style="margin:0;line-height:1.7">«أرسل القديم» يرسل لنظام الإدارة كل الطلبات ومبيعات التطبيقات والمصاريف وملخص كل يوم من قبل ما تشغّل الربط. لو أرسلته مرتين ما يتكرر عندهم.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <button class="btn" type="button" id="extOld">أرسل القديم</button>
+      <button class="btn ghost" type="button" id="extRef">حدّث</button>
+      <span class="err" id="extMsg" role="status"></span>
+    </div>`;
+  $('#extRef').onclick = drawExt;
+  $('#extOld').onclick = async () => {
+    if (!confirm('أرسل كل البيانات القديمة لنظام الإدارة؟')) return;
+    const b = $('#extOld'), m = $('#extMsg'); b.disabled = true; m.style.color = ''; m.textContent = 'جاري التجهيز…';
+    try {
+      const r = await api('ext_backfill', {});
+      m.style.color = 'var(--ok)';
+      m.textContent = `تجهز ✓ ${r.orders} طلب، ${r.app_sales} مبيعات تطبيقات، ${r.expenses} مصروف، ${r.days} يوم. قاعد ينرسل الحين.`;
+      setTimeout(drawExt, 8000);
+    } catch (ex) { m.textContent = ex.message === 'not_on' ? 'شغّل الربط أول' : msg(ex); b.disabled = false; }
+  };
+}
 async function drawSettings() {
   let st;
   try { st = await api('settings'); } catch (ex) { if (ex.message === 'login_required') location.reload(); return; }
   lastSettings = st;
   $('[data-panel="set"]').innerHTML = `
+    <h3 class="lal">ربط نظام الإدارة</h3>
+    <div class="card" id="extBox" style="display:grid;gap:10px;padding:18px"><p style="margin:0">جاري التحميل…</p></div>
+
     <h3 class="lal">نسبة عمولة التطبيقات</h3>
     <form class="card formrow" id="cf">
       ${Object.entries(CH).map(([k, v]) => `<div class="field"><label for="c_${k}">${v} %</label><input type="number" id="c_${k}" step="0.01" min="0" max="100" value="${st.commissions[k] == null ? 0 : st.commissions[k]}"></div>`).join('')}
@@ -535,6 +570,7 @@ async function drawSettings() {
           <button class="del" data-toggle="${u.id}" data-active="${u.active}" type="button">${u.active ? 'إيقاف' : 'تفعيل'}</button>`}</td></tr>`).join('')}</tbody>
     </table></div>`;
 
+  drawExt();
   $('#cf').onsubmit = async e => {
     e.preventDefault();
     const vals = Object.fromEntries(Object.keys(CH).map(k => [k, +$('#c_' + k).value || 0]));
@@ -1048,7 +1084,11 @@ async function drawData() {
 }
 
 // ---------- boot ----------
-try { Object.assign(commissions, (await api('settings')).commissions); } catch { /* defaults */ }
+try {
+  const st = await api('settings');
+  Object.assign(commissions, st.commissions);
+  if (Array.isArray(st.channels) && st.channels.length) { for (const k of Object.keys(CH)) delete CH[k]; for (const c of st.channels) CH[c.k] = c.ar; }
+} catch { /* defaults */ }
 setPeriod('today');
 
 })();

@@ -160,7 +160,7 @@ class TillExpensesState extends State<TillExpenses> {
       if (e.code == 'network') {
         await Outbox.I.add('expense', {...body, 'at': stamp(DateTime.now())}, '${_catName(cat)} ${money(body['amount'])}');
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(backgroundColor: kOrange, content: Text('No internet: expense saved on this device, it will be sent automatically', style: const TextStyle(color: kPurple, fontWeight: FontWeight.w800))));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(backgroundColor: kOrange, content: Text('No internet: expense saved on this device, it will be sent automatically', style: TextStyle(color: kPurple, fontWeight: FontWeight.w800))));
         setState(() {});
         return;
       }

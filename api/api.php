@@ -50,7 +50,7 @@ function accounts_data(): array {
     $bal = [];
     foreach ($accts as $x) $bal[$x['k']] = ['k' => $x['k'], 'name' => $x['name'], 'opening' => (float)$x['opening'], 'card' => 0.0, 'payouts' => 0.0, 'in' => 0.0, 'out' => 0.0, 'expenses' => 0.0];
     $bal['main']['card'] = (float)(q("SELECT COALESCE(SUM(total), 0) s FROM orders WHERE payment = 'card' AND status <> 'cancelled'")->fetch()['s'] ?? 0);
-    $bal['main']['expenses'] = (float)(q('SELECT COALESCE(SUM(amount), 0) s FROM expenses')->fetch()['s'] ?? 0);
+    $bal['main']['expenses'] = (float)(q("SELECT COALESCE(SUM(amount), 0) s FROM expenses WHERE paid_from <> 'cash'")->fetch()['s'] ?? 0);
     $acc = fn($k) => isset($bal[$k]) ? $k : 'main';
     foreach (q('SELECT acct, SUM(amount) s FROM channel_payouts GROUP BY acct')->fetchAll() as $r) $bal[$acc($r['acct'])]['payouts'] += (float)$r['s'];
     foreach (q('SELECT acct, kind, SUM(amount) s FROM bank_moves GROUP BY acct, kind')->fetchAll() as $r) $bal[$acc($r['acct'])][$r['kind'] === 'out' ? 'out' : 'in'] += (float)$r['s'];
@@ -86,6 +86,22 @@ function valid_acct($k): string {
     foreach (bank_accounts() as $a) if ($a['k'] === $k) return $k;
     return 'main';
 }
+/** Expense types the staff can pick at the till (English), saved under the owner's Arabic categories. */
+function pos_expense_cats(): array {
+    return BIZ === 'karak'
+        ? ['raw' => ['Ingredients (milk, tea, spices)', 'مواد خام'], 'bread' => ['Bread & pastries', 'خبز ومعجنات'], 'packaging' => ['Cups & packaging', 'أكواب وتغليف'],
+           'gas' => ['Gas & water', 'كهرباء وماء وغاز'], 'cleaning' => ['Cleaning supplies', 'مواد تنظيف'], 'maintenance' => ['Repairs', 'صيانة'],
+           'transport' => ['Taxi / delivery', 'مواصلات'], 'other' => ['Other', 'أخرى']]
+        : ['raw' => ['Fruit & ingredients', 'مواد خام (آساي وفواكه)'], 'packaging' => ['Cups & packaging', 'أكواب وتغليف'], 'water' => ['Water & ice', 'كهرباء وماء'],
+           'cleaning' => ['Cleaning supplies', 'مواد تنظيف'], 'maintenance' => ['Repairs', 'صيانة'], 'transport' => ['Taxi / delivery', 'مواصلات'], 'other' => ['Other', 'أخرى']];
+}
+/** A time sent by a till that was offline: accepted if it is within the last 7 days (else now). */
+function offline_time($at): ?string {
+    if (!is_string($at) || !preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $at)) return null;
+    $t = strtotime($at);
+    return ($t && $t <= time() + 300 && $t >= time() - 7 * 86400) ? date('Y-m-d H:i:s', $t) : null;
+}
+function clean_client_id($v): string { return preg_match('/^[a-zA-Z0-9-]{8,40}$/', (string)$v) ? (string)$v : ''; }
 function shop_cats(): array { return json_decode(setting('categories', '[]'), true) ?: []; }
 const STATUSES = ['new', 'preparing', 'ready', 'done', 'cancelled'];
 
@@ -124,7 +140,7 @@ function promo_price(float $v, bool $offer = true): float {
 
 /** Validates [{product_id, qty, toppings?}] against the menu; returns [lines, total].
  *  "Build your bowl" lines carry the chosen toppings; their names list them so every screen and receipt shows them. */
-function price_items($items, bool $offer = true, bool $staff = false): array {
+function price_items($items, bool $offer = true, bool $staff = false, bool $offline = false): array {
     if (!is_array($items) || !count($items) || count($items) > 40) fail('invalid_items');
     $lines = []; $total = 0.0;
     foreach ($items as $it) {
@@ -132,7 +148,7 @@ function price_items($items, bool $offer = true, bool $staff = false): array {
         if ($qty < 1 || $qty > 50) fail('invalid_qty');
         $p = q('SELECT id, name_ar, name_en, price, kind, size, soldout FROM products WHERE id = ? AND active = 1', [$pid])->fetch();
         if (!$p) fail('invalid_product');
-        if ((int)$p['soldout']) fail('sold_out');
+        if ((int)$p['soldout'] && !$offline) fail('sold_out');   // an offline sale already happened
         if ($p['kind'] === 'open') {
             // Custom item from the till: staff type the name and price
             if (!$staff) fail('invalid_product');
@@ -345,7 +361,8 @@ case 'me':
 case 'pos_config':   // staff devices: which shop this is, its delivery apps and menu sections
     need('staff');
     out(['biz' => BIZ, 'name_en' => BIZ === 'karak' ? 'Karak Dose' : 'Açaí Dose', 'name_ar' => BIZ === 'karak' ? 'كرك دوز' : 'أساي دوز',
-         'channels' => channel_list(), 'cats' => shop_cats(), 'sizes' => array_map(fn($v) => ['en' => $v[0], 'ar' => $v[1]], SIZE_NAMES)]);
+         'channels' => channel_list(), 'cats' => shop_cats(), 'sizes' => array_map(fn($v) => ['en' => $v[0], 'ar' => $v[1]], SIZE_NAMES),
+         'expense_cats' => array_map(fn($k, $v) => ['k' => $k, 'en' => $v[0]], array_keys(pos_expense_cats()), pos_expense_cats())]);
 
 case 'soldout':      // staff: an item ran out (hidden from the order page, greyed on the till) or is back
     $post(); need('staff');
@@ -385,8 +402,13 @@ case 'pos_sale':
     $post(); $u = need('staff');
     $pay = $in['payment'] ?? '';
     if (!in_array($pay, payments(), true)) fail('bad_payment');
+    // A sale made while the till was offline comes with the device's id (sent again until it gets through: saved once) and its time
+    $cid = clean_client_id($in['client_id'] ?? '');
+    if ($cid !== '' && ($dup = q('SELECT order_no, day, total, free_cups FROM orders WHERE client_id = ?', [$cid])->fetch()))
+        out(['order_no' => (int)$dup['order_no'], 'ref' => order_ref($dup['day'], (int)$dup['order_no']), 'total' => (float)$dup['total'], 'free_cups' => (int)$dup['free_cups'], 'loyalty' => null, 'duplicate' => true]);
+    $at = offline_time($in['at'] ?? null);
     // Delivery-app orders (Talabat, Snoonu, Khedmah) always go in at full price: the day offer is for our own customers
-    [$lines, $total] = price_items($in['items'] ?? null, !in_array($pay, channels(), true), true);
+    [$lines, $total] = price_items($in['items'] ?? null, !in_array($pay, channels(), true), true, $at !== null);
     // App orders: snapshot today's commission so later rate changes don't rewrite history
     $commission = 0.0;
     if (in_array($pay, channels(), true)) {
@@ -407,10 +429,43 @@ case 'pos_sale':
         'source' => 'pos', 'customer_name' => in_array($pay, channels(), true) ? CHANNEL_NAMES[$pay][0] : 'Walk-in', 'phone' => $cphone,
         'items' => json_encode($lines, JSON_UNESCAPED_UNICODE), 'total' => $total, 'status' => 'done', 'payment' => $pay,
         'commission' => $commission, 'created_by' => (int)$u['id'], 'free_cups' => $free, 'discount' => money($discount),
-    ]);
+    ] + ($cid !== '' ? ['client_id' => $cid] : []) + ($at ? ['created_at' => $at] : []), $at ? substr($at, 0, 10) : null);
     $loy = null;
     if ($cphone !== '') { save_customer($cphone, clean((string)($in['name'] ?? ''), 60)); loyalty_changed($cphone); $loy = loyalty_state($cphone); }
-    out(['order_no' => $no, 'ref' => order_ref(date('Y-m-d'), $no), 'total' => $total, 'free_cups' => $free, 'loyalty' => $loy]);
+    out(['order_no' => $no, 'ref' => order_ref($at ? substr($at, 0, 10) : date('Y-m-d'), $no), 'total' => $total, 'free_cups' => $free, 'loyalty' => $loy]);
+
+case 'pos_expense':   // staff: money paid from the till's cash (milk, gas, taxi…); can come later from an offline till
+    $post(); $u = need('staff');
+    $cid = clean_client_id($in['client_id'] ?? '');
+    if ($cid !== '' && ($dup = q('SELECT id FROM expenses WHERE client_id = ?', [$cid])->fetch())) out(['ok' => true, 'id' => (int)$dup['id'], 'duplicate' => true]);
+    $cats = pos_expense_cats();
+    $k = (string)($in['cat'] ?? ''); if (!isset($cats[$k])) fail('bad_category');
+    $amt = round((float)($in['amount'] ?? 0), 3); if ($amt <= 0 || $amt > 500) fail('bad_amount');
+    $note = clean((string)($in['note'] ?? ''), 80);
+    if ($k === 'other' && $note === '') fail('need_note');
+    $at = offline_time($in['at'] ?? null) ?? now();
+    q("INSERT INTO expenses (expense_date, category, amount, note, created_at, created_by, client_id, paid_from) VALUES (?,?,?,?,?,?,?,'cash')",
+      [substr($at, 0, 10), $cats[$k][1], money($amt), clean('POS · ' . $u['username'] . ($note !== '' ? ' · ' . $note : ''), 120), $at, (int)$u['id'], $cid ?: null]);
+    $id = (int)db()->lastInsertId();
+    ext_emit('expense', $id, 'created');
+    out(['ok' => true, 'id' => $id]);
+
+case 'pos_expenses':  // staff: today's till expenses
+    need('staff');
+    $rows = q("SELECT e.id, e.created_at, e.category, e.amount, e.note, e.created_by, u.username AS by_user FROM expenses e LEFT JOIN users u ON u.id = e.created_by
+               WHERE e.expense_date = ? AND e.paid_from = 'cash' ORDER BY e.id DESC", [date('Y-m-d')])->fetchAll();
+    $en = []; foreach (pos_expense_cats() as $v) $en[$v[1]] = $v[0];
+    out(array_map(fn($r) => ['id' => (int)$r['id'], 'at' => $r['created_at'], 'cat' => $en[$r['category']] ?? $r['category'], 'amount' => (float)$r['amount'],
+        'note' => trim((string)preg_replace('/^POS · [^·]*(· )?/u', '', (string)$r['note'])), 'by_user' => (string)($r['by_user'] ?? ''), 'mine' => (int)$r['created_by']], $rows));
+
+case 'pos_expense_void':  // staff: remove a till expense they entered in the last 15 minutes (owner: any time)
+    $post(); $u = need('staff');
+    $e = q("SELECT * FROM expenses WHERE id = ? AND paid_from = 'cash'", [(int)($in['id'] ?? 0)])->fetch() ?: fail('not_found', 404);
+    if ($u['role'] !== 'owner' && ((int)$e['created_by'] !== (int)$u['id'] || strtotime($e['created_at']) < time() - 15 * 60)) fail('void_window');
+    $old = ext_on() ? ext_row('expense', (int)$e['id']) : null;
+    q('DELETE FROM expenses WHERE id = ?', [(int)$e['id']]);
+    if ($old) ext_emit('expense', (int)$e['id'], 'deleted', $old);
+    out(['ok' => true]);
 
 case 'curb_order':  // staff outside takes an order at the car; it goes to the orders screen inside, paid on hand-over
     $post(); $u = need('staff');

@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'offline.dart';
+
 /// The ordering site; the app uses the same API as the web pages.
 const String kSite = 'https://order.acaiee.com';
 
@@ -21,20 +23,30 @@ class Shop {
 
 /// What the server says about this shop after login: delivery apps, menu sections, size names.
 class ShopConfig {
-  ShopConfig({this.channels = const [], this.cats = const [], this.sizes = const {}});
+  ShopConfig({this.channels = const [], this.cats = const [], this.sizes = const {}, this.expenseCats = const []});
   final List<Map<String, dynamic>> channels; // [{k, en, ar}]
+  final List<Map<String, dynamic>> expenseCats; // [{k, en}] what staff can pay from the till
   final List<Map<String, dynamic>> cats; // [{k, en, ar}]
   final Map<String, Map<String, dynamic>> sizes; // small -> {en, ar}
   static ShopConfig I = ShopConfig();
 
   static Future<void> load() async {
+    Map<String, dynamic>? r;
     try {
-      final r = Map<String, dynamic>.from(await Api.I.get('pos_config') as Map);
+      r = Map<String, dynamic>.from(await Api.I.get('pos_config') as Map);
+      await Cache.put('pos_config', r);
+    } catch (_) {
+      final c = await Cache.get('pos_config');
+      if (c is Map) r = Map<String, dynamic>.from(c);
+    }
+    try {
+      if (r == null) throw StateError('none');
       List<Map<String, dynamic>> list(dynamic v) => ((v as List?) ?? []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
       I = ShopConfig(
         channels: list(r['channels']),
         cats: list(r['cats']),
         sizes: ((r['sizes'] as Map?) ?? {}).map((k, v) => MapEntry('$k', Map<String, dynamic>.from(v as Map))),
+        expenseCats: list(r['expense_cats']),
       );
     } catch (_) {
       // Older server: the three delivery apps it always had
@@ -119,8 +131,10 @@ class Api {
         r = await http.post(uri, headers: headers, body: jsonEncode(body)).timeout(const Duration(seconds: 12));
       }
     } catch (_) {
+      Outbox.I.markOnline(false);
       throw ApiError('network');
     }
+    if (r.statusCode < 500) Outbox.I.markOnline(true);
     await _keepCookie(r);
     dynamic data;
     try {
@@ -149,6 +163,10 @@ const Map<String, String> kErrors = {
   'no_free_cup': 'This customer has no free cup',
   'sold_out': 'An item in this sale is sold out',
   'invalid_car': 'Write the car plate',
+  'bad_amount': 'Amount must be more than 0 and up to 500',
+  'bad_category': 'Pick what it was for',
+  'need_note': 'Write what it was for',
+  'not_found': 'Already removed',
 };
 
 String errText(Object e) => kErrors[e.toString()] ?? 'Something went wrong, try again';

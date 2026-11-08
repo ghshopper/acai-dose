@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'api.dart';
+import 'expenses.dart';
+import 'offline.dart';
 import 'printer.dart';
 import 'receipt.dart';
 import 'theme.dart';
@@ -42,6 +44,8 @@ class _PosPageState extends State<PosPage> {
     super.initState();
     _loadMenu();
     _loadToday();
+    Outbox.I.addListener(_outboxChanged);
+    Outbox.I.listen(_loadToday);
     PrintSettings.load().then((c) {
       if (mounted) setState(() => _printIt = c.autoPos);
     });
@@ -53,35 +57,74 @@ class _PosPageState extends State<PosPage> {
     _phone.dispose();
     _search.dispose();
     _lookup?.cancel();
+    Outbox.I.removeListener(_outboxChanged);
+    Outbox.I.unlisten(_loadToday);
     super.dispose();
   }
 
+  void _outboxChanged() {
+    if (!mounted) return;
+    // Back online with no menu yet (the app was opened offline for the first time): load it now
+    if (Outbox.I.online && _products.isEmpty) _loadMenu();
+    setState(() {});
+  }
+
   Future<void> _loadMenu() async {
+    List<Map<String, dynamic>> maps(dynamic v) => ((v as List?) ?? []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
     try {
       final r = await Api.I.get('menu');
       List<Map<String, dynamic>> tops = [];
       try {
-        tops = ((await Api.I.get('toppings')) as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        tops = maps(await Api.I.get('toppings'));
       } catch (_) {}
+      await Cache.put('menu', {'products': r, 'toppings': tops});
+      if (!mounted) return;
       setState(() {
-        _products = (r as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        _products = maps(r);
         _toppings = tops;
         _menuErr = '';
       });
     } catch (e) {
-      setState(() => _menuErr = 'Could not load the menu. ${errText(e)}');
+      // Offline: the menu as it was last time
+      final c = await Cache.get('menu');
+      if (!mounted) return;
+      if (c is Map && (c['products'] as List?)?.isNotEmpty == true) {
+        setState(() {
+          _products = maps(c['products']);
+          _toppings = maps(c['toppings']);
+          _menuErr = '';
+        });
+      } else {
+        setState(() => _menuErr = 'Could not load the menu. ${errText(e)}');
+      }
     }
   }
 
   Future<void> _loadToday() async {
+    final day = stamp(DateTime.now()).substring(0, 10);
     try {
       final r = await Api.I.get('pos_today');
+      final rows = (r as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      await Cache.put('pos_today', {'day': day, 'rows': rows});
       if (!mounted) return;
-      setState(() => _today = (r as List).map((e) => Map<String, dynamic>.from(e as Map)).toList());
+      setState(() => _today = rows);
     } on ApiError catch (e) {
-      if (e.code == 'login_required') widget.onLoggedOut();
+      if (e.code == 'login_required') {
+        widget.onLoggedOut();
+        return;
+      }
+      final c = await Cache.get('pos_today');
+      if (c is Map && c['day'] == day && mounted) {
+        setState(() => _today = ((c['rows'] as List?) ?? []).map((e) => Map<String, dynamic>.from(e as Map)).toList());
+      }
     }
   }
+
+  /// Sales made offline that are still waiting to be sent, shaped like today's rows.
+  List<Map<String, dynamic>> get _pendingSales => Outbox.I.items.where((i) => i['kind'] == 'sale').map((i) {
+        final b = Map<String, dynamic>.from(i['body'] as Map);
+        return {'ref': 'OFF', 'pending': true, 'total': b['_total'] ?? 0, 'payment': b['payment'], 'created_at': b['at'], 'items': b['_lines'] ?? [], 'status': 'done'};
+      }).toList();
 
   double _price(Map<String, dynamic> p) => (p['price'] as num).toDouble();
   int _id(Map<String, dynamic> p) => (p['id'] as num).toInt();
@@ -316,13 +359,30 @@ class _PosPageState extends State<PosPage> {
       _busy = true;
       _err = '';
     });
+    final body = <String, dynamic>{
+      'client_id': newClientId(),
+      'items': items,
+      'payment': payment,
+      'phone': ph.isNotEmpty && shop ? '+968$ph' : '',
+      'use_free': shop && _freeOn,
+    };
     try {
-      final r = Map<String, dynamic>.from(await Api.I.post('pos_sale', {
-        'items': items,
-        'payment': payment,
-        'phone': ph.isNotEmpty && shop ? '+968$ph' : '',
-        'use_free': shop && _freeOn,
-      }) as Map);
+      Map<String, dynamic> r;
+      var offline = false;
+      try {
+        r = Map<String, dynamic>.from(await Api.I.post('pos_sale', body) as Map);
+      } on ApiError catch (e) {
+        if (e.code != 'network') rethrow;
+        if (body['use_free'] == true) {
+          setState(() => _err = 'No internet: a free cup needs internet. Untick it to sell now.');
+          return;
+        }
+        // No internet: the sale is kept on this device and sent automatically later
+        final lines = [for (final e in _cart.entries) {'qty': e.value, 'name_en': _lineName(e.key)}];
+        await Outbox.I.add('sale', {...body, 'at': stamp(DateTime.now()), '_total': _total, '_lines': lines}, '${money(_total)} $payment');
+        r = {'ref': 'OFF-${(body['client_id'] as String).substring(0, 4).toUpperCase()}', 'total': _total};
+        offline = true;
+      }
       final loy = r['loyalty'] is Map ? Map<String, dynamic>.from(r['loyalty'] as Map) : null;
       final receipt = ReceiptData(
         ref: '${r['ref']}',
@@ -345,6 +405,14 @@ class _PosPageState extends State<PosPage> {
       }
       if (!mounted) return;
       final payName = payment == 'cash' ? 'Cash' : payment == 'card' ? 'Card' : ShopConfig.I.channelName(payment);
+      if (offline) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            backgroundColor: kOrange,
+            content: Text('No internet: sale saved on this device · ${money(r['total'])} OMR ($payName). It will be sent automatically.',
+                style: const TextStyle(color: kPurple, fontSize: 17, fontWeight: FontWeight.w800))));
+        setState(() {});
+        return;
+      }
       var msg = 'Sale #${r['ref']} saved · ${money(r['total'])} OMR ($payName)';
       if (loy != null) msg += ' · Stamps ${loy['stamps']}/${loy['need']}${((loy['free'] as num?) ?? 0) > 0 ? ' · FREE cup ready' : ''}';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(backgroundColor: kOk, content: Text(msg, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700))));
@@ -427,7 +495,7 @@ class _PosPageState extends State<PosPage> {
         widget.onLoggedOut();
         return;
       }
-      setState(() => _err = errText(e));
+      setState(() => _err = e.code == 'network' ? 'No internet: car orders need internet. Take the money and sell it as Cash / Card.' : errText(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -590,7 +658,40 @@ class _PosPageState extends State<PosPage> {
     final karak = Api.I.shop.isKarak;
     final tiles = _tiles;
     final cats = _cats;
+    final box = Outbox.I;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (!box.online || box.waiting > 0)
+        Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: box.online ? kOrange : kBad, borderRadius: BorderRadius.circular(14)),
+          child: Row(children: [
+            Icon(box.online ? Icons.cloud_upload : Icons.cloud_off, color: Colors.white),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                box.online
+                    ? 'Sending ${box.waiting} saved item(s)…'
+                    : 'No internet · keep selling, ${box.waiting} item(s) saved on this device will be sent automatically',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
+              ),
+            ),
+            TextButton(onPressed: box.sync, child: const Text('Retry', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900))),
+          ]),
+        ),
+      if (box.failed.isNotEmpty)
+        Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: const Color(0xFFFBEBEB), borderRadius: BorderRadius.circular(14)),
+          child: Row(children: [
+            Expanded(
+              child: Text('${box.failed.length} offline item(s) were not accepted: ${box.failed.map((f) => '${f['label']} (${f['error']})').join(', ')}. Tell the owner.',
+                  style: const TextStyle(color: kBad, fontWeight: FontWeight.w800)),
+            ),
+            TextButton(onPressed: box.clearFailed, child: const Text('OK')),
+          ]),
+        ),
       if (karak) ...[
         TextField(
           controller: _search,
@@ -820,7 +921,8 @@ class _PosPageState extends State<PosPage> {
   }
 
   Widget _todayList() {
-    final ok = _today.where((r) => r['status'] != 'cancelled').toList();
+    final pending = _pendingSales;
+    final ok = [...pending, ..._today.where((r) => r['status'] != 'cancelled')];
     double sum([String? k]) => ok.where((r) => k == null || r['payment'] == k).fold(0.0, (s, r) => s + (r['total'] as num).toDouble());
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       const SizedBox(height: 18),
@@ -828,8 +930,19 @@ class _PosPageState extends State<PosPage> {
       Text('${ok.length} sales · Total ${money(sum())} · Cash ${money(sum('cash'))} · Card ${money(sum('card'))}',
           style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.black54)),
       const SizedBox(height: 8),
-      if (_today.isEmpty)
+      if (_today.isEmpty && pending.isEmpty)
         const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('No shop sales yet today', style: TextStyle(fontWeight: FontWeight.w700, color: Colors.black54)))),
+      for (final r in pending)
+        Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          color: const Color(0xFFFFF4E0),
+          child: ListTile(
+            leading: const Icon(Icons.cloud_upload_outlined, color: kOrange),
+            title: Text('${money(r['total'])} · ${r['payment'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)),
+            subtitle: Text('${'${r['created_at'] ?? ''}'.length >= 16 ? '${r['created_at']}'.substring(11, 16) : ''}  '
+                '${((r['items'] as List?) ?? []).map((i) => '${i['qty']}× ${i['name_en']}').join(', ')} · waiting for internet'),
+          ),
+        ),
       for (final r in _today)
         Card(
           margin: const EdgeInsets.only(bottom: 8),
@@ -857,6 +970,12 @@ class _PosPageState extends State<PosPage> {
     ]);
   }
 
+  double get _cashToday => [..._pendingSales, ..._today.where((r) => r['status'] != 'cancelled')]
+      .where((r) => r['payment'] == 'cash')
+      .fold(0.0, (s, r) => s + ((r['total'] as num?) ?? 0).toDouble());
+
+  Widget _expenses() => TillExpenses(cashSales: _cashToday, onLoggedOut: widget.onLoggedOut);
+
   @override
   Widget build(BuildContext context) {
     final wide = MediaQuery.of(context).size.width >= 900;
@@ -865,7 +984,7 @@ class _PosPageState extends State<PosPage> {
         Expanded(
           child: RefreshIndicator(
             onRefresh: _loadToday,
-            child: ListView(padding: const EdgeInsets.all(14), children: [_grid(true), _todayList()]),
+            child: ListView(padding: const EdgeInsets.all(14), children: [_grid(true), _todayList(), _expenses()]),
           ),
         ),
         SizedBox(width: 430, child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(0, 14, 14, 14), child: _ticket())),
@@ -873,7 +992,7 @@ class _PosPageState extends State<PosPage> {
     }
     return RefreshIndicator(
       onRefresh: _loadToday,
-      child: ListView(padding: const EdgeInsets.all(12), children: [_grid(false), const SizedBox(height: 12), _ticket(), _todayList()]),
+      child: ListView(padding: const EdgeInsets.all(12), children: [_grid(false), const SizedBox(height: 12), _ticket(), _todayList(), _expenses()]),
     );
   }
 }

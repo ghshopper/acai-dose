@@ -51,7 +51,8 @@ function ext_app_sale(array $r): array {
 }
 function ext_expense(array $r): array {
     return ['id' => (int)$r['id'], 'date' => (string)$r['expense_date'], 'category' => (string)$r['category'], 'amount' => money($r['amount']),
-            'one_off' => ext_one_off((string)$r['category']), 'note' => (string)($r['note'] ?? ''), 'created_at' => (string)$r['created_at']];
+            'one_off' => ext_one_off((string)$r['category']), 'note' => (string)($r['note'] ?? ''), 'created_at' => (string)$r['created_at'],
+            'paid_from' => (string)($r['paid_from'] ?? 'bank'), 'entered_at' => ($r['created_by'] ?? null) !== null ? 'pos' : 'owner'];
 }
 function ext_row(string $kind, int $id): ?array {
     if ($kind === 'order') { $r = q('SELECT * FROM orders WHERE id = ?', [$id])->fetch(); return $r ? ext_order($r) : null; }

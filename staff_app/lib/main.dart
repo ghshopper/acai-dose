@@ -4,6 +4,7 @@ import 'api.dart';
 import 'home_page.dart';
 import 'login_page.dart';
 import 'native.dart';
+import 'offline.dart';
 import 'theme.dart';
 
 Future<void> main() async {
@@ -53,17 +54,30 @@ class _GateState extends State<Gate> {
     try {
       final r = await Api.I.get('me');
       _me = r is Map<String, dynamic> ? r : null;
+      if (_me != null) await Cache.put('me', _me);
     } on ApiError catch (e) {
       _me = null;
-      if (e.code == 'network') _error = 'No internet connection';
+      if (e.code == 'network') {
+        // No internet: open with the last login so the till keeps selling (sales wait and sync later)
+        final c = await Cache.get('me');
+        if (c is Map && Api.I.cookie != null) {
+          _me = Map<String, dynamic>.from(c);
+        } else {
+          _error = 'No internet connection';
+        }
+      }
     }
+    Outbox.I.onLoggedOut = _logout;
+    await Outbox.I.load();
     if (_me != null) await ShopConfig.load();
     if (_me != null && Api.I.cookie != null) Native.startWatch(Api.I.cookie!, Api.I.shop);
     if (mounted) setState(() => _loading = false);
   }
 
   Future<void> _loggedIn(Map<String, dynamic> me) async {
+    await Cache.put('me', me);
     await ShopConfig.load();
+    Outbox.I.sync();
     if (Api.I.cookie != null) Native.startWatch(Api.I.cookie!, Api.I.shop);
     if (mounted) setState(() => _me = me);
   }

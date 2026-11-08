@@ -8,77 +8,140 @@
 <meta name="theme-color" content="#470D43">
 <link rel="icon" href="assets/logo-purple.png">
 <link rel="stylesheet" href="assets/app.css?v=1794150000">
-<script>/* Karak Dose (under /karak/): charcoal and white, its own logo */if(/^\/karak(\/|$)/.test(location.pathname)){document.documentElement.classList.add('karak');addEventListener('DOMContentLoaded',function(){document.querySelectorAll('img[src*="logo-cream"],img[src*="logo-purple"]').forEach(function(i){i.src=i.getAttribute('src').indexOf('logo-cream')>=0?'assets/karak/logo-white.png':'assets/karak/logo-dark.png';i.alt='Karak Dose'});var m=document.querySelector('meta[name=theme-color]');if(m)m.content='#393939';document.title=document.title.replace(/Açaí Dose|أساي دوز/g,'Karak Dose')})}</script>
+<script>/* Karak Dose (under /karak/): charcoal and white, its own logo */if(/^\/karak(\/|$)/.test(location.pathname)){document.documentElement.classList.add('karak');var kfix=function(){document.querySelectorAll('img[src*="logo-cream"],img[src*="logo-purple"]').forEach(function(i){i.src=i.getAttribute('src').indexOf('logo-cream')>=0?'assets/karak/logo-white.png':'assets/karak/logo-dark.png';i.alt='Karak Dose'});var m=document.querySelector('meta[name=theme-color]');if(m)m.content='#393939';if(/Açaí Dose/.test(document.title))document.title=document.title.replace(/Açaí Dose/g,'Karak Dose')};new MutationObserver(kfix).observe(document.documentElement,{subtree:true,childList:true});addEventListener('DOMContentLoaded',kfix)}</script>
 <style>
+/* Web till: same layout and flow as the staff app's POS (sections → items, sale ticket, payments, today's sales, till expenses). */
 body{background:var(--c2);font-family:'Montserrat','Tajawal',system-ui,sans-serif}
 .topbar .nav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
 .topbar .btn.ghost{color:var(--c);border-color:var(--c)}
-.pos{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(300px,1fr);gap:14px;padding:14px;align-items:start}
-@media (max-width:860px){.pos{grid-template-columns:1fr}}
+.dot{width:12px;height:12px;border-radius:50%;background:#7BD389;display:inline-block}
+.dot.off{background:#E06C6C}
+.pos{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(320px,430px);gap:14px;padding:14px;align-items:start}
+@media (max-width:900px){.pos{grid-template-columns:1fr}}
+.banner{border-radius:14px;padding:12px 14px;color:#fff;font-weight:800;display:flex;gap:10px;align-items:center;margin-bottom:10px}
+.banner button{margin-inline-start:auto;background:none;border:0;color:#fff;font-weight:900;cursor:pointer;font-size:15px}
+.banner.off{background:var(--bad)} .banner.send{background:var(--p2)} .banner.fail{background:#FBEBEB;color:var(--bad)} .banner.fail button{color:var(--bad)}
+.search{width:100%;min-height:52px;border:2px solid var(--l);border-radius:14px;padding:8px 14px;font-size:18px;background:#fff;margin-bottom:10px}
+.head{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.head h2{margin:0;font-size:24px}
+.chips{display:flex;gap:8px;overflow-x:auto;margin-bottom:10px}
+.chip{min-height:46px;padding:0 16px;border-radius:999px;border:2px solid var(--l);background:#fff;font-weight:800;font-size:16px;white-space:nowrap;cursor:pointer}
+.chip[aria-pressed=true]{background:var(--o);border-color:var(--o);color:var(--p)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
-.prod{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 10px;border:3px solid transparent;cursor:pointer;text-align:center;min-height:220px;font:inherit;color:inherit}
-.prod:active{transform:scale(.97)}
-.prod:focus-visible{outline:3px solid var(--o)}
-.prod img{height:120px;width:auto}
-.prod .nm{font-weight:800;font-size:16px;line-height:1.25}
-.prod .pr{font-weight:800;font-size:18px;color:var(--p)}
-.prod .q{position:relative}
-.prod .cnt{position:absolute;top:-6px;right:-30px;min-width:34px;height:34px;border-radius:17px;background:var(--o);color:var(--p);font-weight:800;display:grid;place-items:center}
+.sec{background:var(--p);color:#fff;border:0;border-radius:18px;min-height:120px;padding:14px;cursor:pointer;position:relative;display:flex;flex-direction:column;justify-content:center;gap:2px;text-align:center}
+.sec b{font-size:23px;line-height:1.15} .sec span{font-size:16px;opacity:.75;font-weight:700} .sec small{opacity:.55;font-weight:600}
+.tile{background:#fff;border:3px solid transparent;border-radius:18px;padding:12px 10px;cursor:pointer;position:relative;display:flex;flex-direction:column;align-items:stretch;justify-content:center;gap:4px;text-align:center;min-height:118px;font:inherit;color:inherit}
+.tile:active,.sec:active{transform:scale(.97)}
+.tile img{height:110px;width:auto;object-fit:contain;align-self:center}
+.tile .nm{font-weight:900;font-size:20px;line-height:1.15}
+.tile .ar{font-weight:700;font-size:16px;opacity:.6}
+.tile .pr{font-weight:900;font-size:18px;color:var(--p)}
+.tile.out{background:#E6E6E6} .tile.out .nm{text-decoration:line-through} .tile.out .pr{color:var(--bad)}
+.cnt{position:absolute;top:8px;right:8px;min-width:32px;height:32px;border-radius:16px;background:var(--o);color:var(--p);font-weight:900;display:grid;place-items:center;font-size:16px}
+.sec .cnt{background:#fff}
+.html-acai .tile{min-height:220px}
+.custom{width:100%;margin:2px 0 12px;min-height:50px;border-radius:14px;border:2px solid var(--p);background:#fff;color:var(--p);font-weight:800;font-size:16px;cursor:pointer}
 .ticket{padding:18px;display:flex;flex-direction:column;gap:12px;position:sticky;top:12px}
 .ticket h2{margin:0;font-size:20px;display:flex;justify-content:space-between;align-items:center}
-.lines{display:flex;flex-direction:column;gap:8px;min-height:60px}
+.lines{display:flex;flex-direction:column;gap:8px;min-height:40px}
 .line{display:flex;align-items:center;gap:8px;font-weight:700}
 .line .n{flex:1}
-.line button{width:40px;height:40px;border-radius:50%;border:2px solid var(--p);background:#fff;font-weight:800;font-size:20px;cursor:pointer}
-.line .qq{min-width:24px;text-align:center;font-weight:800}
+.line button{width:40px;height:40px;border-radius:50%;border:2px solid var(--p);background:#fff;font-weight:800;font-size:20px;cursor:pointer;color:var(--p)}
+.line .qq{min-width:24px;text-align:center;font-weight:900}
 .line .t{min-width:64px;text-align:right;font-weight:800}
-.total{display:flex;justify-content:space-between;align-items:baseline;border-top:2px dashed #eadfca;padding-top:12px}
+.total{display:flex;justify-content:space-between;align-items:baseline;border-top:2px dashed var(--l);padding-top:12px}
 .total b{font-size:32px}
 .paybtns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .paybtns .btn{min-height:64px;font-size:20px}
-.appbtns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.curb{min-height:58px;background:var(--ok)!important;color:#fff!important;width:100%}
+.appbtns{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px}
 .appbtns .btn{min-height:52px;font-size:15px;padding:8px 6px;background:#fff;color:var(--p);border:2px solid var(--p)}
-.appbtns .btn:not(:disabled):hover{background:var(--c2)}
 .sub{font-size:13px;font-weight:800;opacity:.7;margin-bottom:-4px}
 .change{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.change input{width:120px;min-height:46px;border:2px solid #e3d6bf;border-radius:12px;padding:6px 10px;font-size:18px}
+.change input,.cust input{width:140px;min-height:46px;border:2px solid var(--l);border-radius:12px;padding:6px 10px;font-size:18px}
 .cust{display:flex;flex-direction:column;gap:6px;background:var(--c);border-radius:14px;padding:10px 12px}
 .cust .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.cust input{width:150px;min-height:46px;border:2px solid #e3d6bf;border-radius:12px;padding:6px 10px;font-size:18px;direction:ltr}
+.cust input{direction:ltr;width:150px}
 .cust .info{font-weight:700;font-size:15px}
 .cust .free{display:flex;gap:8px;align-items:center;font-weight:800;color:var(--p);background:var(--o);border-radius:10px;padding:8px 10px;cursor:pointer}
-.cust .free input{width:22px;height:22px;min-height:0}
-.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ok);color:#fff;font-weight:800;font-size:20px;padding:16px 28px;border-radius:999px;z-index:9;box-shadow:0 10px 30px rgba(0,0,0,.25)}
-.today{margin:0 14px 30px}
-.today h3{margin:6px 4px 10px;font-size:20px;display:flex;gap:14px;flex-wrap:wrap;align-items:baseline}
-.today h3 small{font-size:14px;font-weight:700;opacity:.8}
-table{width:100%;border-collapse:collapse;background:#fff;border-radius:var(--r);overflow:hidden;font-size:15px}
-th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #f0e6d4;white-space:nowrap}
-th{background:var(--c);font-size:13px}
-.void{background:none;border:0;color:var(--bad);font-weight:800;cursor:pointer;min-height:40px}
-.x td{text-decoration:line-through;opacity:.5}
-.tbl{overflow-x:auto}
+.err{color:var(--bad);font-weight:800}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ok);color:#fff;font-weight:800;font-size:19px;padding:16px 28px;border-radius:999px;z-index:99;box-shadow:0 10px 30px rgba(0,0,0,.25);max-width:calc(100% - 32px);text-align:center}
+.toast.warn{background:#B26A00}
+.lists{margin:0 14px 30px;display:grid;gap:18px}
+.lists h3{margin:6px 4px 8px;font-size:20px;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.lists h3 small{font-size:14px;font-weight:700;opacity:.8}
+.lists h3 .btn{margin-inline-start:auto}
+.row-card{background:#fff;border-radius:14px;padding:12px 14px;margin-bottom:8px;display:flex;gap:12px;align-items:center}
+.row-card .m{flex:1;min-width:0}
+.row-card b{display:block}
+.row-card span{opacity:.7;font-size:14px}
+.row-card.pend{background:#FFF4E0}
+.row-card.x b{text-decoration:line-through;opacity:.5}
+.lnk{background:none;border:0;color:var(--bad);font-weight:800;cursor:pointer;min-height:40px}
+dialog{border:0;border-radius:22px;padding:22px;width:min(520px,calc(100% - 24px));box-shadow:0 20px 60px rgba(0,0,0,.3)}
+dialog::backdrop{background:rgba(20,20,20,.45)}
+dialog h3{margin:0 0 14px;font-size:22px}
+dialog .opts{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+dialog .sizes{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:14px}
+dialog .sz{min-height:74px;border-radius:16px;border:2px solid var(--p);background:#fff;color:var(--p);font-weight:900;font-size:18px;cursor:pointer}
+dialog .sz[aria-pressed=true]{background:var(--p);color:var(--c)}
+dialog .sz:disabled{opacity:.4}
+dialog label.f{display:block;font-weight:800;margin:10px 0 4px}
+dialog input[type=text],dialog input[type=number],dialog input:not([type]){width:100%;min-height:50px;border:2px solid var(--l);border-radius:12px;padding:6px 12px;font-size:18px}
+dialog .acts{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.seg button{min-height:50px;border-radius:12px;border:2px solid var(--p);background:#fff;color:var(--p);font-weight:800;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--p);color:var(--c)}
 </style>
 <script>
 /* Shows the reason instead of a blank page when a script fails (e.g. an old device browser). */
-(function(){var shown=false;function show(t){if(shown)return;shown=true;var d=document.createElement('div');d.style.cssText='position:fixed;inset:auto 12px 12px 12px;z-index:99999;background:#470D43;color:#FAF3E0;padding:14px 16px;border-radius:14px;font:15px/1.5 system-ui,sans-serif;direction:ltr;text-align:left';d.innerHTML='<b>Page could not start.</b><br>'+String(t).replace(/</g,'&lt;')+'<br><small>'+navigator.userAgent.replace(/</g,'&lt;')+'</small>';(document.body||document.documentElement).appendChild(d);}
+(function(){var shown=false;function show(t){if(shown)return;shown=true;var d=document.createElement('div');d.style.cssText='position:fixed;inset:auto 12px 12px 12px;z-index:99999;background:#393939;color:#fff;padding:14px;border-radius:14px;font:600 15px system-ui';d.textContent='Problem: '+t;document.body.appendChild(d)}
 window.addEventListener('error',function(e){show(e.message||'Script error')});window.addEventListener('unhandledrejection',function(e){show((e.reason&&e.reason.message)||e.reason)});
 setTimeout(function(){if(!window.__appStarted)show('The page script did not run. Update Android System WebView / Chrome on this device.')},6000);})();
 </script>
 </head>
 <body>
 <div id="app"></div>
+<dialog id="dlg"></dialog>
 <script type="module">
-import { api, $, esc, money, requireLogin, logout, msgEn, watchNewOrders } from './assets/common.js?v=1791732362';
+import { api, $, $$, esc, money, requireLogin, logout, msgEn, watchNewOrders } from './assets/common.js?v=1794150000';
 window.__appStarted = true;
 (async () => {
+const KARAK = /^\/karak(\/|$)/.test(location.pathname);
 const app = $('#app');
 const me = await requireLogin(app, 'POS', true);
+if (!KARAK) document.documentElement.classList.add('html-acai');
+
+// ---------- small helpers ----------
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('pos_' + k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('pos_' + k, JSON.stringify(v)); } catch { /* private mode */ } },
+};
+const cid = () => [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join('');
+const two = n => String(n).padStart(2, '0');
+const stamp = (d = new Date()) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())} ${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`;
+const today = () => stamp().slice(0, 10);
+function toast(text, warn) { const t = document.createElement('div'); t.className = 'toast' + (warn ? ' warn' : ''); t.setAttribute('role', 'status'); t.textContent = text; document.body.append(t); setTimeout(() => t.remove(), 3200); }
+const ERR = { bad_amount: 'Amount must be more than 0 and up to 500', bad_category: 'Pick what it was for', need_note: 'Write what it was for', invalid_car: 'Write the car plate', sold_out: 'An item in this sale is sold out' };
+const errText = ex => ERR[ex && ex.message] || msgEn(ex);
+const dlg = $('#dlg');
+/** Opens the dialog with the given HTML; resolves with what done(value) is called with (null if closed). */
+function modal(html, wire) {
+  return new Promise(res => {
+    let val = null;
+    dlg.innerHTML = html;
+    const done = v => { val = v; dlg.close(); };
+    dlg.onclose = () => res(val);
+    wire(done);
+    dlg.showModal();
+  });
+}
 
 app.innerHTML = `
 <header class="topbar">
   <img src="assets/logo-cream.png" alt="Açaí Dose">
   <div class="nav">
+    <span class="dot" id="net" title="Internet"></span>
     <span class="who">${esc(me.username)}</span>
     <a class="btn small ghost" href="screen.html">Orders screen</a>
     ${me.role === 'owner' ? '<a class="btn small ghost" href="dashboard.html">Dashboard</a>' : ''}
@@ -86,65 +149,220 @@ app.innerHTML = `
   </div>
 </header>
 <div class="pos">
-  <section aria-label="Menu"><div class="grid" id="grid"><div class="card" style="padding:20px">Loading menu…</div></div></section>
+  <section aria-label="Menu"><div id="banners"></div><div id="menu"><div class="card" style="padding:20px">Loading menu…</div></div></section>
   <aside class="card ticket" aria-label="Current sale">
     <h2>Current sale <button class="btn small ghost" id="clear" type="button">Clear</button></h2>
     <div class="lines" id="lines"></div>
     <div class="total"><span style="font-weight:800">Total</span><span><b id="tot">0.000</b> OMR</span></div>
-    <div class="cust">
+    <div id="freeNote" style="text-align:right;color:var(--ok);font-weight:800"></div>
+    ${KARAK ? '' : `<div class="cust">
       <div class="row"><label for="cphone" style="font-weight:800">Customer mobile <small style="font-weight:600;opacity:.7">(optional, loyalty)</small></label>
         <input id="cphone" type="tel" inputmode="numeric" maxlength="8" placeholder="9XXXXXXX" autocomplete="off"></div>
       <div class="info" id="cinfo" aria-live="polite"></div>
-    </div>
-    <div class="change"><label for="given" style="font-weight:800">Cash given</label><input id="given" type="number" step="0.001" min="0" inputmode="decimal"><span id="chg" style="font-weight:800"></span></div>
+    </div>`}
+    <div class="change"><label for="given" style="font-weight:800">Cash given</label><input id="given" type="number" step="0.001" min="0" inputmode="decimal"><span id="chg" style="font-weight:900"></span></div>
     <div class="sub">In-shop payment</div>
     <div class="paybtns">
       <button class="btn pay" data-pay="cash" type="button" disabled>Cash</button>
       <button class="btn orange pay" data-pay="card" type="button" disabled>Card</button>
     </div>
+    <div class="sub">Car order · pay on hand-over</div>
+    <button class="btn curb need" id="curb" type="button" disabled>Send to inside</button>
     <div class="sub">Delivery app order</div>
-    <div class="appbtns">
-      <button class="btn pay" data-pay="talabat" type="button" disabled>Talabat</button>
-      <button class="btn pay" data-pay="snoonu" type="button" disabled>Snoonu</button>
-      <button class="btn pay" data-pay="khedmah" type="button" disabled>Khedmah</button>
-    </div>
+    <div class="appbtns" id="apps"></div>
     <div class="err" id="err" role="alert"></div>
   </aside>
 </div>
-<section class="today">
-  <h3>Today's shop sales <small id="sum"></small></h3>
-  <div class="tbl" id="todayTbl"></div>
+<section class="lists">
+  <div><h3>Today's shop sales <small id="sum"></small></h3><div id="todayList"></div></div>
+  <div><h3>Till expenses today <small id="expSum"></small><button class="btn small" id="addExp" type="button">+ Add expense</button></h3><div id="expList"></div></div>
 </section>`;
 $('#out').onclick = logout;
 watchNewOrders();
 
-let products = [];
-const cart = new Map();
+// ---------- data: setup and menu (kept for when the internet drops) ----------
+let cfg = store.get('cfg', { channels: [], cats: [], sizes: {}, expense_cats: [] });
+let products = store.get('menu', []);
+try { cfg = await api('pos_config'); store.set('cfg', cfg); } catch { /* offline: last copy */ }
+const SIZES = cfg.sizes || {};
+const sizeName = k => (SIZES[k] && SIZES[k].en) || k || '';
+const chName = k => (cfg.channels.find(c => c.k === k) || {}).en || (k === 'cash' ? 'Cash' : k === 'card' ? 'Card' : k);
+$('#apps').innerHTML = cfg.channels.map(c => `<button class="btn pay" data-pay="${esc(c.k)}" type="button" disabled>${esc(c.en)}</button>`).join('');
 
-function drawGrid() {
-  $('#grid').innerHTML = products.map(p => {
-    const q = cart.get(p.id) || 0;
-    return `<button class="card prod" type="button" data-id="${p.id}" aria-label="Add ${esc(p.name_en)}">
-      <span class="q"><img src="assets/${esc(p.img || 'cup-smoothie.png')}" alt="">${q ? `<span class="cnt">${q}</span>` : ''}</span>
-      <span class="nm">${esc(p.name_en)}</span><span class="pr">${money(p.price)}</span></button>`;
-  }).join('');
+async function loadMenu() {
+  try { products = await api('menu'); store.set('menu', products); } catch { /* keep last copy */ }
+  drawMenu(); drawTicket();
 }
-let cust = null;   // loyalty info for the typed mobile
-function subtotal() { return products.reduce((s, p) => s + (cart.get(p.id) || 0) * p.price, 0); }
-function freeOn() { const f = $('#usefree'); return !!(f && f.checked && cust && cust.free > 0); }
-function discount() { if (!freeOn()) return 0; const inCart = products.filter(p => cart.get(p.id)); return inCart.length ? Math.max(...inCart.map(p => p.price)) : 0; }
-function total() { return Math.max(0, subtotal() - discount()); }
+
+// ---------- offline queue: sales and expenses wait here and go in order ----------
+let outbox = store.get('outbox', []), failed = store.get('failed', []), online = navigator.onLine !== false, syncing = false;
+const saveBox = () => { store.set('outbox', outbox); store.set('failed', failed); };
+function setOnline(v) { online = v; $('#net').classList.toggle('off', !v); drawBanners(); }
+async function sync() {
+  if (syncing || !outbox.length) return;
+  syncing = true; let sent = 0;
+  try {
+    while (outbox.length) {
+      const it = outbox[0];
+      try { await api(it.kind === 'expense' ? 'pos_expense' : 'pos_sale', it.body); outbox.shift(); sent++; setOnline(true); }
+      catch (ex) {
+        if (ex.message === 'network' || /^http_5|server_error|too_many/.test(ex.message)) { setOnline(ex.message !== 'network'); break; }
+        if (ex.message === 'login_required') { location.reload(); break; }
+        failed.push({ ...it, error: ex.message }); outbox.shift();
+      }
+      saveBox();
+    }
+  } finally { syncing = false; saveBox(); drawBanners(); if (sent) { loadToday(); loadExp(); } }
+}
+setInterval(sync, 20000);
+addEventListener('online', () => { setOnline(true); sync(); });
+addEventListener('offline', () => setOnline(false));
+function drawBanners() {
+  const n = outbox.length;
+  let h = '';
+  if (!online || n) h += `<div class="banner ${online ? 'send' : 'off'}">${online ? `Sending ${n} saved item(s)…` : `No internet · keep selling, ${n} item(s) saved here will be sent automatically`}<button type="button" data-sync>Retry</button></div>`;
+  if (failed.length) h += `<div class="banner fail">${failed.length} offline item(s) were not accepted: ${failed.map(f => `${esc(f.label)} (${esc(f.error)})`).join(', ')}. Tell the owner.<button type="button" data-okfail>OK</button></div>`;
+  $('#banners').innerHTML = h;
+}
+$('#banners').addEventListener('click', e => {
+  if (e.target.closest('[data-sync]')) sync();
+  if (e.target.closest('[data-okfail]')) { failed = []; saveBox(); drawBanners(); }
+});
+
+// ---------- menu: sections (Karak Dose) → items ----------
+const DRINK_CATS = new Set(['karak', 'milk', 'drinks']);
+const DRINK_NOTES = ['Less sugar', 'No sugar', 'Extra sugar', 'Extra strong', 'Cold'];
+const NO_NOTES = new Set(['Water', 'Kinza', 'Top Fruit']);
+let cat = '', q = '';
+const sellable = () => products.filter(p => p.kind !== 'open' && p.kind !== 'build');
+const cats = () => (cfg.cats || []).filter(c => sellable().some(p => p.cat === c.k));
+const openItem = () => products.find(p => p.kind === 'open');
+const curCat = () => cat || (KARAK || !cats().length ? '' : cats()[0].k);
+function short(p, ar) {
+  const name = ar ? p.name_ar : p.name_en;
+  if (q) return name;
+  const c = (cfg.cats || []).find(c => c.k === p.cat); if (!c) return name;
+  const pre = (ar ? c.ar : c.en) + ' ';
+  return name.startsWith(pre) && name.length > pre.length ? name.slice(pre.length) : name;
+}
+/** Items of the same name (Karak Small / Large, Kinza flavours) share one tile. */
+function tiles() {
+  const m = new Map();
+  for (const p of sellable()) {
+    if (q) { if (!(`${p.name_en} ${p.name_ar}`.toLowerCase().includes(q))) continue; }
+    else if (cats().length && p.cat !== curCat()) continue;
+    const k = `${p.cat || ''}|${p.name_en}`;
+    if (!m.has(k)) m.set(k, []);
+    m.get(k).push(p);
+  }
+  return [...m.values()];
+}
+const qtyOfId = id => [...cart.values()].filter(l => l.pid === id).reduce((s, l) => s + l.qty, 0);
+const priceLabel = vs => [...new Set(vs.map(v => money(v.price)))].join(' / ');
+function drawMenu() {
+  const box = $('#menu');
+  if (!products.length) { box.innerHTML = `<div class="card" style="padding:20px">Could not load the menu. <button class="btn small" type="button" data-reload>Retry</button></div>`; return; }
+  const cs = cats(), sections = KARAK && cs.length && !cat && !q;
+  let h = KARAK ? `<input class="search" id="q" type="search" placeholder="Search the menu" value="${esc(q)}" autocomplete="off">` : '';
+  if (sections) {
+    h += `<div class="grid">${cs.map(c => {
+      const items = sellable().filter(p => p.cat === c.k), n = items.reduce((s, p) => s + qtyOfId(p.id), 0);
+      return `<button class="sec" type="button" data-cat="${esc(c.k)}"><b>${esc(c.en)}</b><span>${esc(c.ar || '')}</span><small>${new Set(items.map(p => p.name_en)).size} items</small>${n ? `<span class="cnt">${n}</span>` : ''}</button>`;
+    }).join('')}</div>`;
+  } else {
+    if (KARAK && cs.length && !q) {
+      h += `<div class="head"><button class="btn small" type="button" data-cat="">← All</button><h2>${esc((cs.find(c => c.k === curCat()) || {}).en || '')}</h2></div>`;
+    } else if (!KARAK && cs.length && !q) {
+      h += `<div class="chips">${cs.map(c => `<button class="chip" type="button" data-cat="${esc(c.k)}" aria-pressed="${curCat() === c.k}">${esc(c.en)}</button>`).join('')}</div>`;
+    }
+    const ts = tiles();
+    h += `<div class="grid">${ts.length ? ts.map(vs => {
+      const p = vs[0], out = vs.every(v => v.soldout), n = vs.reduce((s, v) => s + qtyOfId(v.id), 0);
+      return `<button class="tile${out ? ' out' : ''}" type="button" data-tile="${esc(p.cat || '')}|${esc(p.name_en)}" title="Right-click / long-press: sold out">
+        ${KARAK ? '' : `<img src="assets/${esc(p.img || 'cup-smoothie.png')}" alt="">`}
+        <span class="nm">${esc(KARAK ? short(p, false) : p.name_en)}</span>${KARAK ? `<span class="ar">${esc(short(p, true))}</span>` : ''}
+        <span class="pr">${out ? 'SOLD OUT' : priceLabel(vs)}</span>${n ? `<span class="cnt">${n}</span>` : ''}</button>`;
+    }).join('') : '<div style="font-weight:700;padding:20px">Nothing matches</div>'}</div>`;
+  }
+  if (openItem()) h += `<button class="custom" type="button" data-custom style="margin-top:12px">✎ Custom item (type name and price)</button>`;
+  box.innerHTML = h;
+  const qi = $('#q');
+  if (qi) qi.oninput = () => { const pos = qi.selectionStart; q = qi.value.trim().toLowerCase(); drawMenu(); const n = $('#q'); n.focus(); n.setSelectionRange(pos, pos); };
+}
+const variantsOf = key => tiles().find(vs => `${vs[0].cat || ''}|${vs[0].name_en}` === key) || [];
+$('#menu').addEventListener('click', e => {
+  if (e.target.closest('[data-reload]')) return loadMenu();
+  const c = e.target.closest('[data-cat]'); if (c) { cat = c.dataset.cat; drawMenu(); return; }
+  if (e.target.closest('[data-custom]')) return customItem();
+  const t = e.target.closest('[data-tile]'); if (t) pick(variantsOf(t.dataset.tile));
+});
+$('#menu').addEventListener('contextmenu', e => {
+  const t = e.target.closest('[data-tile]'); if (!t) return;
+  e.preventDefault(); toggleSoldOut(variantsOf(t.dataset.tile));
+});
+
+async function pick(vs) {
+  if (!vs.length) return;
+  if (vs.every(v => v.soldout)) return toast('Sold out. Right-click / long-press the item to bring it back.', true);
+  const first = vs[0];
+  if (!KARAK) return add(first, '');
+  let size = vs.find(v => !v.soldout);
+  const notes = DRINK_CATS.has(first.cat) && !NO_NOTES.has(first.name_en) ? DRINK_NOTES : [];
+  if (vs.length === 1 && !notes.length) return add(size, '');
+  let note = '';
+  const ok = await modal(`<h3>${esc(first.name_en)}</h3>
+    ${vs.length > 1 ? `<div class="sizes">${vs.map((v, i) => `<button class="sz" type="button" data-i="${i}" aria-pressed="${v === size}" ${v.soldout ? 'disabled' : ''}>${esc(sizeName(v.size))}<br><small>${v.soldout ? 'Sold out' : money(v.price)}</small></button>`).join('')}</div>` : ''}
+    ${notes.length ? `<div class="opts">${notes.map(n => `<button class="chip" type="button" data-n="${esc(n)}" aria-pressed="false">${esc(n)}</button>`).join('')}</div>` : ''}
+    <div class="acts"><button class="btn small ghost" type="button" data-x>Cancel</button><button class="btn small" type="button" data-ok>Add · <span id="pp">${money(size.price)}</span></button></div>`, done => {
+    dlg.querySelectorAll('[data-i]').forEach(b => b.onclick = () => { size = vs[+b.dataset.i]; dlg.querySelectorAll('[data-i]').forEach(x => x.setAttribute('aria-pressed', x === b)); $('#pp').textContent = money(size.price); });
+    dlg.querySelectorAll('[data-n]').forEach(b => b.onclick = () => { note = note === b.dataset.n ? '' : b.dataset.n; dlg.querySelectorAll('[data-n]').forEach(x => x.setAttribute('aria-pressed', x.dataset.n === note)); });
+    $('[data-x]', dlg).onclick = () => done(null); $('[data-ok]', dlg).onclick = () => done(true);
+  });
+  if (ok) add(size, note);
+}
+async function customItem() {
+  const it = openItem(); if (!it) return;
+  const r = await modal(`<h3>Custom item</h3>
+    <label class="f" for="cn">Name</label><input id="cn" maxlength="40" placeholder="e.g. Extra cheese">
+    <label class="f" for="cp">Price (OMR)</label><input id="cp" type="number" step="0.001" min="0" inputmode="decimal">
+    <div class="acts"><button class="btn small ghost" type="button" data-x>Cancel</button><button class="btn small" type="button" data-ok>Add</button></div>`, done => {
+    $('[data-x]', dlg).onclick = () => done(null);
+    $('[data-ok]', dlg).onclick = () => { const p = Math.round(parseFloat($('#cp').value) * 1000) / 1000; if (!(p > 0 && p <= 100)) { $('#cp').focus(); return; } done({ name: $('#cn').value.trim() || 'Custom item', price: p }); };
+    setTimeout(() => $('#cn').focus(), 50);
+  });
+  if (r) { const k = `c:${cid()}`; cart.set(k, { pid: it.id, qty: 1, name: r.name, price: r.price, custom: true }); redraw(); }
+}
+async function toggleSoldOut(vs) {
+  if (!vs.length) return;
+  const out = vs.every(v => v.soldout);
+  if (!confirm(out ? `${vs[0].name_en} is back in stock?` : `${vs[0].name_en} sold out? It is hidden from the order page until you bring it back.`)) return;
+  try { for (const v of vs) await api('soldout', { id: v.id, soldout: !out }); await loadMenu(); }
+  catch (ex) { toast(errText(ex), true); }
+}
+
+// ---------- the sale ----------
+const cart = new Map();   // key -> {pid, qty, name, price, note?, custom?}
+function add(p, note) {
+  const k = `${p.id}:${note}`;
+  const name = (p.size ? `${p.name_en} (${sizeName(p.size)})` : p.name_en) + (note ? ` · ${note}` : '');
+  const l = cart.get(k) || { pid: p.id, qty: 0, name, price: p.price, note };
+  l.qty++; cart.set(k, l); redraw();
+}
+let cust = null;
+const subtotal = () => [...cart.values()].reduce((s, l) => s + l.qty * l.price, 0);
+const freeOn = () => { const f = $('#usefree'); return !!(f && f.checked && cust && cust.free > 0); };
+const discount = () => freeOn() && cart.size ? Math.max(...[...cart.values()].map(l => l.price)) : 0;
+const total = () => Math.max(0, subtotal() - discount());
 function drawCust() {
-  const box = $('#cinfo');
+  const box = $('#cinfo'); if (!box) return;
   if (!cust) { box.innerHTML = ''; return; }
   if (!cust.on) { box.textContent = cust.found ? `${cust.name || 'Customer'} (loyalty is off)` : 'New customer'; return; }
-  const who = cust.found ? esc(cust.name || 'Customer') : 'New customer';
-  box.innerHTML = `${who} · Stamps <b>${cust.stamps}/${cust.need}</b>` +
+  box.innerHTML = `${cust.found ? esc(cust.name || 'Customer') : 'New customer'} · Stamps <b>${cust.stamps}/${cust.need}</b>` +
     (cust.free > 0 ? `<label class="free"><input type="checkbox" id="usefree"> Use FREE cup (${cust.free} available)</label>` : ' · Stamps are added for Cash / Card');
   const f = $('#usefree'); if (f) f.onchange = drawTicket;
 }
 let lookupT = null;
-$('#cphone').addEventListener('input', e => {
+if ($('#cphone')) $('#cphone').addEventListener('input', e => {
   e.target.value = e.target.value.replace(/\D/g, '').slice(0, 8);
   cust = null; drawCust(); drawTicket(); clearTimeout(lookupT);
   const v = e.target.value;
@@ -154,77 +372,180 @@ $('#cphone').addEventListener('input', e => {
   }, 250);
 });
 function drawTicket() {
-  const rows = products.filter(p => cart.get(p.id));
-  $('#lines').innerHTML = rows.length ? rows.map(p => {
-    const q = cart.get(p.id);
-    return `<div class="line"><span class="n">${esc(p.name_en)}</span>
-      <button type="button" data-d="-1" data-id="${p.id}" aria-label="Remove one">−</button><span class="qq">${q}</span>
-      <button type="button" data-d="1" data-id="${p.id}" aria-label="Add one">+</button><span class="t">${money(q * p.price)}</span></div>`;
-  }).join('') : '<div style="opacity:.6;font-weight:700">Tap a drink to add it</div>';
+  const rows = [...cart.entries()];
+  $('#lines').innerHTML = rows.length ? rows.map(([k, l]) => `<div class="line"><span class="n">${esc(l.name)}</span>
+      <button type="button" data-d="-1" data-k="${esc(k)}" aria-label="Remove one">−</button><span class="qq">${l.qty}</span>
+      <button type="button" data-d="1" data-k="${esc(k)}" aria-label="Add one">+</button><span class="t">${money(l.qty * l.price)}</span></div>`).join('')
+    : `<div style="opacity:.6;font-weight:700">Tap ${KARAK ? 'an item' : 'a drink'} to add it</div>`;
   const t = total(), dsc = discount();
-  $('#tot').textContent = money(t) + (dsc ? ` (−${money(dsc)} free cup)` : '');
-  document.querySelectorAll('.pay').forEach(b => { b.disabled = t === 0; });
+  $('#tot').textContent = money(t);
+  $('#freeNote').textContent = dsc ? `−${money(dsc)} free cup` : '';
+  $$('.pay, .need').forEach(b => { b.disabled = t === 0 || busy; });
   const g = parseFloat($('#given').value);
-  $('#chg').textContent = g && t ? (g >= t ? `Change: ${money(g - t)}` : `Short: ${money(t - g)}`) : '';
+  const chg = $('#chg');
+  chg.textContent = g && t ? (g >= t ? `Change: ${money(g - t)}` : `Short: ${money(t - g)}`) : '';
+  chg.style.color = g >= t ? 'var(--ok)' : 'var(--bad)';
 }
-function redraw() { drawGrid(); drawTicket(); }
-
-$('#grid').addEventListener('click', e => {
-  const b = e.target.closest('.prod'); if (!b) return;
-  const id = +b.dataset.id; cart.set(id, (cart.get(id) || 0) + 1); redraw();
-});
+function redraw() { drawMenu(); drawTicket(); }
 $('#lines').addEventListener('click', e => {
-  const b = e.target.closest('button[data-id]'); if (!b) return;
-  const id = +b.dataset.id, q = (cart.get(id) || 0) + +b.dataset.d;
-  q > 0 ? cart.set(id, q) : cart.delete(id); redraw();
+  const b = e.target.closest('button[data-k]'); if (!b) return;
+  const l = cart.get(b.dataset.k); if (!l) return;
+  l.qty += +b.dataset.d; if (l.qty <= 0) cart.delete(b.dataset.k);
+  redraw();
 });
-function resetSale() { cart.clear(); $('#given').value = ''; $('#cphone').value = ''; cust = null; drawCust(); redraw(); }
+function resetSale() {
+  cart.clear(); $('#given').value = ''; if ($('#cphone')) $('#cphone').value = ''; cust = null; drawCust();
+  if (KARAK) { cat = ''; q = ''; }
+  $('#err').textContent = ''; redraw();
+}
 $('#clear').onclick = resetSale;
 $('#given').oninput = drawTicket;
+const items = () => [...cart.values()].map(l => l.custom ? { product_id: l.pid, qty: l.qty, name: l.name, price: l.price } : { product_id: l.pid, qty: l.qty, ...(l.note ? { note: l.note } : {}) });
 
+let busy = false;
 async function sell(payment) {
-  const items = [...cart].map(([product_id, qty]) => ({ product_id, qty }));
-  document.querySelectorAll('.pay').forEach(b => { b.disabled = true; }); $('#err').textContent = '';
+  const ph = $('#cphone') ? $('#cphone').value : '';
+  if (ph && !/^[279]\d{7}$/.test(ph)) { $('#err').textContent = 'Customer mobile must be 8 digits (or leave it empty)'; return; }
+  const shop = payment === 'cash' || payment === 'card';
+  const body = { client_id: cid(), items: items(), payment, phone: ph && shop ? '+968' + ph : '', use_free: shop && freeOn() };
+  busy = true; drawTicket(); $('#err').textContent = '';
   try {
-    const ph = $('#cphone').value;
-    if (ph && !/^[279]\d{7}$/.test(ph)) { $('#err').textContent = 'Customer mobile must be 8 digits (or leave it empty)'; drawTicket(); return; }
-    const shop = payment === 'cash' || payment === 'card';
-    const r = await api('pos_sale', { items, payment, phone: ph && shop ? '+968' + ph : '', use_free: shop && freeOn() });
+    const r = await api('pos_sale', body);
     resetSale();
-    const t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status');
-    t.textContent = `Sale #${r.ref} saved · ${money(r.total)} OMR (${payment})` + (r.loyalty ? ` · Stamps ${r.loyalty.stamps}/${r.loyalty.need}${r.loyalty.free ? ' · FREE cup ready' : ''}` : '');
-    document.body.append(t); setTimeout(() => t.remove(), 2500);
+    toast(`Sale #${r.ref} saved · ${money(r.total)} OMR (${chName(payment)})` + (r.loyalty ? ` · Stamps ${r.loyalty.stamps}/${r.loyalty.need}${r.loyalty.free ? ' · FREE cup ready' : ''}` : ''));
     loadToday();
   } catch (ex) {
     if (ex.message === 'login_required') return location.reload();
-    $('#err').textContent = msgEn(ex); drawTicket();
-  }
+    if (ex.message === 'network') {
+      if (body.use_free) { $('#err').textContent = 'No internet: a free cup needs internet. Untick it to sell now.'; return; }
+      const t = total();
+      outbox.push({ kind: 'sale', label: `${money(t)} ${chName(payment)}`, body: { ...body, at: stamp(), _total: t, _lines: [...cart.values()].map(l => ({ qty: l.qty, name_en: l.name })) } });
+      saveBox(); setOnline(false); resetSale();
+      toast(`No internet: sale saved here · ${money(t)} OMR (${chName(payment)}). It will be sent automatically.`, true);
+      drawToday();
+      return;
+    }
+    $('#err').textContent = errText(ex);
+  } finally { busy = false; drawTicket(); }
 }
-document.querySelectorAll('.pay').forEach(b => { b.onclick = () => sell(b.dataset.pay); });
+$('.ticket').addEventListener('click', e => { const b = e.target.closest('.pay'); if (b && !b.disabled) sell(b.dataset.pay); });
 
+$('#curb').onclick = async () => {
+  const ph = $('#cphone') ? $('#cphone').value : '';
+  const r = await modal(`<h3>Car order</h3>
+    <label class="f" for="pl">Car plate</label><input id="pl" style="font-size:22px;font-weight:900;text-transform:uppercase" placeholder="12345 A">
+    <label class="f" for="cd">Car model & colour (optional)</label><input id="cd" placeholder="White Land Cruiser">
+    <label class="f" for="nt">Note (optional)</label><input id="nt" placeholder="No ice">
+    <p style="font-weight:800;opacity:.7">${money(subtotal())} OMR · paid when you hand it over</p>
+    <div class="acts"><button class="btn small ghost" type="button" data-x>Cancel</button><button class="btn small" type="button" data-ok>Send inside</button></div>`, done => {
+    $('[data-x]', dlg).onclick = () => done(null);
+    $('[data-ok]', dlg).onclick = () => { const p = $('#pl').value.trim().toUpperCase(); if (!p) { $('#pl').focus(); return; } done({ car_plate: p, car_desc: $('#cd').value.trim(), notes: $('#nt').value.trim() }); };
+    setTimeout(() => $('#pl').focus(), 50);
+  });
+  if (!r) return;
+  busy = true; drawTicket();
+  try {
+    const o = await api('curb_order', { items: items(), ...r, phone: ph ? '+968' + ph : '', name: cust && cust.name ? cust.name : '' });
+    resetSale();
+    toast(`Order #${o.ref} sent inside · car ${r.car_plate} · collect ${money(o.total)} OMR`);
+  } catch (ex) {
+    if (ex.message === 'login_required') return location.reload();
+    $('#err').textContent = ex.message === 'network' ? 'No internet: car orders need internet. Take the money and sell it as Cash / Card.' : errText(ex);
+  } finally { busy = false; drawTicket(); }
+};
+
+// ---------- today's sales ----------
+let todayRows = store.get('today', { day: '', rows: [] }).day === today() ? store.get('today', {}).rows : [];
 async function loadToday() {
-  let rows = [];
-  try { rows = await api('pos_today'); } catch (ex) { if (ex.message === 'login_required') location.reload(); return; }
-  const ok = rows.filter(r => r.status !== 'cancelled');
-  const sum = k => ok.filter(r => !k || r.payment === k).reduce((s, r) => s + r.total, 0);
-  const apps = ['talabat', 'snoonu', 'khedmah'].map(k => [k, sum(k)]).filter(x => x[1]).map(([k, v]) => ` · ${k[0].toUpperCase() + k.slice(1)} ${money(v)}`).join('');
-  $('#sum').textContent = `${ok.length} sales · Total ${money(sum())} · Cash ${money(sum('cash'))} · Card ${money(sum('card'))}${apps}`;
-  $('#todayTbl').innerHTML = rows.length ? `<table>
-    <thead><tr><th>Time</th><th>#</th><th>Items</th><th>Total</th><th>Paid</th><th>By</th><th></th></tr></thead>
-    <tbody>${rows.map(r => `<tr class="${r.status === 'cancelled' ? 'x' : ''}"><td>${r.created_at.slice(11, 16)}</td><td>#${esc(r.ref)}</td>
-      <td>${r.items.map(i => `${i.qty}× ${esc(i.name_en)}`).join(', ')}${r.free_cups ? ' <b>(1 free)</b>' : ''}${r.phone ? ` · ${esc(r.phone.slice(-4))}` : ''}</td><td>${money(r.total)}</td><td>${esc(r.payment || '')}</td><td>${esc(r.by_user || '')}</td>
-      <td>${r.status === 'cancelled' ? 'Voided' : `<button class="void" type="button" data-void="${r.id}">Void</button>`}</td></tr>`).join('')}</tbody></table>`
-    : '<div class="card" style="padding:18px;font-weight:700;opacity:.7">No shop sales yet today</div>';
+  try { todayRows = await api('pos_today'); store.set('today', { day: today(), rows: todayRows }); setOnline(true); }
+  catch (ex) { if (ex.message === 'login_required') return location.reload(); }
+  drawToday();
 }
-document.addEventListener('click', async e => {
+const pendingSales = () => outbox.filter(i => i.kind === 'sale').map(i => ({ pending: true, total: i.body._total, payment: i.body.payment, created_at: i.body.at, items: i.body._lines || [] }));
+function cashToday() { return [...pendingSales(), ...todayRows.filter(r => r.status !== 'cancelled')].filter(r => r.payment === 'cash').reduce((s, r) => s + r.total, 0); }
+function drawToday() {
+  const pend = pendingSales(), ok = [...pend, ...todayRows.filter(r => r.status !== 'cancelled')];
+  const sum = k => ok.filter(r => !k || r.payment === k).reduce((s, r) => s + r.total, 0);
+  const apps = cfg.channels.map(c => [c, sum(c.k)]).filter(x => x[1]).map(([c, v]) => ` · ${c.en} ${money(v)}`).join('');
+  $('#sum').textContent = `${ok.length} sales · Total ${money(sum())} · Cash ${money(sum('cash'))} · Card ${money(sum('card'))}${apps}`;
+  const line = r => `${String(r.created_at || '').slice(11, 16)}  ${(r.items || []).map(i => `${i.qty}× ${esc(i.name_en)}`).join(', ')}`;
+  $('#todayList').innerHTML = (pend.length || todayRows.length) ? pend.map(r => `<div class="row-card pend"><div class="m"><b>${money(r.total)} · ${esc(chName(r.payment))}</b><span>${line(r)} · waiting for internet</span></div></div>`).join('') +
+    todayRows.map(r => `<div class="row-card${r.status === 'cancelled' ? ' x' : ''}"><div class="m"><b>#${esc(r.ref)} · ${money(r.total)} · ${esc(chName(r.payment || ''))}</b>
+      <span>${line(r)}${r.free_cups ? ' (1 free)' : ''} · ${esc(r.by_user || '')}</span></div>
+      ${r.status === 'cancelled' ? '<span class="err">Voided</span>' : `<button class="lnk" type="button" data-void="${r.id}" data-ref="${esc(r.ref)}">Void</button>`}</div>`).join('')
+    : '<div class="row-card"><span>No shop sales yet today</span></div>';
+  drawExp();
+}
+$('#todayList').addEventListener('click', async e => {
   const v = e.target.closest('[data-void]'); if (!v) return;
-  if (!confirm('Void this sale?')) return;
-  try { await api('pos_void', { id: +v.dataset.void }); loadToday(); } catch (ex) { alert(msgEn(ex)); }
+  if (!confirm(`Void sale #${v.dataset.ref}?`)) return;
+  try { await api('pos_void', { id: +v.dataset.void }); } catch (ex) { toast(errText(ex), true); }
+  loadToday();
 });
 
-try { products = await api('menu'); } catch { $('#grid').innerHTML = '<div class="card" style="padding:20px">Could not load menu. Refresh the page.</div>'; }
-redraw(); loadToday();
+// ---------- till expenses ----------
+let expRows = store.get('exp', { day: '' }).day === today() ? store.get('exp', {}).rows : [];
+const expCat = k => (cfg.expense_cats.find(c => c.k === k) || {}).en || k;
+async function loadExp() {
+  try { expRows = await api('pos_expenses'); store.set('exp', { day: today(), rows: expRows }); }
+  catch (ex) { if (ex.message === 'login_required') return location.reload(); }
+  drawExp();
+}
+function drawExp() {
+  const pend = outbox.filter(i => i.kind === 'expense').map(i => i.body);
+  const all = [...pend.map(p => ({ amount: p.amount, paid_from: p.paid_from })), ...expRows];
+  const paid = all.reduce((s, r) => s + r.amount, 0), cashOut = all.filter(r => (r.paid_from || 'cash') === 'cash').reduce((s, r) => s + r.amount, 0);
+  $('#expSum').textContent = `Paid ${money(paid)} · Cash in drawer should be ${money(cashToday() - cashOut)} OMR`;
+  $('#expList').innerHTML = (pend.length || expRows.length) ? pend.map(p => `<div class="row-card pend"><div class="m"><b>${esc(expCat(p.cat))} · ${money(p.amount)}${p.paid_from === 'bank' ? ' · Transfer' : ''}</b><span>${String(p.at || '').slice(11, 16)} ${esc(p.note || '')} · waiting for internet</span></div></div>`).join('') +
+    expRows.map(r => `<div class="row-card"><div class="m"><b>${esc(r.cat)} · ${money(r.amount)}${r.paid_from === 'bank' ? ' · Transfer' : ''}</b><span>${String(r.at || '').slice(11, 16)} ${esc(r.note || '')}${r.note ? ' · ' : ''}${esc(r.by_user || '')}</span></div>
+      <button class="lnk" type="button" data-rm="${r.id}" data-label="${esc(r.cat)} · ${money(r.amount)}">Remove</button></div>`).join('')
+    : '<div class="row-card"><span>Nothing paid from the till today</span></div>';
+}
+$('#expList').addEventListener('click', async e => {
+  const b = e.target.closest('[data-rm]'); if (!b) return;
+  if (!confirm(`Remove ${b.dataset.label}?`)) return;
+  try { await api('pos_expense_void', { id: +b.dataset.rm }); } catch (ex) { toast(errText(ex), true); }
+  loadExp();
+});
+$('#addExp').onclick = async () => {
+  if (!cfg.expense_cats.length) return toast('Connect to the internet once to load expense types', true);
+  let ec = '', pay = 'cash';
+  const r = await modal(`<h3>Pay from the till</h3>
+    <div style="font-weight:800;margin-bottom:6px">What was it for?</div>
+    <div class="opts">${cfg.expense_cats.map(c => `<button class="chip" type="button" data-c="${esc(c.k)}" aria-pressed="false">${esc(c.en)}</button>`).join('')}</div>
+    <label class="f" for="ea">Amount (OMR)</label><input id="ea" type="number" step="0.001" min="0" max="500" inputmode="decimal" style="font-size:24px;font-weight:900">
+    <label class="f" for="en">Note <span id="enReq">(optional)</span></label><input id="en" maxlength="80" placeholder="e.g. 2 boxes of milk">
+    <label class="f">Paid by</label>
+    <div class="seg"><button type="button" data-p="cash" aria-pressed="true">Cash from till</button><button type="button" data-p="bank" aria-pressed="false">Bank transfer</button></div>
+    <div class="err" id="eerr"></div>
+    <div class="acts"><button class="btn small ghost" type="button" data-x>Cancel</button><button class="btn small" type="button" data-ok>Save</button></div>`, done => {
+    dlg.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { ec = b.dataset.c; dlg.querySelectorAll('[data-c]').forEach(x => x.setAttribute('aria-pressed', x === b)); $('#enReq').textContent = ec === 'other' ? '(required)' : '(optional)'; });
+    dlg.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { pay = b.dataset.p; dlg.querySelectorAll('[data-p]').forEach(x => x.setAttribute('aria-pressed', x === b)); });
+    $('[data-x]', dlg).onclick = () => done(null);
+    $('[data-ok]', dlg).onclick = () => {
+      const a = Math.round(parseFloat($('#ea').value) * 1000) / 1000, note = $('#en').value.trim();
+      const bad = !ec ? 'Pick what it was for' : !(a > 0 && a <= 500) ? ERR.bad_amount : ec === 'other' && !note ? ERR.need_note : '';
+      if (bad) { $('#eerr').textContent = bad; return; }
+      done({ client_id: cid(), cat: ec, amount: a, note, paid_from: pay });
+    };
+  });
+  if (!r) return;
+  try { await api('pos_expense', r); toast(`Expense saved · ${expCat(r.cat)} · ${money(r.amount)} OMR`); loadExp(); }
+  catch (ex) {
+    if (ex.message === 'login_required') return location.reload();
+    if (ex.message === 'network') {
+      outbox.push({ kind: 'expense', label: `${expCat(r.cat)} ${money(r.amount)}`, body: { ...r, at: stamp() } }); saveBox(); setOnline(false);
+      toast('No internet: expense saved here, it will be sent automatically', true); drawExp();
+      return;
+    }
+    toast(errText(ex), true);
+  }
+};
 
+// ---------- start ----------
+drawBanners(); setOnline(online);
+await loadMenu();
+loadToday(); loadExp(); sync();
 })();
 </script>
 </body>

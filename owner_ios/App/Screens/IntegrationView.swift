@@ -10,6 +10,7 @@ struct IntegrationView: View {
     @State private var askNewKey = false
     @State private var askOff = false
     @State private var testing = false
+    @State private var askOld = false
 
     var body: some View {
         Group {
@@ -48,6 +49,9 @@ struct IntegrationView: View {
                     } header: { Text("رابط الاستقبال (نرسل له كل حركة)") } footer: { Text("كل بيع وإلغاء ومصروف، وملخص كل يوم بعد نص الليل، يوصل لنظام الإدارة على طول. لو ما رد، نعيد المحاولة.") }
 
                     if c["on"].bool {
+                        Section {
+                            Button { askOld = true } label: { Label("أرسل القديم", systemImage: "clock.arrow.circlepath") }
+                        } footer: { Text("يرسل كل الطلبات ومبيعات التطبيقات والمصاريف وملخص كل يوم من قبل ما تشغّل الربط. لو انرسل مرتين ما يتكرر عندهم.") }
                         Section { Button("طفّي الربط", role: .destructive) { askOff = true } }
                     }
                 }
@@ -66,6 +70,10 @@ struct IntegrationView: View {
         } message: { Text((shown?.value ?? "") + "\n\nيطلع مرة وحدة بس، انسخه الحين.") }
         .confirmationDialog("المفتاح القديم بيوقف، ونظام الإدارة يحتاج الجديد", isPresented: $askNewKey, titleVisibility: .visible) {
             Button("سوّ مفتاح جديد", role: .destructive) { Task { await newKey() } }
+            Button("إلغاء", role: .cancel) {}
+        }
+        .confirmationDialog("أرسل كل البيانات القديمة لنظام الإدارة؟", isPresented: $askOld, titleVisibility: .visible) {
+            Button("أرسل") { Task { await sendOld() } }
             Button("إلغاء", role: .cancel) {}
         }
         .confirmationDialog("نظام الإدارة بيوقف يستلم ويسحب من هالمحل", isPresented: $askOff, titleVisibility: .visible) {
@@ -115,6 +123,14 @@ struct IntegrationView: View {
             let r = try await API.shared.post("ext_hook_test")
             if r["ok"].bool { toaster.show("وصل ✓ (\(r["code"].int))") }
             else { toaster.show(r["code"].int > 0 ? "رد بخطأ \(r["code"].int)" : "ما رد: \(r["error"].string)", ok: false) }
+        } catch { toaster.show(errText(error), ok: false) }
+    }
+
+    private func sendOld() async {
+        do {
+            let r = try await API.shared.post("ext_backfill")
+            toaster.show("تجهز: \(r["orders"].int) طلب، \(r["expenses"].int) مصروف، \(r["days"].int) يوم. قاعد ينرسل")
+            await load()
         } catch { toaster.show(errText(error), ok: false) }
     }
 

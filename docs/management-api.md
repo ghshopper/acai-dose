@@ -77,8 +77,10 @@ Only needed if you want a cron job to push waiting webhooks; normally not used.
 
 **Expense**
 ```json
-{"id":301,"date":"2026-11-08","category":"إيجار","amount":250,"one_off":false,"note":"","created_at":"…"}
+{"id":301,"date":"2026-11-08","category":"إيجار","amount":250,"one_off":false,"note":"","created_at":"…","paid_from":"bank","entered_at":"owner"}
 ```
+- `paid_from`: `cash` (paid from the shop's till) or `bank` (from the company account).
+- `entered_at`: `pos` (staff at the till; note starts with `POS · <staff name>`) or `owner`.
 `one_off` is true for equipment, fit-out and décor (categories containing معدات / أجهزة / تأسيس / ديكور). Everything else is running cost. Category names are Arabic and set by the owner.
 
 **DaySummary**
@@ -132,10 +134,16 @@ $e = json_decode($body, true);
 // upsert by ($e['shop'], $e['data']['id']); skip if event_id already processed
 http_response_code(200);
 ```
+```python
+import hmac, hashlib, time
+sig = 'sha256=' + hmac.new(secret.encode(), ts.encode() + b'.' + raw_body, hashlib.sha256).hexdigest()
+ok = hmac.compare_digest(sig, request.headers['X-Dose-Signature']) and abs(time.time() - int(ts)) < 300
+```
 ```js
 // Node (Express with raw body)
 const sig = 'sha256=' + crypto.createHmac('sha256', SECRET).update(ts + '.' + rawBody).digest('hex');
-if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(req.get('X-Dose-Signature') || ''))) return res.sendStatus(401);
+const got = req.get('X-Dose-Signature') || '';
+if (sig.length !== got.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(got))) return res.sendStatus(401);
 ```
 
 **Delivery rules**

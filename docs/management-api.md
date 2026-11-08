@@ -81,6 +81,7 @@ Only needed if you want a cron job to push waiting webhooks; normally not used.
 ```
 - `paid_from`: `cash` (paid from the shop's till) or `bank` (from the company account).
 - `entered_at`: `pos` (staff at the till; note starts with `POS · <staff name>`) or `owner`.
+
 `one_off` is true for equipment, fit-out and décor (categories containing معدات / أجهزة / تأسيس / ديكور). Everything else is running cost. Category names are Arabic and set by the owner.
 
 **DaySummary**

@@ -44,7 +44,10 @@ struct MoreView: View {
             Section {
                 Toggle(isOn: Binding(get: { reportOn }, set: { on in
                     Task { @MainActor in
-                        if on && !(await DailyReport.requestPermission()) { toaster.show("شغّل الإشعارات للتطبيق من إعدادات الآيفون", ok: false); return }
+                        if on {
+                            let allowed = await DailyReport.requestPermission()
+                            if !allowed { toaster.show("شغّل الإشعارات للتطبيق من إعدادات الآيفون", ok: false); return }
+                        }
                         reportOn = on; DailyReport.enabled = on; DailyReport.scheduleFallback()
                         if on { toaster.show("بيوصلك تقرير كل يوم بعد ما يسكر المحل") }
                     }

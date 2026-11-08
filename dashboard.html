@@ -904,8 +904,8 @@ async function drawCost() {
 
 // ---------- import old sales + reset ----------
 const PAY_WORDS = { cash: ['نقد', 'نقدي', 'كاش', 'cash'], card: ['بطاقة', 'بطاقه', 'كارد', 'فيزا', 'شبكة', 'card', 'visa'],
-  talabat: ['طلبات', 'talabat'], snoonu: ['سنونو', 'snoonu'], khedmah: ['خدمة', 'خدمه', 'khedmah'] };
-const PAY_AR = { cash: 'نقد', card: 'بطاقة', talabat: 'طلبات', snoonu: 'سنونو', khedmah: 'خدمة' };
+  talabat: ['طلبات', 'talabat'], snoonu: ['سنونو', 'snoonu', 'sunono'], khedmah: ['خدمة', 'خدمه', 'khedmah'], tmdone: ['تم دن', 'تم دون', 'tm done', 'tmdone'] };
+const PAY_AR = { cash: 'نقد', card: 'بطاقة', talabat: 'طلبات', snoonu: 'سنونو', khedmah: 'خدمة', tmdone: 'تم دن' };
 const IMPORT_ERR = { bad_date: 'التاريخ غلط أو في المستقبل', bad_payment: 'طريقة الدفع غلط', bad_amount: 'المبلغ غلط', bad_orders: 'عدد الطلبات غلط',
   bad_product: 'الصنف مب موجود', bad_qty: 'عدد الأكواب غلط', bad_pct: 'نسبة العمولة غلط' };
 let parsed = null;

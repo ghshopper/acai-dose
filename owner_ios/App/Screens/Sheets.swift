@@ -39,6 +39,7 @@ struct AddExpenseSheet: View {
     @State private var cat = kCats[0]
     @State private var amount = ""
     @State private var note = ""
+    @State private var pay = "bank"
     @State private var busy = false
     @State private var err = ""
 
@@ -57,9 +58,17 @@ struct AddExpenseSheet: View {
                 }
                 TextField("ملاحظة (اختياري)", text: $note)
             }
+            Section {
+                Picker("طريقة الدفع", selection: $pay) {
+                    Text("تحويل").tag("bank")
+                    Text("كاش").tag("cash")
+                }
+                .pickerStyle(.segmented)
+            } header: { Text("طريقة الدفع") } footer: { Text(pay == "bank" ? "ينقص من رصيد حساب الشركة" : "انصرف كاش، وما ينقص من رصيد الحساب") }
         }
         .onAppear {
             guard let e = existing else { return }
+            pay = e["paid_from"].string == "cash" ? "cash" : "bank"
             let f = DateFormatter(); f.calendar = Calendar(identifier: .gregorian); f.locale = Locale(identifier: "en_US_POSIX")
             f.timeZone = TimeZone(identifier: "Asia/Muscat"); f.dateFormat = "yyyy-MM-dd"
             date = f.date(from: e["expense_date"].string) ?? .now
@@ -72,7 +81,7 @@ struct AddExpenseSheet: View {
     private func save() async {
         guard let a = Double(amount), a > 0 else { err = "اكتب المبلغ"; return }
         busy = true; err = ""
-        var body: [String: Any] = ["expense_date": ymd(date), "category": cat, "amount": a, "note": note.trimmingCharacters(in: .whitespaces)]
+        var body: [String: Any] = ["expense_date": ymd(date), "category": cat, "amount": a, "note": note.trimmingCharacters(in: .whitespaces), "paid_from": pay]
         if let e = existing { body["id"] = e["id"].int }
         do {
             try await API.shared.post(existing == nil ? "add_expense" : "expense_update", body)

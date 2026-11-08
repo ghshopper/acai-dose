@@ -101,6 +101,8 @@ function offline_time($at): ?string {
     $t = strtotime($at);
     return ($t && $t <= time() + 300 && $t >= time() - 7 * 86400) ? date('Y-m-d H:i:s', $t) : null;
 }
+/** How an expense was paid: cash, or bank transfer ('bank' — taken off the company account balance). */
+function paid_from($v, string $default): string { return in_array($v, ['cash', 'bank'], true) ? $v : $default; }
 function clean_client_id($v): string { return preg_match('/^[a-zA-Z0-9-]{8,40}$/', (string)$v) ? (string)$v : ''; }
 function shop_cats(): array { return json_decode(setting('categories', '[]'), true) ?: []; }
 const STATUSES = ['new', 'preparing', 'ready', 'done', 'cancelled'];
@@ -444,23 +446,23 @@ case 'pos_expense':   // staff: money paid from the till's cash (milk, gas, taxi
     $note = clean((string)($in['note'] ?? ''), 80);
     if ($k === 'other' && $note === '') fail('need_note');
     $at = offline_time($in['at'] ?? null) ?? now();
-    q("INSERT INTO expenses (expense_date, category, amount, note, created_at, created_by, client_id, paid_from) VALUES (?,?,?,?,?,?,?,'cash')",
-      [substr($at, 0, 10), $cats[$k][1], money($amt), clean('POS · ' . $u['username'] . ($note !== '' ? ' · ' . $note : ''), 120), $at, (int)$u['id'], $cid ?: null]);
+    q('INSERT INTO expenses (expense_date, category, amount, note, created_at, created_by, client_id, paid_from) VALUES (?,?,?,?,?,?,?,?)',
+      [substr($at, 0, 10), $cats[$k][1], money($amt), clean('POS · ' . $u['username'] . ($note !== '' ? ' · ' . $note : ''), 120), $at, (int)$u['id'], $cid ?: null, paid_from($in['paid_from'] ?? null, 'cash')]);
     $id = (int)db()->lastInsertId();
     ext_emit('expense', $id, 'created');
     out(['ok' => true, 'id' => $id]);
 
 case 'pos_expenses':  // staff: today's till expenses
     need('staff');
-    $rows = q("SELECT e.id, e.created_at, e.category, e.amount, e.note, e.created_by, u.username AS by_user FROM expenses e LEFT JOIN users u ON u.id = e.created_by
-               WHERE e.expense_date = ? AND e.paid_from = 'cash' ORDER BY e.id DESC", [date('Y-m-d')])->fetchAll();
+    $rows = q("SELECT e.id, e.created_at, e.category, e.amount, e.note, e.created_by, e.paid_from, u.username AS by_user FROM expenses e LEFT JOIN users u ON u.id = e.created_by
+               WHERE e.expense_date = ? AND e.created_by IS NOT NULL ORDER BY e.id DESC", [date('Y-m-d')])->fetchAll();
     $en = []; foreach (pos_expense_cats() as $v) $en[$v[1]] = $v[0];
-    out(array_map(fn($r) => ['id' => (int)$r['id'], 'at' => $r['created_at'], 'cat' => $en[$r['category']] ?? $r['category'], 'amount' => (float)$r['amount'],
+    out(array_map(fn($r) => ['id' => (int)$r['id'], 'at' => $r['created_at'], 'paid_from' => $r['paid_from'], 'cat' => $en[$r['category']] ?? $r['category'], 'amount' => (float)$r['amount'],
         'note' => trim((string)preg_replace('/^POS · [^·]*(· )?/u', '', (string)$r['note'])), 'by_user' => (string)($r['by_user'] ?? ''), 'mine' => (int)$r['created_by']], $rows));
 
 case 'pos_expense_void':  // staff: remove a till expense they entered in the last 15 minutes (owner: any time)
     $post(); $u = need('staff');
-    $e = q("SELECT * FROM expenses WHERE id = ? AND paid_from = 'cash'", [(int)($in['id'] ?? 0)])->fetch() ?: fail('not_found', 404);
+    $e = q('SELECT * FROM expenses WHERE id = ? AND created_by IS NOT NULL', [(int)($in['id'] ?? 0)])->fetch() ?: fail('not_found', 404);
     if ($u['role'] !== 'owner' && ((int)$e['created_by'] !== (int)$u['id'] || strtotime($e['created_at']) < time() - 15 * 60)) fail('void_window');
     $old = ext_on() ? ext_row('expense', (int)$e['id']) : null;
     q('DELETE FROM expenses WHERE id = ?', [(int)$e['id']]);
@@ -534,8 +536,8 @@ case 'add_expense':
     $post(); need('owner');
     $amt = (float)($in['amount'] ?? -1); if ($amt < 0) fail('bad_amount');
     $cat = clean($in['category'] ?? '', 60); if ($cat === '') fail('bad_category');
-    q('INSERT INTO expenses (expense_date, category, amount, note, created_at) VALUES (?,?,?,?,?)',
-      [valid_date($in['expense_date'] ?? ''), $cat, money($amt), clean($in['note'] ?? '', 120) ?: null, now()]);
+    q('INSERT INTO expenses (expense_date, category, amount, note, created_at, paid_from) VALUES (?,?,?,?,?,?)',
+      [valid_date($in['expense_date'] ?? ''), $cat, money($amt), clean($in['note'] ?? '', 120) ?: null, now(), paid_from($in['paid_from'] ?? null, 'bank')]);
     ext_emit('expense', (int)db()->lastInsertId(), 'created');
     out(['ok' => true]);
 
@@ -652,6 +654,7 @@ case 'expense_update':  // owner fixes an expense (date, type, amount, note)
     $cat = clean($in['category'] ?? '', 60); if ($cat === '') fail('bad_category');
     q('UPDATE expenses SET expense_date = ?, category = ?, amount = ?, note = ? WHERE id = ?',
       [valid_date($in['expense_date'] ?? ''), $cat, money($amt), clean($in['note'] ?? '', 120) ?: null, (int)($in['id'] ?? 0)]);
+    if (isset($in['paid_from'])) q('UPDATE expenses SET paid_from = ? WHERE id = ?', [paid_from($in['paid_from'], 'bank'), (int)($in['id'] ?? 0)]);
     ext_emit('expense', (int)($in['id'] ?? 0), 'updated');
     out(['ok' => true]);
 

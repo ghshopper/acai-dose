@@ -65,6 +65,8 @@ class TillExpensesState extends State<TillExpenses> {
   List<Map<String, dynamic>> get _pending => Outbox.I.items.where((i) => i['kind'] == 'expense').map((i) => Map<String, dynamic>.from(i['body'] as Map)).toList();
 
   double get _total => _rows.fold(0.0, (s, r) => s + (r['amount'] as num).toDouble()) + _pending.fold(0.0, (s, r) => s + (r['amount'] as num).toDouble());
+  /// Only what was paid in cash comes out of the drawer
+  double get _cashOut => [..._rows, ..._pending].where((r) => (r['paid_from'] ?? 'cash') == 'cash').fold(0.0, (s, r) => s + (r['amount'] as num).toDouble());
 
   Future<void> _add() async {
     final cats = ShopConfig.I.expenseCats;
@@ -73,6 +75,7 @@ class TillExpensesState extends State<TillExpenses> {
       return;
     }
     String cat = '';
+    String pay = 'cash';
     final amount = TextEditingController();
     final note = TextEditingController();
     String err = '';
@@ -116,6 +119,17 @@ class TillExpensesState extends State<TillExpenses> {
                     decoration: InputDecoration(labelText: cat == 'other' ? 'What was it? (required)' : 'Note (optional)', hintText: 'e.g. 2 boxes of milk'),
                     onChanged: (_) => set(() {}),
                   ),
+                  const SizedBox(height: 4),
+                  const Text('Paid by', style: TextStyle(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 6),
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(value: 'cash', label: Text('Cash from till'), icon: Icon(Icons.payments_outlined)),
+                      ButtonSegment(value: 'bank', label: Text('Bank transfer'), icon: Icon(Icons.account_balance_outlined)),
+                    ],
+                    selected: {pay},
+                    onSelectionChanged: (v) => set(() => pay = v.first),
+                  ),
                   if (err.isNotEmpty) Text(err, style: const TextStyle(color: kBad, fontWeight: FontWeight.w800)),
                 ]),
               ),
@@ -132,7 +146,7 @@ class TillExpensesState extends State<TillExpenses> {
       ),
     );
     if (ok != true) return;
-    final body = {'client_id': newClientId(), 'cat': cat, 'amount': double.parse(amount.text), 'note': note.text.trim()};
+    final body = {'client_id': newClientId(), 'cat': cat, 'amount': double.parse(amount.text), 'note': note.text.trim(), 'paid_from': pay};
     try {
       await Api.I.post('pos_expense', body);
       if (!mounted) return;
@@ -177,7 +191,7 @@ class TillExpensesState extends State<TillExpenses> {
   @override
   Widget build(BuildContext context) {
     final pending = _pending;
-    final drawer = widget.cashSales - _total;
+    final drawer = widget.cashSales - _cashOut;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       const SizedBox(height: 18),
       Row(children: [
@@ -195,7 +209,7 @@ class TillExpensesState extends State<TillExpenses> {
           color: const Color(0xFFFFF4E0),
           child: ListTile(
             leading: const Icon(Icons.cloud_upload_outlined, color: kOrange),
-            title: Text('${_catName('${p['cat']}')} · ${money(p['amount'])}', style: const TextStyle(fontWeight: FontWeight.w800)),
+            title: Text('${_catName('${p['cat']}')} · ${money(p['amount'])}${p['paid_from'] == 'bank' ? ' · Transfer' : ''}', style: const TextStyle(fontWeight: FontWeight.w800)),
             subtitle: Text('${'${p['at'] ?? ''}'.length >= 16 ? '${p['at']}'.substring(11, 16) : ''}  ${p['note'] ?? ''} · waiting for internet'),
           ),
         ),
@@ -204,7 +218,7 @@ class TillExpensesState extends State<TillExpenses> {
           margin: const EdgeInsets.only(bottom: 8),
           child: ListTile(
             leading: const Icon(Icons.payments_outlined, color: kPurple),
-            title: Text('${r['cat']} · ${money(r['amount'])}', style: const TextStyle(fontWeight: FontWeight.w800)),
+            title: Text('${r['cat']} · ${money(r['amount'])}${r['paid_from'] == 'bank' ? ' · Transfer' : ''}', style: const TextStyle(fontWeight: FontWeight.w800)),
             subtitle: Text('${'${r['at'] ?? ''}'.length >= 16 ? '${r['at']}'.substring(11, 16) : ''}  ${r['note'] ?? ''}${'${r['note'] ?? ''}'.isEmpty ? '' : ' · '}${r['by_user'] ?? ''}'),
             trailing: TextButton(onPressed: () => _remove(r), child: const Text('Remove', style: TextStyle(color: kBad, fontWeight: FontWeight.w800))),
           ),

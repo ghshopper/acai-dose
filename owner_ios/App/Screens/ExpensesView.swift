@@ -45,7 +45,7 @@ struct ExpensesView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(r["category"].string).font(.subheadline.weight(.semibold)).foregroundStyle(Color.primary)
-                            Text(r["expense_date"].string + (r["note"].string.isEmpty ? "" : " · \(r["note"].string)")).font(.caption).foregroundStyle(.secondary)
+                            Text(r["expense_date"].string + (r["paid_from"].string == "cash" ? " · كاش" : " · تحويل") + (r["note"].string.isEmpty ? "" : " · \(r["note"].string)")).font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
                         Text(money(r["amount"])).font(.headline).monospacedDigit().foregroundStyle(Color.primary)

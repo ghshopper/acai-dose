@@ -36,7 +36,7 @@ class _PosPageState extends State<PosPage> {
   Timer? _lookup;
   /// Custom items typed at the till: sale line key -> price
   final Map<String, double> _customPrice = {};
-  String _cat = ''; // menu section shown on the till ('' = first section, or everything when the shop has none)
+  String _cat = ''; // menu section open on the till ('' = Karak Dose: the sections as big tiles; Açaí Dose: first section)
   final _search = TextEditingController();
 
   @override
@@ -319,6 +319,7 @@ class _PosPageState extends State<PosPage> {
 
   void _reset() {
     setState(() {
+      if (Api.I.shop.isKarak) _cat = '';   // next customer starts from the sections
       _cart.clear();
       _customPrice.clear();
       _given.clear();
@@ -551,7 +552,54 @@ class _PosPageState extends State<PosPage> {
   }
 
   List<Map<String, dynamic>> get _cats => ShopConfig.I.cats.where((c) => _products.any((p) => p['cat'] == c['k'])).toList();
-  String get _currentCat => _cat.isNotEmpty ? _cat : (_cats.isEmpty ? '' : '${_cats.first['k']}');
+  String get _currentCat => _cat.isNotEmpty ? _cat : (_cats.isEmpty || Api.I.shop.isKarak ? '' : '${_cats.first['k']}');
+  /// Karak Dose: the till first shows the sections (Karak, Croissant…); tap one to see its items
+  bool get _showSections => Api.I.shop.isKarak && _cats.isNotEmpty && _cat.isEmpty && _search.text.trim().isEmpty;
+
+  Widget _sections(bool wide) {
+    final cats = _cats;
+    return GridView.count(
+      crossAxisCount: wide ? 4 : 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 12,
+      crossAxisSpacing: 12,
+      childAspectRatio: 1.6,
+      children: [
+        for (final c in cats)
+          Builder(builder: (_) {
+            final items = _products.where((p) => p['cat'] == c['k'] && p['kind'] != 'open').toList();
+            final inCart = items.fold<int>(0, (s, p) => s + _qtyOf(_id(p)));
+            final names = <String>{for (final p in items) '${p['name_en']}'};
+            return Material(
+              color: kPurple,
+              borderRadius: BorderRadius.circular(18),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: () => setState(() => _cat = '${c['k']}'),
+                child: Stack(children: [
+                  Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      Text('${c['en']}', textAlign: TextAlign.center, maxLines: 2, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22)),
+                      Text('${c['ar'] ?? ''}', textAlign: TextAlign.center, maxLines: 1, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w700, fontSize: 16)),
+                      const SizedBox(height: 4),
+                      Text('${names.length} items', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white54, fontWeight: FontWeight.w600)),
+                    ]),
+                  ),
+                  if (inCart > 0)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: CircleAvatar(radius: 16, backgroundColor: Colors.white, child: Text('$inCart', style: const TextStyle(color: kPurple, fontWeight: FontWeight.w900))),
+                    ),
+                ]),
+              ),
+            );
+          }),
+      ],
+    );
+  }
 
   /// Size and kitchen note for a tile, then into the sale.
   Future<void> _pick(List<Map<String, dynamic>> variants) async {
@@ -664,7 +712,7 @@ class _PosPageState extends State<PosPage> {
         Container(
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: box.online ? kOrange : kBad, borderRadius: BorderRadius.circular(14)),
+          decoration: BoxDecoration(color: box.online ? kPurple2 : kBad, borderRadius: BorderRadius.circular(14)),
           child: Row(children: [
             Icon(box.online ? Icons.cloud_upload : Icons.cloud_off, color: Colors.white),
             const SizedBox(width: 10),
@@ -704,7 +752,32 @@ class _PosPageState extends State<PosPage> {
         ),
         const SizedBox(height: 10),
       ],
-      if (cats.isNotEmpty && _search.text.trim().isEmpty) ...[
+      if (_showSections) ...[
+        _sections(wide),
+        if (_openItem != null) ...[
+          const SizedBox(height: 12),
+          OutlinedButton.icon(onPressed: _customItem, icon: const Icon(Icons.edit_note), label: const Text('Custom item (type name and price)')),
+        ],
+      ] else ...[
+      if (karak && cats.isNotEmpty && _search.text.trim().isEmpty) ...[
+        Row(children: [
+          FilledButton.icon(
+            style: FilledButton.styleFrom(minimumSize: const Size(64, 50)),
+            onPressed: () => setState(() => _cat = ''),
+            icon: const Icon(Icons.arrow_back),
+            label: const Text('All'),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              '${cats.firstWhere((c) => c['k'] == _currentCat, orElse: () => {'en': ''})['en']}',
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 10),
+      ],
+      if (!karak && cats.isNotEmpty && _search.text.trim().isEmpty) ...[
         SizedBox(
           height: 50,
           child: ListView(scrollDirection: Axis.horizontal, children: [
@@ -789,6 +862,7 @@ class _PosPageState extends State<PosPage> {
             }),
         ],
       ),
+      ],
     ]);
   }
 
@@ -828,7 +902,8 @@ class _PosPageState extends State<PosPage> {
           ]),
           if (_discount > 0) Text('−${money(_discount)} free cup', textAlign: TextAlign.right, style: const TextStyle(color: kOk, fontWeight: FontWeight.w800)),
           const SizedBox(height: 10),
-          Container(
+          // Customer mobile for loyalty stamps: Açaí Dose only
+          if (!Api.I.shop.isKarak) Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(color: kCream, borderRadius: BorderRadius.circular(14)),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -937,7 +1012,7 @@ class _PosPageState extends State<PosPage> {
           margin: const EdgeInsets.only(bottom: 8),
           color: const Color(0xFFFFF4E0),
           child: ListTile(
-            leading: const Icon(Icons.cloud_upload_outlined, color: kOrange),
+            leading: const Icon(Icons.cloud_upload_outlined, color: Color(0xFFB26A00)),
             title: Text('${money(r['total'])} · ${r['payment'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)),
             subtitle: Text('${'${r['created_at'] ?? ''}'.length >= 16 ? '${r['created_at']}'.substring(11, 16) : ''}  '
                 '${((r['items'] as List?) ?? []).map((i) => '${i['qty']}× ${i['name_en']}').join(', ')} · waiting for internet'),

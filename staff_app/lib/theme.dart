@@ -2,17 +2,17 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 
-/// Built for Karak Dose (charcoal and karak caramel) or Açaí Dose (purple and orange); chosen when the app is built.
+/// Built for Karak Dose (charcoal and white, as its logo) or Açaí Dose (purple and orange); chosen when the app is built.
 const bool kKarak = String.fromEnvironment('SHOP') == 'karak';
 const Color kPurple = kKarak ? Color(0xFF393939) : Color(0xFF470D43);
 const Color kPurple2 = kKarak ? Color(0xFF4A4A4A) : Color(0xFF5E1A55);
-const Color kCream = kKarak ? Color(0xFFF7EFE4) : Color(0xFFFAF3E0);
-const Color kCream2 = kKarak ? Color(0xFFF1EEEA) : Color(0xFFF1E6CF);
-const Color kOrange = kKarak ? Color(0xFFC9853A) : Color(0xFFE39A2E);
-const Color kLilac = kKarak ? Color(0xFFD9D3CC) : Color(0xFFD9BCDB);
+const Color kCream = kKarak ? Color(0xFFFFFFFF) : Color(0xFFFAF3E0);
+const Color kCream2 = kKarak ? Color(0xFFF2F2F2) : Color(0xFFF1E6CF);
+const Color kOrange = kKarak ? Color(0xFFDDDDDD) : Color(0xFFE39A2E);
+const Color kLilac = kKarak ? Color(0xFFBDBDBD) : Color(0xFFD9BCDB);
 const Color kOk = Color(0xFF2F7D4F);
 const Color kBad = Color(0xFFB23A3A);
-const Color kLine = kKarak ? Color(0xFFE2DDD6) : Color(0xFFE3D6BF);
+const Color kLine = kKarak ? Color(0xFFE3E3E3) : Color(0xFFE3D6BF);
 
 ThemeData appTheme() {
   final scheme = ColorScheme.fromSeed(seedColor: kPurple, primary: kPurple, secondary: kOrange, surface: Colors.white);

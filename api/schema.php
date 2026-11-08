@@ -203,4 +203,6 @@ function create_schema(): void {
         if (!q('SELECT 1 FROM channel_commissions WHERE channel = ?', [$c])->fetch())
             q('INSERT INTO channel_commissions (channel, pct) VALUES (?, 0)', [$c]);
     }
+    // Karak Dose: make sure all four apps are there (Talabat, TM Done, Khedmah, Snoonu)
+    if (BIZ === 'karak' && !q("SELECT 1 FROM settings WHERE k = 'karak_channels_v2'")->fetch()) q("INSERT INTO settings (k, v) VALUES ('karak_channels_v2', '1')");
 }

@@ -208,7 +208,7 @@ class TillExpensesState extends State<TillExpenses> {
           margin: const EdgeInsets.only(bottom: 8),
           color: const Color(0xFFFFF4E0),
           child: ListTile(
-            leading: const Icon(Icons.cloud_upload_outlined, color: kOrange),
+            leading: const Icon(Icons.cloud_upload_outlined, color: Color(0xFFB26A00)),
             title: Text('${_catName('${p['cat']}')} · ${money(p['amount'])}${p['paid_from'] == 'bank' ? ' · Transfer' : ''}', style: const TextStyle(fontWeight: FontWeight.w800)),
             subtitle: Text('${'${p['at'] ?? ''}'.length >= 16 ? '${p['at']}'.substring(11, 16) : ''}  ${p['note'] ?? ''} · waiting for internet'),
           ),

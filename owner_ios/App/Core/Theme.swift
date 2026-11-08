@@ -2,18 +2,25 @@ import SwiftUI
 import UIKit
 
 extension Color {
-    static let brand = Color(red: 0x47 / 255, green: 0x0D / 255, blue: 0x43 / 255)
-    static let brand2 = Color(red: 0x5E / 255, green: 0x1A / 255, blue: 0x55 / 255)
-    static let cream = Color(red: 0xFA / 255, green: 0xF3 / 255, blue: 0xE0 / 255)
-    static let cream2 = Color(red: 0xF1 / 255, green: 0xE9 / 255, blue: 0xDA / 255)
-    static let accent2 = Color(red: 0xE3 / 255, green: 0x9A / 255, blue: 0x2E / 255)
-    static let lilac = Color(red: 0xD9 / 255, green: 0xBC / 255, blue: 0xDB / 255)
+    /// Karak Dose is charcoal and white (its logo); Açaí Dose is purple, cream and orange. Follows the shop picked in the app.
+    private static var karak: Bool { BizStore.shared.current == .karak }
+    private static func rgb(_ v: Int) -> Color { Color(red: Double((v >> 16) & 0xFF) / 255, green: Double((v >> 8) & 0xFF) / 255, blue: Double(v & 0xFF) / 255) }
+    static var brand: Color { rgb(karak ? 0x393939 : 0x470D43) }
+    static var brand2: Color { rgb(karak ? 0x4A4A4A : 0x5E1A55) }
+    static var cream: Color { rgb(karak ? 0xFFFFFF : 0xFAF3E0) }
+    static var cream2: Color { rgb(karak ? 0xF2F2F2 : 0xF1E9DA) }
+    static var accent2: Color { rgb(karak ? 0x7A7A7A : 0xE39A2E) }
+    static var lilac: Color { rgb(karak ? 0xBDBDBD : 0xD9BCDB) }
     static let good = Color(red: 0x24 / 255, green: 0x8A / 255, blue: 0x3D / 255)
     static let bad = Color(red: 0xE5 / 255, green: 0x34 / 255, blue: 0x2B / 255)
-    /// Brand purple for text and icons: deep purple in light mode, soft lilac in dark mode so it stays readable.
-    static let ink = Color(uiColor: UIColor { t in
-        t.userInterfaceStyle == .dark ? UIColor(red: 0.86, green: 0.68, blue: 0.86, alpha: 1) : UIColor(red: 0x47 / 255, green: 0x0D / 255, blue: 0x43 / 255, alpha: 1)
-    })
+    /// Brand colour for text and icons: deep in light mode, soft in dark mode so it stays readable.
+    static var ink: Color {
+        let k = karak
+        return Color(uiColor: UIColor { t in
+            if k { return t.userInterfaceStyle == .dark ? UIColor(white: 0.88, alpha: 1) : UIColor(red: 0x39 / 255, green: 0x39 / 255, blue: 0x39 / 255, alpha: 1) }
+            return t.userInterfaceStyle == .dark ? UIColor(red: 0.86, green: 0.68, blue: 0.86, alpha: 1) : UIColor(red: 0x47 / 255, green: 0x0D / 255, blue: 0x43 / 255, alpha: 1)
+        })
+    }
     static let pageBG = Color(uiColor: .systemGroupedBackground)
     static let cardBG = Color(uiColor: .secondarySystemGroupedBackground)
 }

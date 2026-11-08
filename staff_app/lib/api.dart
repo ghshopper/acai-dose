@@ -52,6 +52,7 @@ class ShopConfig {
       // Older server: the three delivery apps it always had
       I = ShopConfig(channels: [
         {'k': 'talabat', 'en': 'Talabat', 'ar': 'طلبات'},
+        if (Api.I.shop.isKarak) {'k': 'tmdone', 'en': 'TM Done', 'ar': 'تم دن'},
         {'k': 'snoonu', 'en': 'Snoonu', 'ar': 'سنونو'},
         {'k': 'khedmah', 'en': 'Khedmah', 'ar': 'خدمة'},
       ]);

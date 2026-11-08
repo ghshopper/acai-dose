@@ -55,7 +55,7 @@ struct MoreView: View {
             }
             Section {
                 VStack(spacing: 6) {
-                    Image("logo-purple").resizable().scaledToFit().frame(height: 30).opacity(0.35)
+                    Image(BizStore.shared.current == .karak ? "karak-dark" : "logo-purple").resizable().scaledToFit().frame(height: 30).opacity(0.35)
                     Text("\(BizStore.shared.current == .karak ? "Karak Dose" : "Açaí Dose") · Owner \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")")
                         .font(.caption).foregroundStyle(.tertiary)
                 }

@@ -8,6 +8,8 @@
   padding-top:env(safe-area-inset-top,0px);
   padding-bottom:env(safe-area-inset-bottom,0px);
 }
+/* Karak Dose screens: charcoal and white */
+html.karak{--p:#393939; --p2:#4A4A4A; --pd:#232323; --c:#FFFFFF; --c2:#F2F2F2; --o:#DDDDDD; --l:#BDBDBD; --muted:#6B6B6B}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--c);color:var(--p);font-family:'Tajawal',system-ui,sans-serif}
 body{min-height:100vh}

@@ -2,6 +2,8 @@
 declare(strict_types=1);
 require __DIR__ . '/lib.php';
 require __DIR__ . '/loyalty.php';
+require __DIR__ . '/ext.php';
+register_shutdown_function('ext_after_request');
 
 header('X-Content-Type-Options: nosniff');
 header('Referrer-Policy: same-origin');
@@ -218,6 +220,7 @@ function insert_order(array $f, ?string $day = null): int {
         $f += ['order_no' => $no, 'day' => $day, 'created_at' => now(), 'updated_at' => now()];
         $cols = array_keys($f);
         q('INSERT INTO orders (' . implode(',', $cols) . ') VALUES (' . implode(',', array_fill(0, count($cols), '?')) . ')', array_values($f));
+        ext_emit('order', (int)$pdo->lastInsertId(), 'created');
         if ($own) $pdo->commit();
     } catch (Throwable $e) { if ($own) $pdo->rollBack(); throw $e; }
     return $no;
@@ -225,6 +228,7 @@ function insert_order(array $f, ?string $day = null): int {
 
 try {
 ensure_schema();
+if (str_starts_with($a, 'ext_')) ext_handle($a, $in, $post);
 switch ($a) {
 
 // ---------------- public ----------------
@@ -368,6 +372,7 @@ case 'order_status':
     $oid = (int)($in['id'] ?? 0);
     if ($st === 'done' && $pay) q('UPDATE orders SET status = ?, payment = ?, updated_at = ? WHERE id = ?', [$st, $pay, now(), $oid]);
     else q('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?', [$st, now(), $oid]);
+    ext_emit('order', $oid, 'updated');
     // Paid or cancelled website orders change the customer's stamps
     if ($st === 'done' || $st === 'cancelled') {
         $o = q("SELECT phone FROM orders WHERE id = ?", [$oid])->fetch();
@@ -443,6 +448,7 @@ case 'pos_void':
     if (!$o) fail('not_found', 404);
     if ($u['role'] !== 'owner' && ((int)$o['created_by'] !== (int)$u['id'] || strtotime($o['created_at']) < time() - 15 * 60)) fail('void_window');
     q("UPDATE orders SET status = 'cancelled', updated_at = ? WHERE id = ?", [now(), (int)$o['id']]);
+    ext_emit('order', (int)$o['id'], 'updated');
     $ph = q('SELECT phone FROM orders WHERE id = ?', [(int)$o['id']])->fetch()['phone'] ?? '';
     if ($ph !== '') loyalty_changed((string)$ph);
     out(['ok' => true]);
@@ -466,6 +472,7 @@ case 'add_sale':
     $cnt = isset($in['orders_count']) && $in['orders_count'] !== null && $in['orders_count'] !== '' ? max(0, (int)$in['orders_count']) : null;
     q('INSERT INTO channel_sales (sale_date, channel, gross, commission_pct, commission, orders_count, note, created_at) VALUES (?,?,?,?,?,?,?,?)',
       [valid_date($in['sale_date'] ?? ''), $ch, money($gross), $pct, money($gross * $pct / 100), $cnt, clean($in['note'] ?? '', 120) ?: null, now()]);
+    ext_emit('app_sale', (int)db()->lastInsertId(), 'created');
     out(['ok' => true]);
 
 case 'add_expense':
@@ -474,6 +481,7 @@ case 'add_expense':
     $cat = clean($in['category'] ?? '', 60); if ($cat === '') fail('bad_category');
     q('INSERT INTO expenses (expense_date, category, amount, note, created_at) VALUES (?,?,?,?,?)',
       [valid_date($in['expense_date'] ?? ''), $cat, money($amt), clean($in['note'] ?? '', 120) ?: null, now()]);
+    ext_emit('expense', (int)db()->lastInsertId(), 'created');
     out(['ok' => true]);
 
 // ---------------- owner: delivery app money and the company account ----------------
@@ -589,12 +597,16 @@ case 'expense_update':  // owner fixes an expense (date, type, amount, note)
     $cat = clean($in['category'] ?? '', 60); if ($cat === '') fail('bad_category');
     q('UPDATE expenses SET expense_date = ?, category = ?, amount = ?, note = ? WHERE id = ?',
       [valid_date($in['expense_date'] ?? ''), $cat, money($amt), clean($in['note'] ?? '', 120) ?: null, (int)($in['id'] ?? 0)]);
+    ext_emit('expense', (int)($in['id'] ?? 0), 'updated');
     out(['ok' => true]);
 
 case 'delete':
     $post(); need('owner');
     $t = ['sale' => 'channel_sales', 'expense' => 'expenses'][$in['type'] ?? ''] ?? fail('bad_type');
-    q("DELETE FROM $t WHERE id = ?", [(int)($in['id'] ?? 0)]);
+    $did = (int)($in['id'] ?? 0); $kind = $t === 'expenses' ? 'expense' : 'app_sale';
+    $old = ext_on() ? ext_row($kind, $did) : null;
+    q("DELETE FROM $t WHERE id = ?", [$did]);
+    if ($old) ext_emit($kind, $did, 'deleted', $old);
     out(['ok' => true]);
 
 case 'reset_sales':   // owner wipes sales to start fresh (menu, prices, staff and settings stay)
@@ -608,6 +620,7 @@ case 'reset_sales':   // owner wipes sales to start fresh (menu, prices, staff a
         if (!empty($in['all'])) {
             foreach (['orders', 'day_counters', 'channel_sales'] as $t) q("DELETE FROM $t");
             if (!empty($in['expenses'])) q('DELETE FROM expenses');
+            ext_emit('sales', 0, 'reset', ['all' => true, 'from' => null, 'to' => null, 'expenses' => !empty($in['expenses'])]);
         } else {
             $f = valid_date($in['from'] ?? ''); $t2 = valid_date($in['to'] ?? '');
             if ($f > $t2) [$f, $t2] = [$t2, $f];
@@ -615,6 +628,7 @@ case 'reset_sales':   // owner wipes sales to start fresh (menu, prices, staff a
             q('DELETE FROM day_counters WHERE day BETWEEN ? AND ?', [$f, $t2]);
             q('DELETE FROM channel_sales WHERE sale_date BETWEEN ? AND ?', [$f, $t2]);
             if (!empty($in['expenses'])) q('DELETE FROM expenses WHERE expense_date BETWEEN ? AND ?', [$f, $t2]);
+            ext_emit('sales', 0, 'reset', ['all' => false, 'from' => $f, 'to' => $t2, 'expenses' => !empty($in['expenses'])]);
         }
         $pdo->commit();
     } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
@@ -902,6 +916,7 @@ case 'purchase_add':   // owner: bought stock; updates the ingredient's price an
         q('INSERT INTO expenses (expense_date, category, amount, note, created_at) VALUES (?,?,?,?,?)',
           [$date, $cat, money($price), clean($ing['name_ar'] . ' ' . rtrim(rtrim(number_format($qty, 3, '.', ''), '0'), '.') . ($ing['unit'] === 'pc' ? ' حبة' : ' غ') . ($note ? ' · ' . $note : ''), 120), now()]);
         $expId = (int)db()->lastInsertId();
+        ext_emit('expense', $expId, 'created');
     }
     q('INSERT INTO purchases (purchase_date, ingredient_id, qty, price, note, expense_id, created_at) VALUES (?,?,?,?,?,?,?)',
       [$date, (int)$ing['id'], $qty, money($price), $note ?: null, $expId, now()]);
@@ -911,7 +926,11 @@ case 'purchase_add':   // owner: bought stock; updates the ingredient's price an
 case 'purchase_delete':
     $post(); need('owner');
     $pr = q('SELECT * FROM purchases WHERE id = ?', [(int)($in['id'] ?? 0)])->fetch() ?: fail('not_found', 404);
-    if ($pr['expense_id'] !== null) q('DELETE FROM expenses WHERE id = ?', [(int)$pr['expense_id']]);
+    if ($pr['expense_id'] !== null) {
+        $old = ext_on() ? ext_row('expense', (int)$pr['expense_id']) : null;
+        q('DELETE FROM expenses WHERE id = ?', [(int)$pr['expense_id']]);
+        if ($old) ext_emit('expense', (int)$pr['expense_id'], 'deleted', $old);
+    }
     q('DELETE FROM purchases WHERE id = ?', [(int)$pr['id']]);
     out(['ok' => true]);
 

@@ -54,13 +54,17 @@ function create_schema(): void {
             id $id, channel VARCHAR(12) NOT NULL, amount DECIMAL(10,3) NOT NULL, paid_date DATE NOT NULL, note VARCHAR(120) NULL, created_at DATETIME NOT NULL)$eng",
         "CREATE TABLE IF NOT EXISTS bank_moves (
             id $id, move_date DATE NOT NULL, kind VARCHAR(4) NOT NULL, amount DECIMAL(10,3) NOT NULL, note VARCHAR(120) NULL, created_at DATETIME NOT NULL)$eng",
+        // Sales / expense changes for the owner's management system (pull feed + webhook queue)
+        "CREATE TABLE IF NOT EXISTS ext_events (
+            id $id, kind VARCHAR(12) NOT NULL, ref_id INT NOT NULL, action VARCHAR(10) NOT NULL, data MEDIUMTEXT NOT NULL,
+            created_at DATETIME NOT NULL, pushed_at DATETIME NULL, tries INT NOT NULL DEFAULT 0, next_try DATETIME NULL, last_error VARCHAR(200) NULL)$eng",
         "CREATE TABLE IF NOT EXISTS wallet_regs (device_id VARCHAR(100) NOT NULL, serial VARCHAR(40) NOT NULL, created_at DATETIME NOT NULL, PRIMARY KEY (device_id, serial))$eng",
     ];
     foreach ($sql as $s) xq($s);
     $idx = [
         'CREATE INDEX orders_created ON orders (created_at)', 'CREATE INDEX orders_status ON orders (status)',
         'CREATE INDEX sales_date ON channel_sales (sale_date)', 'CREATE INDEX exp_date ON expenses (expense_date)',
-        'CREATE INDEX hits_k ON hits (k, at)',
+        'CREATE INDEX hits_k ON hits (k, at)', 'CREATE INDEX ext_push ON ext_events (pushed_at, id)',
     ];
     foreach ($idx as $s) { try { xq($s); } catch (Throwable $e) { /* already exists */ } }
 

@@ -67,6 +67,8 @@ let kErrors: [String: String] = [
     "sold_out": "الصنف خالص",
     "bad_channel": "اختار التطبيق",
     "account_used": "الحساب فيه حركات، احذفها أو انقلها أول",
+    "bad_url": "الرابط لازم يبدأ بـ https://",
+    "no_webhook": "حط رابط الاستقبال أول",
 ]
 
 func errText(_ code: String) -> String { kErrors[code] ?? "صار خطأ، جرب مرة ثانية" }

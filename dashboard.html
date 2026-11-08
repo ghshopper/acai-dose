@@ -146,7 +146,10 @@ const me = await requireLogin(app, 'الداشبورد');
 if (me.role !== 'owner') { location.href = 'screen.html'; throw 0; }
 
 const CH = { talabat: 'طلبات', snoonu: 'سنونو', khedmah: 'خدمة' };   // replaced at start by this shop's apps (Karak Dose also has TM Done)
-const CATS = ['مواد خام (آساي وفواكه)', 'أكواب وتغليف', 'رواتب', 'إيجار', 'كهرباء وماء', 'تسويق وإعلانات', 'صيانة', 'أخرى'];
+const CATS = /^\/karak(\/|$)/.test(location.pathname)
+  ? ['مواد خام', 'خبز ومعجنات', 'أكواب وتغليف', 'رواتب', 'إيجار', 'كهرباء وماء وغاز', 'مواد تنظيف', 'مواصلات', 'تسويق وإعلانات', 'صيانة', 'معدات وأجهزة (مرة وحدة)', 'أخرى']
+  : ['مواد خام (آساي وفواكه)', 'أكواب وتغليف', 'رواتب', 'إيجار', 'كهرباء وماء', 'مواد تنظيف', 'مواصلات', 'تسويق وإعلانات', 'صيانة', 'معدات وأجهزة (مرة وحدة)', 'أخرى'];
+const PAID = { bank: 'تحويل', cash: 'كاش', custody: 'من العهدة' };
 
 app.innerHTML = `
 <div class="shell">
@@ -375,25 +378,40 @@ function drawApps({ apps }) {
 // ---------- expenses ----------
 function drawExp({ exps }) {
   const total = exps.reduce((s, r) => s + +r.amount, 0);
+  const cats = [...new Set([...CATS, ...exps.map(r => r.category)])];
   $('[data-panel="exp"]').innerHTML = `
     <form class="card formrow" id="xf">
       <div class="field"><label for="xd">التاريخ</label><input type="date" id="xd" value="${ymd(new Date())}" required></div>
-      <div class="field"><label for="xc">النوع</label><select id="xc">${CATS.map(c => `<option>${c}</option>`).join('')}</select></div>
+      <div class="field"><label for="xc">النوع</label><select id="xc">${cats.map(c => `<option>${esc(c)}</option>`).join('')}</select></div>
       <div class="field"><label for="xa">المبلغ (ر.ع)</label><input type="number" id="xa" step="0.001" min="0" inputmode="decimal" required></div>
+      <div class="field"><label for="xp">الدفع</label><select id="xp">${Object.entries(PAID).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
       <div class="field"><label for="xn">ملاحظة</label><input id="xn" maxlength="120"></div>
-      <button class="btn" type="submit">أضف</button>
+      <button class="btn" type="submit" id="xsave">أضف</button>
+      <button class="btn ghost" type="button" id="xcancel" style="display:none">إلغاء التعديل</button>
       <div class="err" id="xerr" role="alert"></div>
     </form>
     <h3 class="lal">السجل</h3>
     ${exps.length ? `<div class="tbl-wrap"><table>
-      <thead><tr><th>التاريخ</th><th>النوع</th><th>المبلغ</th><th>ملاحظة</th><th></th></tr></thead>
-      <tbody>${exps.map(r => `<tr><td class="num">${r.expense_date}</td><td>${esc(r.category)}</td><td class="num">${money(r.amount)}</td><td>${esc(r.note || '')}${r.paid_from === 'cash' ? ' <span class="pill">كاش</span>' : r.paid_from === 'custody' ? ' <span class="pill">من العهدة</span>' : ''}${r.receipt ? ` <a href="api/api.php?a=receipt&id=${r.id}" target="_blank" rel="noopener" style="font-weight:800">الفاتورة</a>` : ''}</td><td><button class="del" data-del="expense:${r.id}" type="button">حذف</button></td></tr>`).join('')}</tbody>
-      <tfoot><tr><td colspan="2">المجموع</td><td class="num">${money(total)}</td><td colspan="2"></td></tr></tfoot>
+      <thead><tr><th>التاريخ</th><th>النوع</th><th>المبلغ</th><th>ملاحظة</th><th></th><th></th></tr></thead>
+      <tbody>${exps.map(r => `<tr><td class="num">${r.expense_date}</td><td>${esc(r.category)}</td><td class="num">${money(r.amount)}</td><td>${esc(r.note || '')}${r.paid_from === 'cash' ? ' <span class="pill">كاش</span>' : r.paid_from === 'custody' ? ' <span class="pill">من العهدة</span>' : ''}${r.receipt ? ` <a href="api/api.php?a=receipt&id=${r.id}" target="_blank" rel="noopener" style="font-weight:800">الفاتورة</a>` : ''}</td><td><button class="btn small ghost" type="button" data-xedit="${r.id}">تعديل</button></td><td><button class="del" data-del="expense:${r.id}" type="button">حذف</button></td></tr>`).join('')}</tbody>
+      <tfoot><tr><td colspan="2">المجموع</td><td class="num">${money(total)}</td><td colspan="3"></td></tr></tfoot>
     </table></div>` : '<div class="card empty">ما فيه مصاريف مسجلة في هالفترة</div>'}`;
+  let editing = null;   // the expense being changed, or null when adding
+  const stopEdit = () => { editing = null; $('#xsave').textContent = 'أضف'; $('#xcancel').style.display = 'none'; $('#xf').reset(); $('#xd').value = ymd(new Date()); };
+  $('#xcancel').onclick = stopEdit;
+  $('[data-panel="exp"]').querySelectorAll('[data-xedit]').forEach(b => b.onclick = () => {
+    const r = exps.find(x => +x.id === +b.dataset.xedit); if (!r) return;
+    editing = r.id;
+    $('#xd').value = r.expense_date; $('#xc').value = r.category; $('#xa').value = (+r.amount).toFixed(3);
+    $('#xp').value = r.paid_from || 'bank'; $('#xn').value = r.note || '';
+    $('#xsave').textContent = 'احفظ التعديل'; $('#xcancel').style.display = '';
+    $('#xf').scrollIntoView({ behavior: 'smooth', block: 'center' }); $('#xa').focus();
+  });
   $('#xf').onsubmit = async e => {
     e.preventDefault();
     if ($('#xa').value === '') { $('#xerr').textContent = 'اكتب المبلغ'; return; }
-    try { await api('add_expense', { expense_date: $('#xd').value, category: $('#xc').value, amount: +$('#xa').value, note: $('#xn').value.trim() || null }); }
+    const body = { expense_date: $('#xd').value, category: $('#xc').value, amount: +$('#xa').value, note: $('#xn').value.trim() || null, paid_from: $('#xp').value };
+    try { await api(editing ? 'expense_update' : 'add_expense', editing ? { ...body, id: editing } : body); }
     catch (ex) { $('#xerr').textContent = msg(ex); return; }
     refresh();
   };

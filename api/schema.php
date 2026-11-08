@@ -58,6 +58,9 @@ function create_schema(): void {
         "CREATE TABLE IF NOT EXISTS ext_events (
             id $id, kind VARCHAR(12) NOT NULL, ref_id INT NOT NULL, action VARCHAR(10) NOT NULL, data MEDIUMTEXT NOT NULL,
             created_at DATETIME NOT NULL, pushed_at DATETIME NULL, tries INT NOT NULL DEFAULT 0, next_try DATETIME NULL, last_error VARCHAR(200) NULL)$eng",
+        // Money the owner hands to the buyer (an employee who shops for supplies) to pay invoices from
+        "CREATE TABLE IF NOT EXISTS custody_moves (
+            id $id, user_id INT NOT NULL, amount DECIMAL(10,3) NOT NULL, move_date DATE NOT NULL, note VARCHAR(120) NULL, created_at DATETIME NOT NULL)$eng",
         "CREATE TABLE IF NOT EXISTS wallet_regs (device_id VARCHAR(100) NOT NULL, serial VARCHAR(40) NOT NULL, created_at DATETIME NOT NULL, PRIMARY KEY (device_id, serial))$eng",
     ];
     foreach ($sql as $s) xq($s);
@@ -90,7 +93,7 @@ function create_schema(): void {
     // Expenses the staff enter at the till: who, paid from the till's cash, and the device's id (so an offline retry is not saved twice)
     $have = [];
     foreach (q(is_mysql() ? 'SHOW COLUMNS FROM expenses' : 'PRAGMA table_info(expenses)')->fetchAll() as $c) $have[] = $c['Field'] ?? $c['name'];
-    foreach (["created_by INT NULL", "client_id VARCHAR(40) NULL", "paid_from VARCHAR(8) NOT NULL DEFAULT 'bank'"] as $def) {
+    foreach (["created_by INT NULL", "client_id VARCHAR(40) NULL", "paid_from VARCHAR(8) NOT NULL DEFAULT 'bank'", "receipt VARCHAR(48) NULL"] as $def) {
         $name = strtok($def, ' ');
         if (!in_array($name, $have, true)) xq("ALTER TABLE expenses ADD COLUMN $def");
     }

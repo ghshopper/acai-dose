@@ -15,7 +15,7 @@ RewriteRule ^karak$ /karak/ [R=301,L]
 RewriteRule ^karak/$ karak.php [L]
 RewriteRule ^karak/app/?$ https://github.com/ghshopper/acai-dose/releases/download/karak-latest/karak-dose-staff.apk [R=302,L]
 RewriteRule ^karak/api/(api|setup)\.php$ api/$1.php [QSA,L]
-RewriteRule ^karak/(pos|screen|dashboard)(\.html)?/?$ $1.html [L]
+RewriteRule ^karak/(pos|screen|dashboard|expenses)(\.html)?/?$ $1.html [L]
 RewriteRule ^karak/(assets/.+)$ $1 [L]
 # Short links: /pos -> pos.html, /screen -> screen.html, /dashboard -> dashboard.html
 RewriteCond %{REQUEST_FILENAME} !-f
@@ -28,7 +28,7 @@ RewriteRule ^(.+?)/?$ $1.html [L]
 <FilesMatch "^(README\.md|\.gitignore)$">
   Require all denied
 </FilesMatch>
-RedirectMatch 404 ^/(android|staff_app|owner_app|orders_app|tools|\.github|\.git)(/|$)
+RedirectMatch 404 ^/(android|staff_app|owner_app|orders_app|tools|receipts|docs|\.github|\.git)(/|$)
 # Always check for a fresh copy so updates reach the shop devices straight away.
 <IfModule mod_headers.c>
 <FilesMatch "\.(html|js|css)$">

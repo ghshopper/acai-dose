@@ -387,7 +387,7 @@ function drawExp({ exps }) {
     <h3 class="lal">السجل</h3>
     ${exps.length ? `<div class="tbl-wrap"><table>
       <thead><tr><th>التاريخ</th><th>النوع</th><th>المبلغ</th><th>ملاحظة</th><th></th></tr></thead>
-      <tbody>${exps.map(r => `<tr><td class="num">${r.expense_date}</td><td>${esc(r.category)}</td><td class="num">${money(r.amount)}</td><td>${esc(r.note || '')}</td><td><button class="del" data-del="expense:${r.id}" type="button">حذف</button></td></tr>`).join('')}</tbody>
+      <tbody>${exps.map(r => `<tr><td class="num">${r.expense_date}</td><td>${esc(r.category)}</td><td class="num">${money(r.amount)}</td><td>${esc(r.note || '')}${r.paid_from === 'cash' ? ' <span class="pill">كاش</span>' : r.paid_from === 'custody' ? ' <span class="pill">من العهدة</span>' : ''}${r.receipt ? ` <a href="api/api.php?a=receipt&id=${r.id}" target="_blank" rel="noopener" style="font-weight:800">الفاتورة</a>` : ''}</td><td><button class="del" data-del="expense:${r.id}" type="button">حذف</button></td></tr>`).join('')}</tbody>
       <tfoot><tr><td colspan="2">المجموع</td><td class="num">${money(total)}</td><td colspan="2"></td></tr></tfoot>
     </table></div>` : '<div class="card empty">ما فيه مصاريف مسجلة في هالفترة</div>'}`;
   $('#xf').onsubmit = async e => {
@@ -416,6 +416,38 @@ function drawOrders({ orders }) {
 
 // ---------- settings ----------
 let lastSettings = null;
+/** The buyer's float: what the owner handed them, what they spent from it, what is left; record a new transfer. */
+async function drawCustody() {
+  const box = $('#custBox'); if (!box) return;
+  let c;
+  try { c = await api('custody'); } catch { box.innerHTML = '<p style="margin:0">ما قدرت أحمّل العهدة.</p>'; return; }
+  if (!c.people.length) { box.innerHTML = '<p style="margin:0;line-height:1.7">ما فيه حساب مشتريات. أضف واحد من «حسابات العمال» فوق واختار النوع «مشتريات».</p>'; return; }
+  box.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px">${c.people.map(p => `
+      <div style="border:2px solid var(--c2);border-radius:16px;padding:12px">
+        <b dir="ltr">${esc(p.username)}</b>
+        <div class="num" style="font-size:26px;font-weight:900">${money(p.balance)} <small style="font-size:14px">ر.ع معه</small></div>
+        <div style="opacity:.75;font-weight:700;font-size:14px">حولت له ${money(p.given)} · صرف ${money(p.spent)}</div>
+      </div>`).join('')}</div>
+    <form class="formrow" id="custF" style="padding:0">
+      <div class="field"><label for="cu">لمين</label><select id="cu">${c.people.map(p => `<option value="${p.id}">${esc(p.username)}</option>`).join('')}</select></div>
+      <div class="field"><label for="ca">المبلغ</label><input id="ca" type="number" step="0.001" min="0" required></div>
+      <div class="field"><label for="cd">التاريخ</label><input id="cd" type="date" value="${ymd(new Date())}"></div>
+      <div class="field"><label for="cn">ملاحظة</label><input id="cn" maxlength="120" placeholder="تحويل بنكي / كاش"></div>
+      <button class="btn" type="submit">سجّل إني حولت له</button>
+      <div class="err" id="cerr2" role="status"></div>
+    </form>
+    ${c.moves.length ? `<div class="tbl-wrap"><table><thead><tr><th>التاريخ</th><th>لمين</th><th>المبلغ</th><th>ملاحظة</th><th></th></tr></thead><tbody>${c.moves.map(m => `<tr><td class="num">${m.date}</td><td dir="ltr" style="text-align:right">${esc(m.username)}</td><td class="num">${money(m.amount)}</td><td>${esc(m.note)}</td><td><button class="del" type="button" data-custdel="${m.id}">حذف</button></td></tr>`).join('')}</tbody></table></div>` : ''}`;
+  $('#custF').onsubmit = async e => {
+    e.preventDefault();
+    try { await api('custody_add', { user_id: +$('#cu').value, amount: +$('#ca').value, date: $('#cd').value, note: $('#cn').value.trim() }); drawCustody(); }
+    catch (ex) { $('#cerr2').textContent = msg(ex); }
+  };
+  box.querySelectorAll('[data-custdel]').forEach(b => b.onclick = async () => {
+    if (!confirm('تحذف هالتحويل؟')) return;
+    try { await api('custody_delete', { id: +b.dataset.custdel }); drawCustody(); } catch (ex) { alert(msg(ex)); }
+  });
+}
 /** Management-system link: status, and "send old" (everything from before the link was on). */
 async function drawExt() {
   const box = $('#extBox'); if (!box) return;
@@ -558,19 +590,25 @@ async function drawSettings() {
     <form class="card formrow" id="uf">
       <div class="field"><label for="nu">اسم المستخدم (إنجليزي)</label><input id="nu" dir="ltr" autocapitalize="off" autocomplete="off" required></div>
       <div class="field"><label for="np">كلمة السر</label><input id="np" type="text" autocomplete="off" minlength="6" required></div>
-      <button class="btn" type="submit">أضف عامل</button>
+      <div class="field"><label for="nr">النوع</label><select id="nr"><option value="staff">عامل كاشير</option><option value="buyer">مشتريات (يدخل المصاريف بس)</option></select></div>
+      <button class="btn" type="submit">أضف</button>
       <div class="err" id="uerr" role="alert"></div>
     </form>
     <div class="tbl-wrap" style="margin-top:12px"><table>
       <thead><tr><th>اسم المستخدم</th><th>الصلاحية</th><th>الحالة</th><th></th></tr></thead>
       <tbody>${st.users.map(u => `<tr><td dir="ltr" style="text-align:right">${esc(u.username)}</td>
-        <td>${u.role === 'owner' ? 'صاحب المحل' : 'عامل (الشاشة بس)'}</td>
+        <td>${u.role === 'owner' ? 'صاحب المحل' : u.role === 'buyer' ? 'مشتريات (المصاريف بس)' : 'عامل كاشير'}</td>
         <td>${u.active ? '<span class="ok">فعال</span>' : '<span class="pill">موقوف</span>'}</td>
         <td>${u.username === me.username ? '' : `<button class="btn small ghost" data-reset="${u.id}" type="button">كلمة سر جديدة</button>
           <button class="del" data-toggle="${u.id}" data-active="${u.active}" type="button">${u.active ? 'إيقاف' : 'تفعيل'}</button>`}</td></tr>`).join('')}</tbody>
-    </table></div>`;
+    </table></div>
+    <p style="margin:6px 4px 0;font-weight:700;opacity:.75">حساب المشتريات يدخل من <span dir="ltr">${location.origin}${location.pathname.replace(/dashboard(\.html)?$/, 'expenses')}</span>: يصوّر الفاتورة وتنقرا لحالها، ويختار دفع من كاش المحل أو من العهدة اللي حولتها له.</p>
+
+    <h3 class="lal">عهدة المشتريات</h3>
+    <div class="card" id="custBox" style="display:grid;gap:12px;padding:18px"><p style="margin:0">جاري التحميل…</p></div>`;
 
   drawExt();
+  drawCustody();
   $('#cf').onsubmit = async e => {
     e.preventDefault();
     const vals = Object.fromEntries(Object.keys(CH).map(k => [k, +$('#c_' + k).value || 0]));
@@ -641,7 +679,7 @@ async function drawSettings() {
   };
   $('#uf').onsubmit = async e => {
     e.preventDefault();
-    try { await api('add_user', { username: $('#nu').value.trim(), password: $('#np').value }); drawSettings(); }
+    try { await api('add_user', { username: $('#nu').value.trim(), password: $('#np').value, role: $('#nr').value }); drawSettings(); }
     catch (ex) { $('#uerr').textContent = msg(ex); }
   };
 }

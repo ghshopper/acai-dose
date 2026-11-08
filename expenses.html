@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Expenses | Açaí Dose</title>
+<meta name="theme-color" content="#470D43">
+<link rel="icon" href="assets/logo-purple.png">
+<link rel="stylesheet" href="assets/app.css?v=1794150000">
+<script>/* Karak Dose (under /karak/): charcoal and white, its own logo */if(/^\/karak(\/|$)/.test(location.pathname)){document.documentElement.classList.add('karak');var kfix=function(){document.querySelectorAll('img[src*="logo-cream"],img[src*="logo-purple"]').forEach(function(i){i.src=i.getAttribute('src').indexOf('logo-cream')>=0?'assets/karak/logo-white.png':'assets/karak/logo-dark.png';i.alt='Karak Dose'});var m=document.querySelector('meta[name=theme-color]');if(m)m.content='#393939';if(/Açaí Dose/.test(document.title))document.title=document.title.replace(/Açaí Dose/g,'Karak Dose')};new MutationObserver(kfix).observe(document.documentElement,{subtree:true,childList:true});addEventListener('DOMContentLoaded',kfix)}</script>
+<style>
+/* Staff expenses: photograph the invoice, Claude reads it, staff check and save. Same login as the till. */
+body{background:var(--c2);font-family:'Montserrat','Tajawal',system-ui,sans-serif}
+.topbar .btn.ghost{color:var(--c);border-color:var(--c)}
+main{max-width:620px;margin:0 auto;padding:14px 14px 40px;display:grid;gap:14px}
+.card{padding:18px}
+h2{margin:0 0 10px;font-size:22px}
+.shot{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:150px;border:3px dashed var(--l);border-radius:20px;background:#fff;cursor:pointer;font-weight:800;font-size:20px;text-align:center;padding:16px}
+.shot small{font-weight:600;opacity:.65;font-size:14px}
+.shot svg{width:44px;height:44px}
+.preview{width:100%;max-height:340px;object-fit:contain;border-radius:14px;background:#f3f3f3}
+.reading{display:flex;gap:10px;align-items:center;font-weight:800}
+.spin{width:22px;height:22px;border-radius:50%;border:3px solid var(--l);border-top-color:var(--p);animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.note{border-radius:12px;padding:10px 12px;font-weight:700;font-size:15px;background:var(--c)}
+.note.warn{background:#FFF4E0;color:#7A4A00}
+label.f{display:block;font-weight:800;margin:12px 0 4px}
+input[type=text],input[type=number],input[type=date],input:not([type]){width:100%;min-height:52px;border:2px solid var(--l);border-radius:12px;padding:6px 12px;font-size:18px;background:#fff}
+.amt{font-size:28px!important;font-weight:900}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{min-height:46px;padding:0 14px;border-radius:999px;border:2px solid var(--l);background:#fff;font-weight:800;font-size:15px;cursor:pointer}
+.chip[aria-pressed=true]{background:var(--p);border-color:var(--p);color:var(--c)}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.seg button{min-height:52px;border-radius:12px;border:2px solid var(--p);background:#fff;color:var(--p);font-weight:800;cursor:pointer;font-size:16px}
+.seg button[aria-pressed=true]{background:var(--p);color:var(--c)}
+.save{width:100%;min-height:60px;font-size:20px;margin-top:16px}
+.err{color:var(--bad);font-weight:800;margin-top:8px}
+.row{background:#fff;border-radius:14px;padding:12px 14px;display:flex;gap:12px;align-items:center;margin-bottom:8px}
+.row .m{flex:1;min-width:0}
+.row b{display:block}
+.row span{opacity:.7;font-size:14px}
+.row a{font-weight:800;color:var(--p)}
+.row.pend{background:#FFF4E0}
+.lnk{background:none;border:0;color:var(--bad);font-weight:800;cursor:pointer;min-height:40px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ok);color:#fff;font-weight:800;font-size:18px;padding:14px 24px;border-radius:999px;z-index:99;box-shadow:0 10px 30px rgba(0,0,0,.25);max-width:calc(100% - 32px);text-align:center}
+.toast.warn{background:#B26A00}
+</style>
+<script>
+(function(){var shown=false;function show(t){if(shown)return;shown=true;var d=document.createElement('div');d.style.cssText='position:fixed;inset:auto 12px 12px 12px;z-index:99999;background:#393939;color:#fff;padding:14px;border-radius:14px;font:600 15px system-ui';d.textContent='Problem: '+t;document.body.appendChild(d)}
+window.addEventListener('error',function(e){show(e.message||'Script error')});window.addEventListener('unhandledrejection',function(e){show((e.reason&&e.reason.message)||e.reason)});
+setTimeout(function(){if(!window.__appStarted)show('The page script did not run. Update Chrome on this device.')},6000);})();
+</script>
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+import { api, $, $$, esc, money, requireLogin, logout, msgEn } from './assets/common.js?v=1794150000';
+window.__appStarted = true;
+(async () => {
+const app = $('#app');
+const me = await requireLogin(app, 'Expenses', true);
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('exp_' + k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('exp_' + k, JSON.stringify(v)); } catch { /* private mode */ } },
+};
+const cid = () => [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join('');
+const two = n => String(n).padStart(2, '0');
+const stamp = (d = new Date()) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())} ${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`;
+const today = () => stamp().slice(0, 10);
+const minDay = () => stamp(new Date(Date.now() - 60 * 86400000)).slice(0, 10);
+function toast(t, warn) { const d = document.createElement('div'); d.className = 'toast' + (warn ? ' warn' : ''); d.setAttribute('role', 'status'); d.textContent = t; document.body.append(d); setTimeout(() => d.remove(), 3500); }
+const ERR = { bad_amount: 'Amount must be more than 0 and up to 500', bad_category: 'Pick what it was for', need_note: 'Write what it was for', bad_image: 'That photo could not be used, take it again', too_many: 'Too many photos this hour, type it in instead' };
+const errText = ex => ERR[ex && ex.message] || msgEn(ex);
+
+let cfg = store.get('cfg', { expense_cats: [] });
+try { cfg = await api('pos_config'); store.set('cfg', cfg); } catch { /* offline: last copy */ }
+const catName = k => (cfg.expense_cats.find(c => c.k === k) || {}).en || k;
+// A buyer (shops for supplies) pays from the till's cash or from the money the owner sent them (their float)
+const BUYER = me.role === 'buyer';
+const PAYS = BUYER ? [['custody', 'From my float'], ['cash', 'Cash from till']] : [['cash', 'Cash from till'], ['bank', 'Bank transfer']];
+const payName = k => ({ custody: 'Float', bank: 'Transfer', cash: '' })[k] || '';
+
+app.innerHTML = `
+<header class="topbar">
+  <img src="assets/logo-cream.png" alt="Açaí Dose">
+  <div class="nav" style="display:flex;gap:10px;align-items:center">
+    <span class="who">${esc(me.username)}</span>
+    <button class="btn small ghost" id="out" type="button">Log out</button>
+  </div>
+</header>
+<main>
+  ${BUYER ? '<section class="card" id="float" style="background:var(--p);color:var(--c)"><div style="opacity:.8;font-weight:700">Money with you (float)</div><div style="font-size:34px;font-weight:900" id="fbal">…</div><div style="opacity:.75;font-weight:600" id="fsub"></div></section>' : ''}
+  <section class="card">
+    <h2>New expense</h2>
+    <label class="shot" id="shotBox">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      Take a photo of the invoice
+      <small>The details are read for you. Check them, then save.</small>
+      <input id="photo" type="file" accept="image/*" capture="environment" hidden>
+    </label>
+    <div id="pic" style="display:none;margin-top:12px"></div>
+    <form id="f" novalidate>
+      <label class="f">What was it for?</label>
+      <div class="chips" id="cats"></div>
+      <label class="f" for="amt">Total amount (OMR)</label>
+      <input id="amt" class="amt" type="number" step="0.001" min="0" max="500" inputmode="decimal" placeholder="0.000">
+      <label class="f" for="day">Invoice date</label>
+      <input id="day" type="date">
+      <label class="f" for="note">Shop and what was bought <span id="req" style="opacity:.6;font-weight:600">(optional)</span></label>
+      <input id="note" maxlength="80" placeholder="e.g. Al Maha · 2 boxes of milk">
+      <label class="f">Paid by</label>
+      <div class="seg">${PAYS.map(([k, l], i) => `<button type="button" data-p="${k}" aria-pressed="${i === 0}">${l}</button>`).join('')}</div>
+      <div class="err" id="err" role="alert"></div>
+      <button class="btn save" type="submit" id="save">Save expense</button>
+    </form>
+  </section>
+  <section>
+    <h2 style="margin:4px 4px 10px">Entered today <small id="sum" style="font-size:14px;opacity:.7"></small></h2>
+    <div id="list"></div>
+  </section>
+</main>`;
+$('#out').onclick = logout;
+
+// ---------- form ----------
+let cat = '', pay = PAYS[0][0], receipt = null, reading = false;
+const day = $('#day'); day.max = today(); day.min = minDay(); day.value = today();
+function drawCats() {
+  $('#cats').innerHTML = cfg.expense_cats.length
+    ? cfg.expense_cats.map(c => `<button class="chip" type="button" data-c="${esc(c.k)}" aria-pressed="${cat === c.k}">${esc(c.en)}</button>`).join('')
+    : '<span class="note warn">Connect to the internet once to load the expense types.</span>';
+  $('#req').textContent = cat === 'other' ? '(required)' : '(optional)';
+}
+drawCats();
+$('#cats').onclick = e => { const b = e.target.closest('[data-c]'); if (b) { cat = b.dataset.c; drawCats(); } };
+$$('.seg [data-p]').forEach(b => b.onclick = () => { pay = b.dataset.p; $$('.seg [data-p]').forEach(x => x.setAttribute('aria-pressed', x === b)); });
+
+/** Shrinks the photo (long side 1600 px, JPEG) so it uploads fast on mobile data. */
+function shrink(file) {
+  return new Promise((res, rej) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const s = Math.min(1, 1600 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas'); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg', 0.82));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('bad_image')); };
+    img.src = url;
+  });
+}
+$('#photo').onchange = async e => {
+  const file = e.target.files[0]; e.target.value = ''; if (!file) return;
+  const box = $('#pic'); box.style.display = 'block';
+  let data;
+  try { data = await shrink(file); } catch { box.innerHTML = `<div class="note warn">${ERR.bad_image}</div>`; return; }
+  box.innerHTML = `<img class="preview" src="${data}" alt="Invoice photo"><div class="reading" style="margin-top:10px"><span class="spin"></span> Reading the invoice…</div>`;
+  receipt = null; reading = true; $('#save').disabled = true;
+  try {
+    const r = await api('pos_invoice_read', { image: data });
+    receipt = r.receipt;
+    const a = r.ai;
+    let msg;
+    if (a && a.readable) {
+      if (a.total) $('#amt').value = a.total.toFixed(3);
+      if (a.date) day.value = a.date;
+      if (a.cat) { cat = a.cat; drawCats(); }
+      $('#note').value = [a.vendor, a.summary].filter(Boolean).join(' · ').slice(0, 80) + (a.invoice_no ? ` #${a.invoice_no}` : '');
+      msg = `<div class="note">✓ Read: <b>${a.total ? money(a.total) + ' OMR' : 'no total'}</b>${a.vendor ? ' · ' + esc(a.vendor) : ''}${a.date ? ' · ' + esc(a.date) : ''}${a.vat ? ` · VAT ${money(a.vat)}` : ''}. Check everything before saving.</div>`;
+    } else if (!r.ai_on) {
+      msg = '<div class="note">Photo saved with the expense. Type the details below.</div>';
+    } else {
+      msg = `<div class="note warn">Could not read this invoice clearly. Type the details, or take the photo again (flat, in good light).</div>`;
+    }
+    box.innerHTML = `<img class="preview" src="${data}" alt="Invoice photo"><div style="margin-top:10px">${msg}</div>`;
+  } catch (ex) {
+    if (ex.message === 'login_required') return location.reload();
+    box.innerHTML = `<img class="preview" src="${data}" alt="Invoice photo"><div class="note warn" style="margin-top:10px">${ex.message === 'network' ? 'No internet: type the details, the expense is kept and sent later (without the photo).' : esc(errText(ex))}</div>`;
+  } finally { reading = false; $('#save').disabled = false; }
+};
+
+// ---------- offline queue ----------
+let outbox = store.get('outbox', []);
+const saveBox = () => store.set('outbox', outbox);
+async function sync() {
+  while (outbox.length) {
+    try { await api('pos_expense', outbox[0]); outbox.shift(); saveBox(); }
+    catch (ex) {
+      if (ex.message === 'network' || /^http_5|server_error/.test(ex.message)) break;
+      if (ex.message === 'login_required') { location.reload(); break; }
+      toast(`An offline expense was refused (${errText(ex)})`, true); outbox.shift(); saveBox();
+    }
+  }
+  load();
+}
+setInterval(() => outbox.length && sync(), 20000);
+addEventListener('online', sync);
+
+$('#f').onsubmit = async e => {
+  e.preventDefault();
+  if (reading) return;
+  const err = $('#err'); err.textContent = '';
+  const a = Math.round(parseFloat($('#amt').value) * 1000) / 1000, note = $('#note').value.trim();
+  const bad = !cat ? 'Pick what it was for' : !(a > 0 && a <= 500) ? ERR.bad_amount : cat === 'other' && !note ? ERR.need_note : '';
+  if (bad) { err.textContent = bad; return; }
+  const body = { client_id: cid(), cat, amount: a, note, paid_from: pay, date: day.value || today(), ...(receipt ? { receipt } : {}) };
+  $('#save').disabled = true;
+  try {
+    await api('pos_expense', body);
+    toast(`Saved · ${catName(cat)} · ${money(a)} OMR`);
+    reset(); load();
+  } catch (ex) {
+    if (ex.message === 'login_required') return location.reload();
+    if (ex.message === 'network') {
+      outbox.push({ ...body, at: stamp() }); saveBox();
+      toast('No internet: saved on this device, it will be sent automatically', true);
+      reset(); draw();
+    } else err.textContent = errText(ex);
+  } finally { $('#save').disabled = false; }
+};
+function reset() {
+  cat = ''; receipt = null; drawCats();
+  pay = PAYS[0][0]; $$('.seg [data-p]').forEach(x => x.setAttribute('aria-pressed', x.dataset.p === pay));
+  $('#amt').value = ''; $('#note').value = ''; day.value = today();
+  $('#pic').style.display = 'none'; $('#pic').innerHTML = '';
+}
+
+// ---------- today's list ----------
+let rows = [];
+async function load() {
+  try { rows = await api('pos_expenses'); } catch (ex) { if (ex.message === 'login_required') return location.reload(); }
+  if (BUYER) {
+    try {
+      const f = await api('float_status');
+      const waiting = outbox.filter(p => p.paid_from === 'custody').reduce((s, p) => s + p.amount, 0);
+      $('#fbal').textContent = money(f.balance - waiting) + ' OMR';
+      $('#fsub').textContent = `Received ${money(f.given)} · spent ${money(f.spent + waiting)}`;
+    } catch { /* offline */ }
+  }
+  draw();
+}
+function draw() {
+  const total = [...outbox, ...rows].reduce((s, r) => s + r.amount, 0);
+  $('#sum').textContent = `${rows.length + outbox.length} · ${money(total)} OMR`;
+  $('#list').innerHTML = (outbox.length || rows.length)
+    ? outbox.map(p => `<div class="row pend"><div class="m"><b>${esc(catName(p.cat))} · ${money(p.amount)}${payName(p.paid_from) ? ' · ' + payName(p.paid_from) : ''}</b><span>${esc(p.note || '')} · waiting for internet</span></div></div>`).join('') +
+      rows.map(r => `<div class="row"><div class="m"><b>${esc(r.cat)} · ${money(r.amount)}${payName(r.paid_from) ? ' · ' + payName(r.paid_from) : ''}</b>
+        <span>${r.date && r.date !== today() ? esc(r.date) + ' · ' : ''}${esc(String(r.at || '').slice(11, 16))} ${esc(r.note || '')}${r.note ? ' · ' : ''}${esc(r.by_user || '')}</span>
+        ${r.receipt ? `<br><a href="api/api.php?a=receipt&id=${r.id}" target="_blank" rel="noopener">View invoice</a>` : ''}</div>
+        <button class="lnk" type="button" data-rm="${r.id}" data-label="${esc(r.cat)} · ${money(r.amount)}">Remove</button></div>`).join('')
+    : '<div class="row"><span>Nothing entered today</span></div>';
+}
+$('#list').onclick = async e => {
+  const b = e.target.closest('[data-rm]'); if (!b) return;
+  if (!confirm(`Remove ${b.dataset.label}?`)) return;
+  try { await api('pos_expense_void', { id: +b.dataset.rm }); } catch (ex) { toast(errText(ex), true); }
+  load();
+};
+load(); sync();
+})();
+</script>
+</body>
+</html>

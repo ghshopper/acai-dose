@@ -3,6 +3,7 @@ declare(strict_types=1);
 require __DIR__ . '/lib.php';
 require __DIR__ . '/loyalty.php';
 require __DIR__ . '/ext.php';
+require __DIR__ . '/receipt.php';
 register_shutdown_function('ext_after_request');
 
 header('X-Content-Type-Options: nosniff');
@@ -50,10 +51,12 @@ function accounts_data(): array {
     $bal = [];
     foreach ($accts as $x) $bal[$x['k']] = ['k' => $x['k'], 'name' => $x['name'], 'opening' => (float)$x['opening'], 'card' => 0.0, 'payouts' => 0.0, 'in' => 0.0, 'out' => 0.0, 'expenses' => 0.0];
     $bal['main']['card'] = (float)(q("SELECT COALESCE(SUM(total), 0) s FROM orders WHERE payment = 'card' AND status <> 'cancelled'")->fetch()['s'] ?? 0);
-    $bal['main']['expenses'] = (float)(q("SELECT COALESCE(SUM(amount), 0) s FROM expenses WHERE paid_from <> 'cash'")->fetch()['s'] ?? 0);
+    $bal['main']['expenses'] = (float)(q("SELECT COALESCE(SUM(amount), 0) s FROM expenses WHERE paid_from = 'bank'")->fetch()['s'] ?? 0);
     $acc = fn($k) => isset($bal[$k]) ? $k : 'main';
     foreach (q('SELECT acct, SUM(amount) s FROM channel_payouts GROUP BY acct')->fetchAll() as $r) $bal[$acc($r['acct'])]['payouts'] += (float)$r['s'];
     foreach (q('SELECT acct, kind, SUM(amount) s FROM bank_moves GROUP BY acct, kind')->fetchAll() as $r) $bal[$acc($r['acct'])][$r['kind'] === 'out' ? 'out' : 'in'] += (float)$r['s'];
+    // Transfers to the buyer's float leave the company account (their invoices then don't, so nothing counts twice)
+    $bal['main']['out'] += (float)(q('SELECT COALESCE(SUM(amount), 0) s FROM custody_moves')->fetch()['s'] ?? 0);
     foreach ($bal as &$x) {
         $x['balance'] = money($x['opening'] + $x['card'] + $x['payouts'] + $x['in'] - $x['out'] - $x['expenses']);
         foreach (['opening', 'card', 'payouts', 'in', 'out', 'expenses'] as $f) $x[$f] = money($x[$f]);
@@ -102,7 +105,15 @@ function offline_time($at): ?string {
     return ($t && $t <= time() + 300 && $t >= time() - 7 * 86400) ? date('Y-m-d H:i:s', $t) : null;
 }
 /** How an expense was paid: cash, or bank transfer ('bank' — taken off the company account balance). */
-function paid_from($v, string $default): string { return in_array($v, ['cash', 'bank'], true) ? $v : $default; }
+function paid_from($v, string $default): string { return in_array($v, ['cash', 'bank', 'custody'], true) ? $v : $default; }
+/** The buyer's float: money the owner handed them minus invoices they paid from it. */
+function float_of(int $uid): array {
+    $given = (float)(q('SELECT COALESCE(SUM(amount), 0) s FROM custody_moves WHERE user_id = ?', [$uid])->fetch()['s'] ?? 0);
+    $spent = (float)(q("SELECT COALESCE(SUM(amount), 0) s FROM expenses WHERE created_by = ? AND paid_from = 'custody'", [$uid])->fetch()['s'] ?? 0);
+    return ['given' => money($given), 'spent' => money($spent), 'balance' => money($given - $spent)];
+}
+/** What a buyer account (expenses only) may call. */
+const BUYER_ACTIONS = ['me', 'login', 'logout', 'pos_config', 'pos_expense', 'pos_expenses', 'pos_expense_void', 'pos_invoice_read', 'receipt', 'float_status'];
 function clean_client_id($v): string { return preg_match('/^[a-zA-Z0-9-]{8,40}$/', (string)$v) ? (string)$v : ''; }
 function shop_cats(): array { return json_decode(setting('categories', '[]'), true) ?: []; }
 const STATUSES = ['new', 'preparing', 'ready', 'done', 'cancelled'];
@@ -246,6 +257,8 @@ function insert_order(array $f, ?string $day = null): int {
 
 try {
 ensure_schema();
+// A buyer account only enters expenses
+if (($cu = user_if_any()) && $cu['role'] === 'buyer' && !in_array($a, BUYER_ACTIONS, true)) fail('forbidden', 403);
 if (str_starts_with($a, 'ext_')) ext_handle($a, $in, $post);
 switch ($a) {
 
@@ -446,19 +459,62 @@ case 'pos_expense':   // staff: money paid from the till's cash (milk, gas, taxi
     $note = clean((string)($in['note'] ?? ''), 80);
     if ($k === 'other' && $note === '') fail('need_note');
     $at = offline_time($in['at'] ?? null) ?? now();
-    q('INSERT INTO expenses (expense_date, category, amount, note, created_at, created_by, client_id, paid_from) VALUES (?,?,?,?,?,?,?,?)',
-      [substr($at, 0, 10), $cats[$k][1], money($amt), clean('POS · ' . $u['username'] . ($note !== '' ? ' · ' . $note : ''), 120), $at, (int)$u['id'], $cid ?: null, paid_from($in['paid_from'] ?? null, 'cash')]);
+    // The invoice's own date (from its photo) when it is within the last 60 days
+    $day = substr($at, 0, 10);
+    if (is_string($in['date'] ?? null) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $in['date']) && $in['date'] <= date('Y-m-d') && $in['date'] >= date('Y-m-d', strtotime('-60 days'))) $day = $in['date'];
+    $rec = receipt_name_ok($in['receipt'] ?? null) && is_file(receipt_path($in['receipt'])) ? $in['receipt'] : null;
+    q('INSERT INTO expenses (expense_date, category, amount, note, created_at, created_by, client_id, paid_from, receipt) VALUES (?,?,?,?,?,?,?,?,?)',
+      [$day, $cats[$k][1], money($amt), clean('POS · ' . $u['username'] . ($note !== '' ? ' · ' . $note : ''), 120), $at, (int)$u['id'], $cid ?: null, paid_from($in['paid_from'] ?? null, 'cash'), $rec]);
     $id = (int)db()->lastInsertId();
     ext_emit('expense', $id, 'created');
     out(['ok' => true, 'id' => $id]);
 
-case 'pos_expenses':  // staff: today's till expenses
+case 'pos_expenses':  // staff: expenses entered at the till today (an invoice may carry an earlier date)
     need('staff');
-    $rows = q("SELECT e.id, e.created_at, e.category, e.amount, e.note, e.created_by, e.paid_from, u.username AS by_user FROM expenses e LEFT JOIN users u ON u.id = e.created_by
-               WHERE e.expense_date = ? AND e.created_by IS NOT NULL ORDER BY e.id DESC", [date('Y-m-d')])->fetchAll();
+    $rows = q("SELECT e.id, e.created_at, e.expense_date, e.category, e.amount, e.note, e.created_by, e.paid_from, e.receipt, u.username AS by_user FROM expenses e LEFT JOIN users u ON u.id = e.created_by
+               WHERE (e.expense_date = ? OR e.created_at >= ?) AND e.created_by IS NOT NULL ORDER BY e.id DESC", [date('Y-m-d'), date('Y-m-d') . ' 00:00:00'])->fetchAll();
     $en = []; foreach (pos_expense_cats() as $v) $en[$v[1]] = $v[0];
-    out(array_map(fn($r) => ['id' => (int)$r['id'], 'at' => $r['created_at'], 'paid_from' => $r['paid_from'], 'cat' => $en[$r['category']] ?? $r['category'], 'amount' => (float)$r['amount'],
+    out(array_map(fn($r) => ['id' => (int)$r['id'], 'at' => $r['created_at'], 'date' => $r['expense_date'], 'receipt' => $r['receipt'] !== null, 'paid_from' => $r['paid_from'], 'cat' => $en[$r['category']] ?? $r['category'], 'amount' => (float)$r['amount'],
         'note' => trim((string)preg_replace('/^POS · [^·]*(· )?/u', '', (string)$r['note'])), 'by_user' => (string)($r['by_user'] ?? ''), 'mine' => (int)$r['created_by']], $rows));
+
+case 'float_status':  // staff / buyer: the money the owner handed me and what is left
+    $u = need('staff');
+    out(float_of((int)$u['id']) + ['role' => $u['role']]);
+
+case 'custody':  // owner: each buyer's float and the recent hand-overs
+    need('owner');
+    $people = [];
+    foreach (q("SELECT id, username, active FROM users WHERE role = 'buyer' ORDER BY id")->fetchAll() as $b) $people[] = ['id' => (int)$b['id'], 'username' => $b['username'], 'active' => (int)$b['active']] + float_of((int)$b['id']);
+    $moves = q('SELECT m.id, m.user_id, m.amount, m.move_date, m.note, u.username FROM custody_moves m LEFT JOIN users u ON u.id = m.user_id ORDER BY m.move_date DESC, m.id DESC LIMIT 40')->fetchAll();
+    out(['people' => $people, 'moves' => array_map(fn($m) => ['id' => (int)$m['id'], 'user_id' => (int)$m['user_id'], 'username' => (string)$m['username'], 'amount' => (float)$m['amount'], 'date' => $m['move_date'], 'note' => (string)($m['note'] ?? '')], $moves)]);
+
+case 'custody_add':  // owner: handed / transferred money to a buyer
+    $post(); need('owner');
+    $b = q("SELECT id FROM users WHERE id = ? AND role = 'buyer'", [(int)($in['user_id'] ?? 0)])->fetch() ?: fail('not_found', 404);
+    $amt = round((float)($in['amount'] ?? 0), 3); if ($amt <= 0 || $amt > 5000) fail('bad_amount');
+    q('INSERT INTO custody_moves (user_id, amount, move_date, note, created_at) VALUES (?,?,?,?,?)', [(int)$b['id'], money($amt), valid_date($in['date'] ?? date('Y-m-d')), clean($in['note'] ?? '', 120) ?: null, now()]);
+    out(['ok' => true] + float_of((int)$b['id']));
+
+case 'custody_delete':
+    $post(); need('owner');
+    q('DELETE FROM custody_moves WHERE id = ?', [(int)($in['id'] ?? 0)]);
+    out(['ok' => true]);
+
+case 'pos_invoice_read':  // staff: photo of an invoice → saved, and read by Claude to fill the expense form
+    $post(); need('staff');
+    rate_limit('invoice', 60, 3600);
+    $name = receipt_save((string)($in['image'] ?? ''));
+    out(['receipt' => $name, 'ai_on' => ai_key() !== '', 'ai' => ai_read_receipt($name)]);
+
+case 'receipt':  // the invoice photo of an expense (staff and owner)
+    need('staff');
+    $e = q('SELECT receipt FROM expenses WHERE id = ?', [(int)($_GET['id'] ?? 0)])->fetch();
+    if (!$e || !receipt_name_ok($e['receipt']) || !is_file($p = receipt_path($e['receipt']))) fail('not_found', 404);
+    header('Content-Type: ' . ['jpg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp'][pathinfo($p, PATHINFO_EXTENSION)]);
+    header('Cache-Control: private, max-age=86400');
+    header('X-Content-Type-Options: nosniff');
+    readfile($p);
+    exit;
 
 case 'pos_expense_void':  // staff: remove a till expense they entered in the last 15 minutes (owner: any time)
     $post(); $u = need('staff');
@@ -1056,7 +1112,8 @@ case 'add_user':
     if (!preg_match('/^[A-Za-z0-9_.-]{3,60}$/', $un)) fail('bad_username');
     if (strlen($pw) < 6) fail('short_password');
     if (q('SELECT 1 FROM users WHERE username = ?', [$un])->fetch()) fail('username_taken');
-    q('INSERT INTO users (username, pass_hash, role, active, created_at) VALUES (?,?,?,1,?)', [$un, password_hash($pw, PASSWORD_DEFAULT), 'staff', now()]);
+    $role = ($in['role'] ?? '') === 'buyer' ? 'buyer' : 'staff';   // buyer = enters expenses only (has a float)
+    q('INSERT INTO users (username, pass_hash, role, active, created_at) VALUES (?,?,?,1,?)', [$un, password_hash($pw, PASSWORD_DEFAULT), $role, now()]);
     out(['ok' => true]);
 
 case 'user_update':

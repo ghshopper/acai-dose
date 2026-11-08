@@ -51,6 +51,12 @@ struct SummaryView: View {
             ToolbarItem(placement: .topBarLeading) {
                 if loading { ProgressView() } else { BizSwitcher() }
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                Image(BizStore.shared.current == .karak ? "karak-dark" : "logo-purple")
+                    .renderingMode(.template).resizable().scaledToFit().frame(height: 26)
+                    .foregroundStyle(Color.ink)
+                    .accessibilityLabel(BizStore.shared.current.name)
+            }
         }
         .refreshable { await load() }
         .task(id: period.version) { await load() }

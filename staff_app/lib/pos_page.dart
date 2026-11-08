@@ -696,6 +696,18 @@ class _PosPageState extends State<PosPage> {
     }
   }
 
+  /// Inside a section the section's word is dropped: "Croissant Cheese" shows as "Cheese" under Croissant
+  String _short(Map<String, dynamic> p, bool ar) {
+    final name = '${ar ? p['name_ar'] : p['name_en']}';
+    if (_search.text.trim().isNotEmpty) return name;
+    for (final c in ShopConfig.I.cats) {
+      if (c['k'] != p['cat']) continue;
+      final pre = '${ar ? c['ar'] : c['en']} ';
+      if (name.startsWith(pre) && name.length > pre.length) return name.substring(pre.length);
+    }
+    return name;
+  }
+
   String _priceLabel(List<Map<String, dynamic>> vs) => vs.map((v) => money(v['price'])).toSet().join(' / ');
 
   Widget _grid(bool wide) {
@@ -807,7 +819,7 @@ class _PosPageState extends State<PosPage> {
         physics: const NeverScrollableScrollPhysics(),
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
-        childAspectRatio: karak ? 1.45 : 0.95,
+        childAspectRatio: karak ? 1.5 : 0.95,
         children: [
           for (final vs in tiles)
             Builder(builder: (_) {
@@ -826,7 +838,7 @@ class _PosPageState extends State<PosPage> {
                     padding: const EdgeInsets.all(10),
                     child: Stack(clipBehavior: Clip.none, children: [
                       Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                        if (img.isNotEmpty || !karak)
+                        if (!karak)
                           Expanded(
                             child: Center(
                               child: Image.network('$kSite/assets/${img.isEmpty ? 'cup-smoothie.png' : img}',
@@ -836,13 +848,15 @@ class _PosPageState extends State<PosPage> {
                         else
                           const Spacer(),
                         const SizedBox(height: 6),
-                        Text('${p['name_en']}',
+                        Text(karak ? _short(p, false) : '${p['name_en']}',
                             textAlign: TextAlign.center,
                             maxLines: 2,
-                            style: TextStyle(fontWeight: FontWeight.w800, fontSize: karak ? 17 : 15, decoration: out ? TextDecoration.lineThrough : null)),
-                        if (karak) Text('${p['name_ar']}', textAlign: TextAlign.center, maxLines: 1, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black54)),
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontWeight: FontWeight.w900, fontSize: karak ? 21 : 15, height: 1.15, decoration: out ? TextDecoration.lineThrough : null)),
+                        if (karak) Text(_short(p, true), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: Colors.black54)),
+                        if (karak) const SizedBox(height: 4),
                         Text(out ? 'SOLD OUT' : _priceLabel(vs),
-                            textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: out ? kBad : kPurple)),
+                            textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w900, fontSize: karak ? 18 : 16, color: out ? kBad : kPurple)),
                         if (karak) const Spacer(),
                       ]),
                       if (n > 0)

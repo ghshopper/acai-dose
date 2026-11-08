@@ -15,7 +15,6 @@ struct AcaiOwnerApp: App {
             // .toasts() reads the Toaster from the environment, so it must sit inside .environment(toaster)
             RootView()
                 .toasts()
-                .tint(.ink)
                 .environment(toaster)
                 .environment(period)
                 .environment(Live.shared)
@@ -56,6 +55,7 @@ struct RootView: View {
         }
         // Switching shop starts over: its own login, numbers and settings
         .id(BizStore.shared.current)
+        .tint(.ink)   // follows the shop: purple for Açaí Dose, charcoal for Karak Dose
         .task(id: BizStore.shared.current) { await check() }
     }
 

@@ -61,6 +61,10 @@ function create_schema(): void {
         // Money the owner hands to the buyer (an employee who shops for supplies) to pay invoices from
         "CREATE TABLE IF NOT EXISTS custody_moves (
             id $id, user_id INT NOT NULL, amount DECIMAL(10,3) NOT NULL, move_date DATE NOT NULL, note VARCHAR(120) NULL, created_at DATETIME NOT NULL)$eng",
+        // Expenses that repeat every month (rent, salaries, electricity): added by themselves on their day
+        "CREATE TABLE IF NOT EXISTS recurring_expenses (
+            id $id, category VARCHAR(60) NOT NULL, amount DECIMAL(10,3) NOT NULL, day_of_month INT NOT NULL DEFAULT 1, note VARCHAR(120) NULL,
+            paid_from VARCHAR(8) NOT NULL DEFAULT 'bank', active TINYINT NOT NULL DEFAULT 1, last_month VARCHAR(7) NULL, created_at DATETIME NOT NULL)$eng",
         "CREATE TABLE IF NOT EXISTS wallet_regs (device_id VARCHAR(100) NOT NULL, serial VARCHAR(40) NOT NULL, created_at DATETIME NOT NULL, PRIMARY KEY (device_id, serial))$eng",
     ];
     foreach ($sql as $s) xq($s);

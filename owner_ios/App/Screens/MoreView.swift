@@ -6,6 +6,8 @@ struct MoreView: View {
     @Environment(Live.self) private var live
     @State private var sale = false
     @State private var askLogout = false
+    @State private var reportOn = DailyReport.enabled
+    @State private var reportTime = Calendar.current.date(bySettingHour: DailyReport.minute / 60, minute: DailyReport.minute % 60, second: 0, of: .now) ?? .now
 
     var body: some View {
         List {
@@ -38,6 +40,27 @@ struct MoreView: View {
             } header: { Text("شاشة القفل والويدجت") } footer: {
                 Text("أضف ويدجت «أساي دوز» من الشاشة الرئيسية: اضغط مطوّل على الشاشة ← + ← أساي دوز.")
             }
+            }
+            Section {
+                Toggle(isOn: Binding(get: { reportOn }, set: { on in
+                    Task { @MainActor in
+                        if on && !(await DailyReport.requestPermission()) { toaster.show("شغّل الإشعارات للتطبيق من إعدادات الآيفون", ok: false); return }
+                        reportOn = on; DailyReport.enabled = on; DailyReport.scheduleFallback()
+                        if on { toaster.show("بيوصلك تقرير كل يوم بعد ما يسكر المحل") }
+                    }
+                })) {
+                    row("bell.badge.fill", .good, "تقرير آخر اليوم", "إشعار بالمبيعات والمصاريف والصافي وكاش الدرج للمحلين")
+                }
+                if reportOn {
+                    DatePicker("وقت التقرير", selection: Binding(get: { reportTime }, set: { t in
+                        reportTime = t
+                        let c = Calendar.current.dateComponents([.hour, .minute], from: t)
+                        DailyReport.minute = (c.hour ?? 0) * 60 + (c.minute ?? 0)
+                        DailyReport.scheduleFallback()
+                    }), displayedComponents: .hourAndMinute)
+                }
+            } footer: {
+                Text("قبل ٦ الصبح يعني تقرير اليوم اللي قبله (مثلاً ١٢:٣٠ بالليل بعد ما يسكر كرك دوز). الآيفون يجيب الأرقام بالخلفية، فممكن يتأخر شوي.")
             }
             Section("على الموقع") {
                 let site = BizStore.shared.current.site

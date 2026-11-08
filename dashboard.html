@@ -390,12 +390,15 @@ function drawExp({ exps }) {
       <button class="btn ghost" type="button" id="xcancel" style="display:none">إلغاء التعديل</button>
       <div class="err" id="xerr" role="alert"></div>
     </form>
+    <h3 class="lal">مصاريف ثابتة كل شهر</h3>
+    <div class="card" id="recBox" style="display:grid;gap:12px;padding:18px"><p style="margin:0">جاري التحميل…</p></div>
     <h3 class="lal">السجل</h3>
     ${exps.length ? `<div class="tbl-wrap"><table>
       <thead><tr><th>التاريخ</th><th>النوع</th><th>المبلغ</th><th>ملاحظة</th><th></th><th></th></tr></thead>
       <tbody>${exps.map(r => `<tr><td class="num">${r.expense_date}</td><td>${esc(r.category)}</td><td class="num">${money(r.amount)}</td><td>${esc(r.note || '')}${r.paid_from === 'cash' ? ' <span class="pill">كاش</span>' : r.paid_from === 'custody' ? ' <span class="pill">من العهدة</span>' : ''}${r.receipt ? ` <a href="api/api.php?a=receipt&id=${r.id}" target="_blank" rel="noopener" style="font-weight:800">الفاتورة</a>` : ''}</td><td><button class="btn small ghost" type="button" data-xedit="${r.id}">تعديل</button></td><td><button class="del" data-del="expense:${r.id}" type="button">حذف</button></td></tr>`).join('')}</tbody>
       <tfoot><tr><td colspan="2">المجموع</td><td class="num">${money(total)}</td><td colspan="3"></td></tr></tfoot>
     </table></div>` : '<div class="card empty">ما فيه مصاريف مسجلة في هالفترة</div>'}`;
+  drawRecurring(cats);
   let editing = null;   // the expense being changed, or null when adding
   const stopEdit = () => { editing = null; $('#xsave').textContent = 'أضف'; $('#xcancel').style.display = 'none'; $('#xf').reset(); $('#xd').value = ymd(new Date()); };
   $('#xcancel').onclick = stopEdit;
@@ -434,6 +437,48 @@ function drawOrders({ orders }) {
 
 // ---------- settings ----------
 let lastSettings = null;
+/** Monthly expenses (rent, salaries…): added by themselves on their day each month. */
+async function drawRecurring(cats) {
+  const box = $('#recBox'); if (!box) return;
+  let rows;
+  try { rows = await api('recurring'); } catch { box.innerHTML = '<p style="margin:0">ما قدرت أحمّل.</p>'; return; }
+  let edit = null;
+  box.innerHTML = `
+    <p style="margin:0;line-height:1.7;font-weight:700">الإيجار والرواتب والكهرباء… تنضاف للمصاريف لحالها في يومها من كل شهر. لو تغيّر المبلغ عدّله هنا، ولو تغيّر في شهر واحد بس عدّل المصروف نفسه في السجل.</p>
+    ${rows.length ? `<div class="tbl-wrap"><table><thead><tr><th>النوع</th><th>المبلغ</th><th>اليوم</th><th>الدفع</th><th>ملاحظة</th><th>الحالة</th><th></th></tr></thead><tbody>
+      ${rows.map(r => `<tr><td>${esc(r.category)}</td><td class="num">${money(r.amount)}</td><td class="num">${r.day}</td><td>${PAID[r.paid_from] || ''}</td><td>${esc(r.note)}</td>
+        <td>${r.active ? '<span class="ok">شغال</span>' : '<span class="pill">موقف</span>'}</td>
+        <td><button class="btn small ghost" type="button" data-redit="${r.id}">تعديل</button> <button class="del" type="button" data-rdel="${r.id}">حذف</button></td></tr>`).join('')}</tbody></table></div>` : ''}
+    <form class="formrow" id="recF" style="padding:0">
+      <div class="field"><label for="rc">النوع</label><select id="rc">${cats.map(c => `<option>${esc(c)}</option>`).join('')}</select></div>
+      <div class="field"><label for="ra">المبلغ</label><input id="ra" type="number" step="0.001" min="0" required></div>
+      <div class="field"><label for="rd">يوم كم في الشهر</label><input id="rd" type="number" min="1" max="31" value="1" required></div>
+      <div class="field"><label for="rp2">الدفع</label><select id="rp2">${Object.entries(PAID).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+      <div class="field"><label for="rn">ملاحظة</label><input id="rn" maxlength="120" placeholder="مثلاً: راتب أحمد"></div>
+      <label id="rnowL" style="display:flex;gap:8px;align-items:center;font-weight:700;min-height:50px"><input type="checkbox" id="rnow" style="width:22px;height:22px"> سجّلها لهالشهر بعد</label>
+      <label id="ractL" style="display:none;gap:8px;align-items:center;font-weight:700;min-height:50px"><input type="checkbox" id="ract" checked style="width:22px;height:22px"> شغال</label>
+      <button class="btn" type="submit" id="rsave">أضف</button>
+      <button class="btn ghost" type="button" id="rcancel" style="display:none">إلغاء</button>
+      <div class="err" id="rerr2" role="status"></div>
+    </form>`;
+  const stop = () => { edit = null; $('#recF').reset(); $('#rd').value = 1; $('#rsave').textContent = 'أضف'; $('#rcancel').style.display = 'none'; $('#ractL').style.display = 'none'; $('#rnowL').style.display = 'flex'; };
+  $('#rcancel').onclick = stop;
+  box.querySelectorAll('[data-redit]').forEach(b => b.onclick = () => {
+    const r = rows.find(x => x.id === +b.dataset.redit); if (!r) return;
+    edit = r.id; $('#rc').value = r.category; $('#ra').value = r.amount.toFixed(3); $('#rd').value = r.day; $('#rp2').value = r.paid_from; $('#rn').value = r.note; $('#ract').checked = r.active;
+    $('#rsave').textContent = 'احفظ التعديل'; $('#rcancel').style.display = ''; $('#ractL').style.display = 'flex'; $('#rnowL').style.display = 'none';
+  });
+  box.querySelectorAll('[data-rdel]').forEach(b => b.onclick = async () => {
+    if (!confirm('تحذفه؟ المصاريف اللي انضافت قبل تظل.')) return;
+    try { await api('recurring_delete', { id: +b.dataset.rdel }); drawRecurring(cats); } catch (ex) { alert(msg(ex)); }
+  });
+  $('#recF').onsubmit = async e => {
+    e.preventDefault();
+    const body = { category: $('#rc').value, amount: +$('#ra').value, day: +$('#rd').value, paid_from: $('#rp2').value, note: $('#rn').value.trim() };
+    if (edit) Object.assign(body, { id: edit, active: $('#ract').checked }); else body.this_month = $('#rnow').checked;
+    try { await api('recurring_save', body); refresh(); } catch (ex) { $('#rerr2').textContent = msg(ex); }
+  };
+}
 /** Invoice reading: the owner pastes the Anthropic API key here (one key for both shops). */
 async function drawAi() {
   const box = $('#aiBox'); if (!box) return;

@@ -88,6 +88,7 @@ final class Live {
             schedule()
             let work = Task { @MainActor in
                 await Live.shared.refresh()
+                await DailyReport.check()
                 task.setTaskCompleted(success: true)
             }
             task.expirationHandler = { work.cancel() }

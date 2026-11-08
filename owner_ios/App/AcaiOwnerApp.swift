@@ -23,6 +23,7 @@ struct AcaiOwnerApp: App {
         }
         .onChange(of: phase) { _, p in
             if p == .background { Live.schedule() }
+            if p == .active { Task { @MainActor in await DailyReport.check(); DailyReport.scheduleFallback() } }
         }
     }
 }

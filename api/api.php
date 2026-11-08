@@ -5,6 +5,24 @@ require __DIR__ . '/loyalty.php';
 require __DIR__ . '/ext.php';
 require __DIR__ . '/receipt.php';
 register_shutdown_function('ext_after_request');
+register_shutdown_function('daily_jobs');
+
+/** Once a day (first request): add this month's repeating expenses whose day has come. */
+function daily_jobs(): void {
+    try {
+        if (setting('jobs_day', '') === date('Y-m-d')) return;
+        set_setting('jobs_day', date('Y-m-d'));
+        $month = date('Y-m'); $dom = (int)date('j'); $last = (int)date('t');
+        foreach (q("SELECT * FROM recurring_expenses WHERE active = 1 AND (last_month IS NULL OR last_month < ?)", [$month])->fetchAll() as $r) {
+            $d = min(max(1, (int)$r['day_of_month']), $last);
+            if ($dom < $d) continue;
+            q("INSERT INTO expenses (expense_date, category, amount, note, created_at, paid_from) VALUES (?,?,?,?,?,?)",
+              [sprintf('%s-%02d', $month, $d), $r['category'], $r['amount'], clean('شهري' . ($r['note'] ? ' · ' . $r['note'] : ''), 120), now(), $r['paid_from']]);
+            ext_emit('expense', (int)db()->lastInsertId(), 'created');
+            q('UPDATE recurring_expenses SET last_month = ? WHERE id = ?', [$month, (int)$r['id']]);
+        }
+    } catch (Throwable $e) { error_log('daily jobs: ' . $e->getMessage()); }
+}
 
 header('X-Content-Type-Options: nosniff');
 header('Referrer-Policy: same-origin');
@@ -476,6 +494,46 @@ case 'pos_expenses':  // staff: expenses entered at the till today (an invoice m
     $en = []; foreach (pos_expense_cats() as $v) $en[$v[1]] = $v[0];
     out(array_map(fn($r) => ['id' => (int)$r['id'], 'at' => $r['created_at'], 'date' => $r['expense_date'], 'receipt' => $r['receipt'] !== null, 'paid_from' => $r['paid_from'], 'cat' => $en[$r['category']] ?? $r['category'], 'amount' => (float)$r['amount'],
         'note' => trim((string)preg_replace('/^POS · [^·]*(· )?/u', '', (string)$r['note'])), 'by_user' => (string)($r['by_user'] ?? ''), 'mine' => (int)$r['created_by']], $rows));
+
+case 'recurring':  // owner: the monthly expenses
+    need('owner');
+    out(array_map(fn($r) => ['id' => (int)$r['id'], 'category' => $r['category'], 'amount' => (float)$r['amount'], 'day' => (int)$r['day_of_month'],
+        'note' => (string)($r['note'] ?? ''), 'paid_from' => $r['paid_from'], 'active' => (bool)(int)$r['active'], 'last_month' => $r['last_month']],
+        q('SELECT * FROM recurring_expenses ORDER BY day_of_month, id')->fetchAll()));
+
+case 'recurring_save':  // owner: add or change one (id given = change)
+    $post(); need('owner');
+    $cat = clean($in['category'] ?? '', 60); if ($cat === '') fail('bad_category');
+    $amt = round((float)($in['amount'] ?? 0), 3); if ($amt <= 0 || $amt > 100000) fail('bad_amount');
+    $day = max(1, min(31, (int)($in['day'] ?? 1)));
+    $vals = [$cat, money($amt), $day, clean($in['note'] ?? '', 120) ?: null, paid_from($in['paid_from'] ?? null, 'bank'), empty($in['active']) && isset($in['active']) ? 0 : 1];
+    if (!empty($in['id'])) q('UPDATE recurring_expenses SET category = ?, amount = ?, day_of_month = ?, note = ?, paid_from = ?, active = ? WHERE id = ?', [...$vals, (int)$in['id']]);
+    else {
+        // Starting this month only if its day is still ahead (no surprise entry for a day already gone)
+        $start = (int)date('j') >= min($day, (int)date('t')) && empty($in['this_month']) ? date('Y-m') : null;
+        q('INSERT INTO recurring_expenses (category, amount, day_of_month, note, paid_from, active, last_month, created_at) VALUES (?,?,?,?,?,?,?,?)', [...$vals, $start, now()]);
+    }
+    set_setting('jobs_day', '');   // run the check again on the next request
+    out(['ok' => true]);
+
+case 'recurring_delete':
+    $post(); need('owner');
+    q('DELETE FROM recurring_expenses WHERE id = ?', [(int)($in['id'] ?? 0)]);
+    out(['ok' => true]);
+
+case 'day_report':  // owner: one business day in numbers, for the end-of-day notification
+    need('owner');
+    $day = valid_date($_GET['day'] ?? date('Y-m-d'));
+    $d = ext_day($day);
+    $bp = (array)$d['by_payment']; $cashIn = (float)($bp['cash'] ?? 0);
+    $cashOut = (float)(q("SELECT COALESCE(SUM(amount), 0) s FROM expenses WHERE expense_date = ? AND paid_from = 'cash'", [$day])->fetch()['s'] ?? 0);
+    $top = [];
+    foreach (q("SELECT items FROM orders WHERE day = ? AND status <> 'cancelled'", [$day])->fetchAll() as $o)
+        foreach (json_decode($o['items'], true) ?: [] as $it) { $n = preg_replace('/ · .*$/', '', (string)($it['name_ar'] ?? '')); $top[$n] = ($top[$n] ?? 0) + (int)($it['qty'] ?? 0); }
+    arsort($top);
+    out(['biz' => BIZ, 'day' => $day, 'orders' => $d['orders'], 'sales' => $d['sales'], 'commission' => $d['commission'], 'expenses' => $d['expenses_total'],
+         'net' => $d['net'], 'cash_expected' => money($cashIn - $cashOut), 'by_payment' => $d['by_payment'],
+         'top' => array_map(fn($k, $v) => ['name' => $k, 'qty' => $v], array_slice(array_keys($top), 0, 3), array_slice(array_values($top), 0, 3))]);
 
 case 'float_status':  // staff / buyer: the money the owner handed me and what is left
     $u = need('staff');

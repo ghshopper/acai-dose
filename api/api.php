@@ -6,6 +6,19 @@ require __DIR__ . '/ext.php';
 require __DIR__ . '/receipt.php';
 register_shutdown_function('ext_after_request');
 register_shutdown_function('daily_jobs');
+register_shutdown_function('invoice_after_request');
+
+/** After the response: read invoices that are waiting (staff don't wait for it). */
+function invoice_after_request(): void {
+    try {
+        if (empty($GLOBALS['invoice_new']) && mt_rand(1, 20) !== 1) return;
+        if (!q("SELECT 1 FROM invoices WHERE status = 'pending' LIMIT 1")->fetch()) return;
+        if (function_exists('litespeed_finish_request')) litespeed_finish_request();
+        elseif (function_exists('fastcgi_finish_request')) fastcgi_finish_request();
+        ignore_user_abort(true); @set_time_limit(400);
+        invoice_jobs(3);
+    } catch (Throwable $e) { error_log('invoice jobs: ' . $e->getMessage()); }
+}
 
 /** Once a day (first request): add this month's repeating expenses whose day has come. */
 function daily_jobs(): void {
@@ -131,7 +144,7 @@ function float_of(int $uid): array {
     return ['given' => money($given), 'spent' => money($spent), 'balance' => money($given - $spent)];
 }
 /** What a buyer account (expenses only) may call. */
-const BUYER_ACTIONS = ['me', 'login', 'logout', 'pos_config', 'pos_expense', 'pos_expenses', 'pos_expense_void', 'pos_invoice_read', 'receipt', 'float_status'];
+const BUYER_ACTIONS = ['me', 'login', 'logout', 'pos_config', 'pos_expense', 'pos_expenses', 'pos_expense_void', 'pos_invoice_read', 'receipt', 'float_status', 'invoice_upload', 'my_invoices', 'invoice_photo'];
 function clean_client_id($v): string { return preg_match('/^[a-zA-Z0-9-]{8,40}$/', (string)$v) ? (string)$v : ''; }
 function shop_cats(): array { return json_decode(setting('categories', '[]'), true) ?: []; }
 const STATUSES = ['new', 'preparing', 'ready', 'done', 'cancelled'];
@@ -489,10 +502,10 @@ case 'pos_expense':   // staff: money paid from the till's cash (milk, gas, taxi
 
 case 'pos_expenses':  // staff: expenses entered at the till today (an invoice may carry an earlier date)
     need('staff');
-    $rows = q("SELECT e.id, e.created_at, e.expense_date, e.category, e.amount, e.note, e.created_by, e.paid_from, e.receipt, u.username AS by_user FROM expenses e LEFT JOIN users u ON u.id = e.created_by
+    $rows = q("SELECT e.id, e.created_at, e.expense_date, e.category, e.amount, e.note, e.created_by, e.paid_from, e.receipt, e.invoice_id, u.username AS by_user FROM expenses e LEFT JOIN users u ON u.id = e.created_by
                WHERE (e.expense_date = ? OR e.created_at >= ?) AND e.created_by IS NOT NULL ORDER BY e.id DESC", [date('Y-m-d'), date('Y-m-d') . ' 00:00:00'])->fetchAll();
     $en = []; foreach (pos_expense_cats() as $v) $en[$v[1]] = $v[0];
-    out(array_map(fn($r) => ['id' => (int)$r['id'], 'at' => $r['created_at'], 'date' => $r['expense_date'], 'receipt' => $r['receipt'] !== null, 'paid_from' => $r['paid_from'], 'cat' => $en[$r['category']] ?? $r['category'], 'amount' => (float)$r['amount'],
+    out(array_map(fn($r) => ['id' => (int)$r['id'], 'at' => $r['created_at'], 'date' => $r['expense_date'], 'receipt' => $r['receipt'] !== null, 'from_invoice' => $r['invoice_id'] !== null, 'paid_from' => $r['paid_from'], 'cat' => $en[$r['category']] ?? $r['category'], 'amount' => (float)$r['amount'],
         'note' => trim((string)preg_replace('/^POS · [^·]*(· )?/u', '', (string)$r['note'])), 'by_user' => (string)($r['by_user'] ?? ''), 'mine' => (int)$r['created_by']], $rows));
 
 case 'recurring':  // owner: the monthly expenses
@@ -569,6 +582,71 @@ case 'ai_key_save':  // owner: paste the Anthropic API key ('' turns invoice rea
     if ($k !== '' && (!preg_match('/^sk-ant-[A-Za-z0-9_\-]{20,200}$/', $k) || !ai_key_works($k))) fail('bad_key');
     ai_key_set($k);
     out(['ok' => true, 'on' => $k !== '']);
+
+case 'invoice_upload':  // staff / buyer: just the photo (and how it was paid); the lines are read and split on the server
+    $post(); $u = need('staff');
+    $cid = clean_client_id($in['client_id'] ?? '');
+    if ($cid !== '' && ($dup = q('SELECT id FROM invoices WHERE client_id = ?', [$cid])->fetch())) out(['ok' => true, 'id' => (int)$dup['id']]);
+    rate_limit('invoice', 80, 3600);
+    $name = receipt_save((string)($in['image'] ?? ''));
+    q('INSERT INTO invoices (receipt, uploaded_by, paid_from, note, status, client_id, created_at) VALUES (?,?,?,?,?,?,?)',
+      [$name, (int)$u['id'], paid_from($in['paid_from'] ?? null, $u['role'] === 'buyer' ? 'custody' : 'cash'), clean($in['note'] ?? '', 120) ?: null, 'pending', $cid ?: null, now()]);
+    $GLOBALS['invoice_new'] = true;
+    out(['ok' => true, 'id' => (int)db()->lastInsertId(), 'ai_on' => ai_key() !== '']);
+
+case 'my_invoices':  // staff / buyer: invoices uploaded in the last 3 days (theirs; the owner sees all)
+    $u = need('staff');
+    $rows = q("SELECT i.*, u.username AS by_user FROM invoices i LEFT JOIN users u ON u.id = i.uploaded_by WHERE i.created_at >= ?" . ($u['role'] === 'owner' ? '' : ' AND i.uploaded_by = ' . (int)$u['id']) . ' ORDER BY i.id DESC LIMIT 50',
+              [date('Y-m-d', strtotime('-3 days')) . ' 00:00:00'])->fetchAll();
+    out(array_map(fn($r) => invoice_out($r, $r['status'] === 'done'), $rows));
+
+case 'invoices':  // owner: invoices in a period, with their lines and how they were split
+    need('owner');
+    $f = valid_date($_GET['from'] ?? date('Y-m-d', strtotime('-30 days'))); $t = valid_date($_GET['to'] ?? date('Y-m-d'));
+    $rows = q("SELECT i.*, u.username AS by_user FROM invoices i LEFT JOIN users u ON u.id = i.uploaded_by
+               WHERE COALESCE(i.invoice_date, DATE(i.created_at)) BETWEEN ? AND ? OR i.status IN ('pending','reading','review') ORDER BY i.id DESC LIMIT 300", [$f, $t])->fetchAll();
+    out(['ai_on' => ai_key() !== '', 'groups' => array_map(fn($k, $v) => ['k' => $k, 'ar' => $v[0]], array_keys(item_groups()), item_groups()),
+         'invoices' => array_map(fn($r) => invoice_out($r, true), $rows)]);
+
+case 'invoice_item_group':  // owner: a line was put in the wrong kind → move it and split the invoice again
+    $post(); need('owner');
+    $g = (string)($in['group'] ?? ''); if (!isset(item_groups()[$g])) fail('bad_category');
+    $it = q('SELECT invoice_id FROM invoice_items WHERE id = ?', [(int)($in['id'] ?? 0)])->fetch() ?: fail('not_found', 404);
+    q('UPDATE invoice_items SET grp = ? WHERE id = ?', [$g, (int)$in['id']]);
+    invoice_rebuild((int)$it['invoice_id']);
+    out(['ok' => true]);
+
+case 'invoice_save':  // owner: fix the header (total, date, shop, how it was paid) and split again
+    $post(); need('owner');
+    $id = (int)($in['id'] ?? 0); q('SELECT id FROM invoices WHERE id = ?', [$id])->fetch() ?: fail('not_found', 404);
+    $tot = round((float)($in['total'] ?? 0), 3);
+    q('UPDATE invoices SET vendor = ?, invoice_date = ?, total = ?, paid_from = ? WHERE id = ?',
+      [clean($in['vendor'] ?? '', 60) ?: null, valid_date($in['date'] ?? date('Y-m-d')), $tot > 0 ? money($tot) : null, paid_from($in['paid_from'] ?? null, 'cash'), $id]);
+    invoice_rebuild($id);
+    out(['ok' => true]);
+
+case 'invoice_retry':  // owner: read it again (e.g. after adding the key)
+    $post(); need('owner');
+    q("UPDATE invoices SET status = 'pending', tries = 0, error = NULL WHERE id = ?", [(int)($in['id'] ?? 0)]);
+    $GLOBALS['invoice_new'] = true;
+    out(['ok' => true]);
+
+case 'invoice_delete':  // owner: the invoice, its lines and its expenses
+    $post(); need('owner');
+    $id = (int)($in['id'] ?? 0);
+    q('DELETE FROM invoice_items WHERE invoice_id = ?', [$id]);
+    invoice_rebuild($id);   // no lines left: removes its expenses
+    q('DELETE FROM invoices WHERE id = ?', [$id]);
+    out(['ok' => true]);
+
+case 'invoice_photo':  // the photo of an invoice (owner, or the person who uploaded it)
+    $u = need('staff');
+    $i = q('SELECT receipt, uploaded_by FROM invoices WHERE id = ?', [(int)($_GET['id'] ?? 0)])->fetch();
+    if (!$i || ($u['role'] !== 'owner' && (int)$i['uploaded_by'] !== (int)$u['id']) || !receipt_name_ok($i['receipt']) || !is_file($p = receipt_path($i['receipt']))) fail('not_found', 404);
+    header('Content-Type: ' . ['jpg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp'][pathinfo($p, PATHINFO_EXTENSION)]);
+    header('Cache-Control: private, max-age=86400'); header('X-Content-Type-Options: nosniff');
+    readfile($p);
+    exit;
 
 case 'pos_invoice_read':  // staff: photo of an invoice → saved, and read by Claude to fill the expense form
     $post(); need('staff');

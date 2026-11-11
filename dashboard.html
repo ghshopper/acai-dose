@@ -150,6 +150,8 @@ const CATS = /^\/karak(\/|$)/.test(location.pathname)
   ? ['مواد خام', 'خبز ومعجنات', 'أكواب وتغليف', 'رواتب', 'إيجار', 'كهرباء وماء وغاز', 'مواد تنظيف', 'مواصلات', 'تسويق وإعلانات', 'صيانة', 'معدات وأجهزة (مرة وحدة)', 'أخرى']
   : ['مواد خام (آساي وفواكه)', 'أكواب وتغليف', 'رواتب', 'إيجار', 'كهرباء وماء', 'مواد تنظيف', 'مواصلات', 'تسويق وإعلانات', 'صيانة', 'معدات وأجهزة (مرة وحدة)', 'أخرى'];
 const PAID = { bank: 'تحويل', cash: 'كاش', custody: 'من العهدة' };
+// Kinds that invoice lines are sorted into (also usable by hand)
+CATS.push(...['حليب', 'أجبان وألبان', 'شاي', 'هيل وبهارات', 'سكر وعسل', 'قهوة وكاكاو', 'بيض', 'طحين', 'زيوت', 'صلصات وأجبان دهن', 'لحوم ودجاج', 'خضار', 'أساي', 'فواكه', 'توبينق ومكسرات', 'بروتين', 'مشروبات غازية وعصائر', 'ماء وثلج', 'سناكات ونودلز', 'غاز'].filter(c => !CATS.includes(c)));
 
 app.innerHTML = `
 <div class="shell">
@@ -160,6 +162,7 @@ app.innerHTML = `
     <button role="tab" aria-selected="true" data-t="sum"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>الملخص</span></button>
     <button role="tab" aria-selected="false" data-t="apps"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg><span>إدخال يدوي للتطبيقات</span></button>
     <button role="tab" aria-selected="false" data-t="exp"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span>المصاريف</span></button>
+    <button role="tab" aria-selected="false" data-t="inv"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg><span>الفواتير</span></button>
     <button role="tab" aria-selected="false" data-t="cost"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h18M6 7v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7M9 7V4h6v3M10 11v6M14 11v6"/></svg><span>التكلفة والمخزون</span></button>
     <button role="tab" aria-selected="false" data-t="orders"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg><span>كل الطلبات</span></button>
     <button role="tab" aria-selected="false" data-t="cust"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M16 4a4 4 0 0 1 0 8M22 21c0-3-2-5-4-5.5"/></svg><span>العملاء</span></button>
@@ -192,6 +195,7 @@ app.innerHTML = `
   <section data-panel="apps" class="hidden"></section>
   <section data-panel="exp" class="hidden"></section>
   <section data-panel="orders" class="hidden"></section>
+  <section data-panel="inv" class="hidden"></section>
   <section data-panel="cost" class="hidden"></section>
   <section data-panel="cust" class="hidden"></section>
   <section data-panel="data" class="hidden"></section>
@@ -245,6 +249,7 @@ async function refresh() {
   if (tab === 'data') return drawData();
   if (tab === 'cust') return drawCustomers();
   if (tab === 'cost') return drawCost();
+  if (tab === 'inv') return drawInvoices();
   const d = await fetchAll();
   ({ sum: drawSum, apps: drawApps, exp: drawExp, orders: drawOrders })[tab](d);
 }
@@ -437,6 +442,80 @@ function drawOrders({ orders }) {
 
 // ---------- settings ----------
 let lastSettings = null;
+/** Invoices staff photographed: read on the server into lines, sorted by kind (milk, tea…), one expense per kind. */
+async function drawInvoices() {
+  const box = $('[data-panel="inv"]');
+  let d;
+  try { d = await api('invoices', undefined, { from, to }); } catch (ex) { box.innerHTML = `<div class="card empty">${esc(msg(ex))}</div>`; return; }
+  const G = Object.fromEntries(d.groups.map(g => [g.k, g.ar]));
+  const done = d.invoices.filter(i => i.status === 'done');
+  // Spend by kind over the period (from the lines, scaled to each invoice's total)
+  const byG = {};
+  for (const i of done) {
+    const sum = i.items.reduce((s, x) => s + x.amount, 0), k = i.total && sum ? i.total / sum : 1;
+    for (const x of i.items) { const g = byG[x.group] ||= { amt: 0, names: {} }; g.amt += x.amount * k; g.names[x.name_ar || x.name] = 1; }
+  }
+  const gs = Object.entries(byG).sort((a, b) => b[1].amt - a[1].amt);
+  const gTotal = gs.reduce((s, [, v]) => s + v.amt, 0);
+  const ST = { pending: ['wait', 'ينتظر القراءة'], reading: ['wait', 'قاعد يقرا…'], review: ['bad', 'ما انقرت · راجعها'], done: ['ok', 'انقرت وانقسمت'] };
+  box.innerHTML = `
+    ${d.ai_on ? '' : '<div class="card" style="padding:16px;font-weight:700">قراءة الفواتير مطفية. حط مفتاح Anthropic من الإعدادات ← قراءة الفواتير، وبعدها اضغط «اقرا مرة ثانية» على الفواتير اللي تنتظر.</div>'}
+    <h3 class="lal">المشتريات حسب الصنف</h3>
+    ${gs.length ? `<div class="card" style="padding:18px;display:grid;gap:10px">${gs.map(([k, v]) => `
+      <div><div style="display:flex;justify-content:space-between;font-weight:800"><span>${esc(G[k] || k)}</span><span class="num">${money(v.amt)}</span></div>
+      <div style="height:8px;border-radius:4px;background:var(--c2);margin:6px 0"><div style="height:8px;border-radius:4px;background:var(--p);width:${gTotal ? (v.amt / gTotal * 100).toFixed(1) : 0}%"></div></div>
+      <div style="font-size:13px;opacity:.7">${esc(Object.keys(v.names).slice(0, 6).join('، '))}</div></div>`).join('')}</div>` : '<div class="card empty">ما فيه فواتير مقروءة في هالفترة</div>'}
+    <h3 class="lal">الفواتير <small style="font-size:15px;opacity:.7">${d.invoices.length}</small></h3>
+    ${d.invoices.map(i => `
+      <div class="card" style="padding:18px;margin-bottom:14px;display:grid;gap:12px" data-inv="${i.id}">
+        <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+          <a href="api/api.php?a=invoice_photo&id=${i.id}" target="_blank" rel="noopener"><img src="api/api.php?a=invoice_photo&id=${i.id}" alt="صورة الفاتورة" loading="lazy" style="width:110px;height:150px;object-fit:cover;border-radius:12px;background:#eee"></a>
+          <div style="flex:1;min-width:240px;display:grid;gap:6px">
+            <div style="font-weight:900;font-size:20px">${i.total != null ? money(i.total) + ' ر.ع' : 'فاتورة'} ${i.vendor ? '· ' + esc(i.vendor) : ''}</div>
+            <div style="opacity:.75;font-weight:600">${esc(i.date || String(i.created_at).slice(0, 10))}${i.invoice_no ? ' · رقم ' + esc(i.invoice_no) : ''}${i.vat ? ' · ضريبة ' + money(i.vat) : ''} · ${PAID[i.paid_from] || ''} · رفعها ${esc(i.by_user || '')}${i.note ? ' · ' + esc(i.note) : ''}</div>
+            <div><span class="pill" style="${ST[i.status][0] === 'bad' ? 'background:#FBEBEB;color:var(--bad)' : ST[i.status][0] === 'ok' ? 'background:#E5F4E4;color:#1E6B34' : ''}">${ST[i.status][1]}</span>${i.error && i.status === 'review' ? ` <small style="opacity:.6">${esc(i.error)}</small>` : ''}</div>
+            ${i.split && i.split.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px">${i.split.map(x => `<span class="pill">${esc(x.category)} ${money(x.amount)}</span>`).join('')}</div>` : ''}
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            ${i.items && i.items.length ? `<button class="btn small ghost" type="button" data-open="${i.id}">الأصناف (${i.items.length})</button>` : ''}
+            <button class="btn small ghost" type="button" data-hdr="${i.id}">عدّل</button>
+            ${i.status !== 'done' || true ? `<button class="btn small ghost" type="button" data-retry="${i.id}">اقرا مرة ثانية</button>` : ''}
+            <button class="del" type="button" data-idel="${i.id}">حذف</button>
+          </div>
+        </div>
+        <form class="formrow hidden" data-hform="${i.id}" style="padding:0">
+          <div class="field"><label>المحل</label><input name="vendor" value="${esc(i.vendor)}" maxlength="60"></div>
+          <div class="field"><label>التاريخ</label><input name="date" type="date" value="${esc(i.date || String(i.created_at).slice(0, 10))}"></div>
+          <div class="field"><label>الإجمالي</label><input name="total" type="number" step="0.001" min="0" value="${i.total ?? ''}"></div>
+          <div class="field"><label>الدفع</label><select name="paid_from">${Object.entries(PAID).map(([k, v]) => `<option value="${k}" ${k === i.paid_from ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
+          <button class="btn" type="submit">احفظ وقسّم</button>
+        </form>
+        ${i.items && i.items.length ? `<div class="tbl-wrap hidden" data-items="${i.id}"><table><thead><tr><th>الصنف</th><th>الكمية</th><th>المبلغ</th><th>النوع</th></tr></thead><tbody>
+          ${i.items.map(x => `<tr><td><b>${esc(x.name_ar || '')}</b><br><small dir="ltr" style="opacity:.6">${esc(x.name)}</small></td><td class="num">${+x.qty}${x.unit ? ' · ' + esc(x.unit) : ''}</td><td class="num">${money(x.amount)}</td>
+            <td><select data-grp="${x.id}">${d.groups.map(g => `<option value="${g.k}" ${g.k === x.group ? 'selected' : ''}>${esc(g.ar)}</option>`).join('')}</select></td></tr>`).join('')}
+        </tbody></table></div>` : ''}
+      </div>`).join('') || '<div class="card empty">ما فيه فواتير</div>'}`;
+  box.querySelectorAll('[data-open]').forEach(b => b.onclick = () => box.querySelector(`[data-items="${b.dataset.open}"]`).classList.toggle('hidden'));
+  box.querySelectorAll('[data-hdr]').forEach(b => b.onclick = () => box.querySelector(`[data-hform="${b.dataset.hdr}"]`).classList.toggle('hidden'));
+  box.querySelectorAll('[data-hform]').forEach(f => f.onsubmit = async e => {
+    e.preventDefault();
+    const v = Object.fromEntries(new FormData(f));
+    try { await api('invoice_save', { id: +f.dataset.hform, vendor: v.vendor, date: v.date, total: +v.total, paid_from: v.paid_from }); drawInvoices(); } catch (ex) { alert(msg(ex)); }
+  });
+  box.querySelectorAll('[data-grp]').forEach(sel => sel.onchange = async () => {
+    try { await api('invoice_item_group', { id: +sel.dataset.grp, group: sel.value }); drawInvoices(); } catch (ex) { alert(msg(ex)); }
+  });
+  box.querySelectorAll('[data-retry]').forEach(b => b.onclick = async () => {
+    if (!confirm('تقرا الفاتورة مرة ثانية؟ التقسيم الحالي بيتغير.')) return;
+    try { await api('invoice_retry', { id: +b.dataset.retry }); setTimeout(drawInvoices, 1500); } catch (ex) { alert(msg(ex)); }
+  });
+  box.querySelectorAll('[data-idel]').forEach(b => b.onclick = async () => {
+    if (!confirm('تحذف الفاتورة ومصاريفها؟')) return;
+    try { await api('invoice_delete', { id: +b.dataset.idel }); drawInvoices(); } catch (ex) { alert(msg(ex)); }
+  });
+  clearTimeout(drawInvoices.t);
+  if (d.invoices.some(i => i.status === 'pending' || i.status === 'reading')) drawInvoices.t = setTimeout(() => { if (tab === 'inv') drawInvoices(); }, 8000);
+}
 /** Monthly expenses (rent, salaries…): added by themselves on their day each month. */
 async function drawRecurring(cats) {
   const box = $('#recBox'); if (!box) return;

@@ -65,6 +65,15 @@ function create_schema(): void {
         "CREATE TABLE IF NOT EXISTS recurring_expenses (
             id $id, category VARCHAR(60) NOT NULL, amount DECIMAL(10,3) NOT NULL, day_of_month INT NOT NULL DEFAULT 1, note VARCHAR(120) NULL,
             paid_from VARCHAR(8) NOT NULL DEFAULT 'bank', active TINYINT NOT NULL DEFAULT 1, last_month VARCHAR(7) NULL, created_at DATETIME NOT NULL)$eng",
+        // Invoice photos staff upload; read in the background into lines, then split into one expense per kind (milk, tea…)
+        "CREATE TABLE IF NOT EXISTS invoices (
+            id $id, receipt VARCHAR(48) NOT NULL, uploaded_by INT NULL, paid_from VARCHAR(8) NOT NULL DEFAULT 'cash', note VARCHAR(120) NULL,
+            status VARCHAR(10) NOT NULL DEFAULT 'pending', vendor VARCHAR(60) NULL, invoice_no VARCHAR(30) NULL, invoice_date DATE NULL,
+            total DECIMAL(10,3) NULL, vat DECIMAL(10,3) NULL, error VARCHAR(160) NULL, tries INT NOT NULL DEFAULT 0, client_id VARCHAR(40) NULL,
+            created_at DATETIME NOT NULL, processed_at DATETIME NULL)$eng",
+        "CREATE TABLE IF NOT EXISTS invoice_items (
+            id $id, invoice_id INT NOT NULL, name VARCHAR(120) NOT NULL, name_ar VARCHAR(80) NULL, qty DECIMAL(10,3) NOT NULL DEFAULT 1,
+            unit VARCHAR(40) NULL, amount DECIMAL(10,3) NOT NULL, grp VARCHAR(20) NOT NULL)$eng",
         "CREATE TABLE IF NOT EXISTS wallet_regs (device_id VARCHAR(100) NOT NULL, serial VARCHAR(40) NOT NULL, created_at DATETIME NOT NULL, PRIMARY KEY (device_id, serial))$eng",
     ];
     foreach ($sql as $s) xq($s);
@@ -97,7 +106,7 @@ function create_schema(): void {
     // Expenses the staff enter at the till: who, paid from the till's cash, and the device's id (so an offline retry is not saved twice)
     $have = [];
     foreach (q(is_mysql() ? 'SHOW COLUMNS FROM expenses' : 'PRAGMA table_info(expenses)')->fetchAll() as $c) $have[] = $c['Field'] ?? $c['name'];
-    foreach (["created_by INT NULL", "client_id VARCHAR(40) NULL", "paid_from VARCHAR(8) NOT NULL DEFAULT 'bank'", "receipt VARCHAR(48) NULL"] as $def) {
+    foreach (["created_by INT NULL", "client_id VARCHAR(40) NULL", "paid_from VARCHAR(8) NOT NULL DEFAULT 'bank'", "receipt VARCHAR(48) NULL", "invoice_id INT NULL"] as $def) {
         $name = strtok($def, ' ');
         if (!in_array($name, $have, true)) xq("ALTER TABLE expenses ADD COLUMN $def");
     }

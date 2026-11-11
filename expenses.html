@@ -46,6 +46,18 @@ input[type=text],input[type=number],input[type=date],input:not([type]){width:100
 .lnk{background:none;border:0;color:var(--bad);font-weight:800;cursor:pointer;min-height:40px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ok);color:#fff;font-weight:800;font-size:18px;padding:14px 24px;border-radius:999px;z-index:99;box-shadow:0 10px 30px rgba(0,0,0,.25);max-width:calc(100% - 32px);text-align:center}
 .toast.warn{background:#B26A00}
+.inv{background:#fff;border-radius:16px;padding:14px;display:flex;gap:12px;align-items:flex-start;margin-bottom:10px}
+.inv img{width:64px;height:84px;object-fit:cover;border-radius:10px;background:#eee;flex:none}
+.inv .m{flex:1;min-width:0}
+.inv b{display:block;font-size:17px}
+.inv span{opacity:.7;font-size:14px}
+.st{display:inline-flex;align-items:center;gap:6px;font-weight:800;font-size:14px;border-radius:999px;padding:4px 10px;margin-top:6px}
+.st.wait{background:#FFF4E0;color:#7A4A00} .st.ok{background:#E5F4E4;color:#1E6B34} .st.bad{background:#FBEBEB;color:#9B2C2C}
+.split{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.split i{font-style:normal;background:var(--c2);border-radius:8px;padding:3px 8px;font-size:13px;font-weight:700}
+details.card summary{font-weight:800;font-size:19px;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center}
+details.card summary::after{content:'+';font-size:26px} details.card[open] summary::after{content:'−'}
+textarea{width:100%;min-height:52px;border:2px solid var(--l);border-radius:12px;padding:10px 12px;font-size:17px;font-family:inherit;box-sizing:border-box}
 </style>
 <script>
 (function(){var shown=false;function show(t){if(shown)return;shown=true;var d=document.createElement('div');d.style.cssText='position:fixed;inset:auto 12px 12px 12px;z-index:99999;background:#393939;color:#fff;padding:14px;border-radius:14px;font:600 15px system-ui';d.textContent='Problem: '+t;document.body.appendChild(d)}
@@ -64,15 +76,14 @@ const me = await requireLogin(app, 'Expenses', true);
 
 const store = {
   get(k, d) { try { const v = localStorage.getItem('exp_' + k); return v ? JSON.parse(v) : d; } catch { return d; } },
-  set(k, v) { try { localStorage.setItem('exp_' + k, JSON.stringify(v)); } catch { /* private mode */ } },
+  set(k, v) { try { localStorage.setItem('exp_' + k, JSON.stringify(v)); return true; } catch { return false; } },
 };
 const cid = () => [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join('');
 const two = n => String(n).padStart(2, '0');
 const stamp = (d = new Date()) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())} ${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`;
 const today = () => stamp().slice(0, 10);
-const minDay = () => stamp(new Date(Date.now() - 60 * 86400000)).slice(0, 10);
 function toast(t, warn) { const d = document.createElement('div'); d.className = 'toast' + (warn ? ' warn' : ''); d.setAttribute('role', 'status'); d.textContent = t; document.body.append(d); setTimeout(() => d.remove(), 3500); }
-const ERR = { bad_amount: 'Amount must be more than 0 and up to 500', bad_category: 'Pick what it was for', need_note: 'Write what it was for', bad_image: 'That photo could not be used, take it again', too_many: 'Too many photos this hour, type it in instead' };
+const ERR = { bad_amount: 'Amount must be more than 0 and up to 500', bad_category: 'Pick what it was for', need_note: 'Write what it was for', bad_image: 'That photo could not be used, take it again', too_many: 'Too many photos this hour, try later' };
 const errText = ex => ERR[ex && ex.message] || msgEn(ex);
 
 let cfg = store.get('cfg', { expense_cats: [] });
@@ -81,7 +92,10 @@ const catName = k => (cfg.expense_cats.find(c => c.k === k) || {}).en || k;
 // A buyer (shops for supplies) pays from the till's cash or from the money the owner sent them (their float)
 const BUYER = me.role === 'buyer';
 const PAYS = BUYER ? [['custody', 'From my float'], ['cash', 'Cash from till']] : [['cash', 'Cash from till'], ['bank', 'Bank transfer']];
-const payName = k => ({ custody: 'Float', bank: 'Transfer', cash: '' })[k] || '';
+const payName = k => ({ custody: 'Float', bank: 'Transfer', cash: 'Cash' })[k] || '';
+const seg = id => `<div class="seg" id="${id}">${PAYS.map(([k, l], i) => `<button type="button" data-p="${k}" aria-pressed="${i === 0}">${l}</button>`).join('')}</div>`;
+const segVal = id => ($(`#${id} [aria-pressed=true]`) || {}).dataset?.p || PAYS[0][0];
+function wireSeg(id) { $$(`#${id} [data-p]`).forEach(b => b.onclick = () => $$(`#${id} [data-p]`).forEach(x => x.setAttribute('aria-pressed', x === b))); }
 
 app.innerHTML = `
 <header class="topbar">
@@ -92,9 +106,10 @@ app.innerHTML = `
   </div>
 </header>
 <main>
-  ${BUYER ? '<section class="card" id="float" style="background:var(--p);color:var(--c)"><div style="opacity:.8;font-weight:700">Money with you (float)</div><div style="font-size:34px;font-weight:900" id="fbal">…</div><div style="opacity:.75;font-weight:600" id="fsub"></div></section>' : ''}
+  ${BUYER ? '<section class="card" style="background:var(--p);color:var(--c)"><div style="opacity:.8;font-weight:700">Money with you (float)</div><div style="font-size:34px;font-weight:900" id="fbal">…</div><div style="opacity:.75;font-weight:600" id="fsub"></div></section>' : ''}
   <section class="card">
-    <h2>New expense</h2>
+    <h2>Add an invoice</h2>
+    <p style="margin:0 0 12px;font-weight:600;opacity:.75">Just the photo. Every line is read and sorted (milk, tea, drinks…) for you.</p>
     <div class="shots">
       <label class="shot">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
@@ -103,37 +118,112 @@ app.innerHTML = `
       </label>
       <label class="shot">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-        Upload a photo
-        <input class="photo" type="file" accept="image/*" hidden>
+        Upload photos
+        <input class="photo" type="file" accept="image/*" multiple hidden>
       </label>
     </div>
-    <p style="margin:8px 2px 0;font-weight:600;opacity:.65;font-size:14px;text-align:center">Photo of the invoice from the camera or the gallery. The details are read for you; check them, then save.</p>
-    <div id="pic" style="display:none;margin-top:12px"></div>
-    <form id="f" novalidate>
+    <label class="f">Paid by</label>
+    ${seg('ipay')}
+    <label class="f" for="inote">Note <span style="opacity:.6;font-weight:600">(optional)</span></label>
+    <input id="inote" maxlength="120" placeholder="e.g. weekly shopping">
+    <p style="margin:10px 2px 0;font-weight:600;opacity:.65;font-size:14px">Pick “Paid by” and the note first, then the photo. Several photos = several invoices.</p>
+  </section>
+  <section>
+    <h2 style="margin:4px 4px 10px">Your invoices <small style="font-size:14px;opacity:.7">last 3 days</small></h2>
+    <div id="invs"></div>
+  </section>
+  <details class="card">
+    <summary>No invoice? Add it by hand</summary>
+    <form id="f" novalidate style="margin-top:8px">
       <label class="f">What was it for?</label>
       <div class="chips" id="cats"></div>
-      <label class="f" for="amt">Total amount (OMR)</label>
+      <label class="f" for="amt">Amount (OMR)</label>
       <input id="amt" class="amt" type="number" step="0.001" min="0" max="500" inputmode="decimal" placeholder="0.000">
-      <label class="f" for="day">Invoice date</label>
-      <input id="day" type="date">
-      <label class="f" for="note">Shop and what was bought <span id="req" style="opacity:.6;font-weight:600">(optional)</span></label>
-      <input id="note" maxlength="80" placeholder="e.g. Al Maha · 2 boxes of milk">
+      <label class="f" for="note">What was it <span id="req" style="opacity:.6;font-weight:600">(optional)</span></label>
+      <input id="note" maxlength="80" placeholder="e.g. taxi to the supplier">
       <label class="f">Paid by</label>
-      <div class="seg">${PAYS.map(([k, l], i) => `<button type="button" data-p="${k}" aria-pressed="${i === 0}">${l}</button>`).join('')}</div>
+      ${seg('mpay')}
       <div class="err" id="err" role="alert"></div>
       <button class="btn save" type="submit" id="save">Save expense</button>
     </form>
-  </section>
+  </details>
   <section>
-    <h2 style="margin:4px 4px 10px">Entered today <small id="sum" style="font-size:14px;opacity:.7"></small></h2>
+    <h2 style="margin:4px 4px 10px">Entered by hand today <small id="sum" style="font-size:14px;opacity:.7"></small></h2>
     <div id="list"></div>
   </section>
 </main>`;
 $('#out').onclick = logout;
+wireSeg('ipay'); wireSeg('mpay');
 
-// ---------- form ----------
-let cat = '', pay = PAYS[0][0], receipt = null, reading = false;
-const day = $('#day'); day.max = today(); day.min = minDay(); day.value = today();
+// ---------- invoices: photo → server reads and splits ----------
+function shrink(file) {
+  return new Promise((res, rej) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const s = Math.min(1, 2000 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas'); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('bad_image')); };
+    img.src = url;
+  });
+}
+let waitingInv = store.get('invq', []);   // photos taken offline, sent when the internet is back
+let invs = [];
+async function sendInvoice(body) {
+  try { await api('invoice_upload', body); return true; }
+  catch (ex) {
+    if (ex.message === 'login_required') { location.reload(); return false; }
+    if (ex.message === 'network' || /^http_5/.test(ex.message)) return null;
+    toast(errText(ex), true); return false;
+  }
+}
+async function flushInvoices() {
+  while (waitingInv.length) {
+    const r = await sendInvoice(waitingInv[0]);
+    if (r === null) break;
+    waitingInv.shift(); store.set('invq', waitingInv);
+  }
+  drawInv();
+}
+$$('.photo').forEach(i => i.onchange = async e => {
+  const files = [...e.target.files]; e.target.value = '';
+  for (const file of files) {
+    let data;
+    try { data = await shrink(file); } catch { toast(ERR.bad_image, true); continue; }
+    const body = { client_id: cid(), image: data, paid_from: segVal('ipay'), note: $('#inote').value.trim() };
+    const r = await sendInvoice(body);
+    if (r === null) {
+      waitingInv.push(body);
+      if (!store.set('invq', waitingInv)) { waitingInv.pop(); toast('No internet and no space to keep this photo here. Try again with internet.', true); continue; }
+      toast('No internet: invoice kept on this device, it will be sent automatically', true);
+    } else if (r) toast('Invoice sent · it is being read now');
+  }
+  $('#inote').value = '';
+  loadInv();
+});
+async function loadInv() {
+  try { invs = await api('my_invoices'); } catch (ex) { if (ex.message === 'login_required') return location.reload(); }
+  drawInv();
+  clearTimeout(loadInv.t);
+  if (invs.some(i => i.status === 'pending' || i.status === 'reading')) loadInv.t = setTimeout(loadInv, 6000);
+}
+function drawInv() {
+  const st = i => i.status === 'done' ? '<span class="st ok">✓ Read and sorted</span>'
+    : i.status === 'review' ? '<span class="st bad">Could not read it · the owner will check it</span>'
+    : '<span class="st wait">Reading…</span>';
+  $('#invs').innerHTML = (waitingInv.length || invs.length)
+    ? waitingInv.map(w => `<div class="inv"><img src="${w.image}" alt=""><div class="m"><b>Waiting for internet</b><span>${esc(payName(w.paid_from))}${w.note ? ' · ' + esc(w.note) : ''}</span><br><span class="st wait">Not sent yet</span></div></div>`).join('') +
+      invs.map(i => `<div class="inv"><img src="api/api.php?a=invoice_photo&id=${i.id}" alt="Invoice" loading="lazy"><div class="m">
+        <b>${i.total != null ? money(i.total) + ' OMR' : 'Invoice'}${i.vendor ? ' · ' + esc(i.vendor) : ''}</b>
+        <span>${esc(i.date || String(i.created_at).slice(0, 10))} · ${esc(payName(i.paid_from))}${i.note ? ' · ' + esc(i.note) : ''}${me.role === 'owner' && i.by_user ? ' · ' + esc(i.by_user) : ''}</span><br>${st(i)}
+        ${i.split && i.split.length ? `<div class="split">${i.split.map(s => `<i>${esc(s.en || s.category)} ${money(s.amount)}</i>`).join('')}</div>` : ''}</div></div>`).join('')
+    : '<div class="row"><span>No invoices yet</span></div>';
+}
+
+// ---------- by hand (no invoice) ----------
+let cat = '';
 function drawCats() {
   $('#cats').innerHTML = cfg.expense_cats.length
     ? cfg.expense_cats.map(c => `<button class="chip" type="button" data-c="${esc(c.k)}" aria-pressed="${cat === c.k}">${esc(c.en)}</button>`).join('')
@@ -142,54 +232,6 @@ function drawCats() {
 }
 drawCats();
 $('#cats').onclick = e => { const b = e.target.closest('[data-c]'); if (b) { cat = b.dataset.c; drawCats(); } };
-$$('.seg [data-p]').forEach(b => b.onclick = () => { pay = b.dataset.p; $$('.seg [data-p]').forEach(x => x.setAttribute('aria-pressed', x === b)); });
-
-/** Shrinks the photo (long side 1600 px, JPEG) so it uploads fast on mobile data. */
-function shrink(file) {
-  return new Promise((res, rej) => {
-    const img = new Image(), url = URL.createObjectURL(file);
-    img.onload = () => {
-      const s = Math.min(1, 1600 / Math.max(img.width, img.height));
-      const c = document.createElement('canvas'); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg', 0.82));
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('bad_image')); };
-    img.src = url;
-  });
-}
-$$('.photo').forEach(i => i.onchange = onPhoto);
-async function onPhoto(e) {
-  const file = e.target.files[0]; e.target.value = ''; if (!file) return;
-  const box = $('#pic'); box.style.display = 'block';
-  let data;
-  try { data = await shrink(file); } catch { box.innerHTML = `<div class="note warn">${ERR.bad_image}</div>`; return; }
-  box.innerHTML = `<img class="preview" src="${data}" alt="Invoice photo"><div class="reading" style="margin-top:10px"><span class="spin"></span> Reading the invoice…</div>`;
-  receipt = null; reading = true; $('#save').disabled = true;
-  try {
-    const r = await api('pos_invoice_read', { image: data });
-    receipt = r.receipt;
-    const a = r.ai;
-    let msg;
-    if (a && a.readable) {
-      if (a.total) $('#amt').value = a.total.toFixed(3);
-      if (a.date) day.value = a.date;
-      if (a.cat) { cat = a.cat; drawCats(); }
-      $('#note').value = [a.vendor, a.summary].filter(Boolean).join(' · ').slice(0, 80) + (a.invoice_no ? ` #${a.invoice_no}` : '');
-      msg = `<div class="note">✓ Read: <b>${a.total ? money(a.total) + ' OMR' : 'no total'}</b>${a.vendor ? ' · ' + esc(a.vendor) : ''}${a.date ? ' · ' + esc(a.date) : ''}${a.vat ? ` · VAT ${money(a.vat)}` : ''}. Check everything before saving.</div>`;
-    } else if (!r.ai_on) {
-      msg = '<div class="note">Photo saved with the expense. Type the details below.</div>';
-    } else {
-      msg = `<div class="note warn">Could not read this invoice clearly. Type the details, or take the photo again (flat, in good light).</div>`;
-    }
-    box.innerHTML = `<img class="preview" src="${data}" alt="Invoice photo"><div style="margin-top:10px">${msg}</div>`;
-  } catch (ex) {
-    if (ex.message === 'login_required') return location.reload();
-    box.innerHTML = `<img class="preview" src="${data}" alt="Invoice photo"><div class="note warn" style="margin-top:10px">${ex.message === 'network' ? 'No internet: type the details, the expense is kept and sent later (without the photo).' : esc(errText(ex))}</div>`;
-  } finally { reading = false; $('#save').disabled = false; }
-}
-
-// ---------- offline queue ----------
 let outbox = store.get('outbox', []);
 const saveBox = () => store.set('outbox', outbox);
 async function sync() {
@@ -203,42 +245,26 @@ async function sync() {
   }
   load();
 }
-setInterval(() => outbox.length && sync(), 20000);
-addEventListener('online', sync);
-
 $('#f').onsubmit = async e => {
   e.preventDefault();
-  if (reading) return;
   const err = $('#err'); err.textContent = '';
   const a = Math.round(parseFloat($('#amt').value) * 1000) / 1000, note = $('#note').value.trim();
   const bad = !cat ? 'Pick what it was for' : !(a > 0 && a <= 500) ? ERR.bad_amount : cat === 'other' && !note ? ERR.need_note : '';
   if (bad) { err.textContent = bad; return; }
-  const body = { client_id: cid(), cat, amount: a, note, paid_from: pay, date: day.value || today(), ...(receipt ? { receipt } : {}) };
+  const body = { client_id: cid(), cat, amount: a, note, paid_from: segVal('mpay') };
   $('#save').disabled = true;
-  try {
-    await api('pos_expense', body);
-    toast(`Saved · ${catName(cat)} · ${money(a)} OMR`);
-    reset(); load();
-  } catch (ex) {
+  try { await api('pos_expense', body); toast(`Saved · ${catName(cat)} · ${money(a)} OMR`); reset(); load(); }
+  catch (ex) {
     if (ex.message === 'login_required') return location.reload();
-    if (ex.message === 'network') {
-      outbox.push({ ...body, at: stamp() }); saveBox();
-      toast('No internet: saved on this device, it will be sent automatically', true);
-      reset(); draw();
-    } else err.textContent = errText(ex);
+    if (ex.message === 'network') { outbox.push({ ...body, at: stamp() }); saveBox(); toast('No internet: saved on this device, it will be sent automatically', true); reset(); draw(); }
+    else err.textContent = errText(ex);
   } finally { $('#save').disabled = false; }
 };
-function reset() {
-  cat = ''; receipt = null; drawCats();
-  pay = PAYS[0][0]; $$('.seg [data-p]').forEach(x => x.setAttribute('aria-pressed', x.dataset.p === pay));
-  $('#amt').value = ''; $('#note').value = ''; day.value = today();
-  $('#pic').style.display = 'none'; $('#pic').innerHTML = '';
-}
+function reset() { cat = ''; drawCats(); $('#amt').value = ''; $('#note').value = ''; }
 
-// ---------- today's list ----------
 let rows = [];
 async function load() {
-  try { rows = await api('pos_expenses'); } catch (ex) { if (ex.message === 'login_required') return location.reload(); }
+  try { rows = (await api('pos_expenses')).filter(r => !r.from_invoice); } catch (ex) { if (ex.message === 'login_required') return location.reload(); }
   if (BUYER) {
     try {
       const f = await api('float_status');
@@ -253,12 +279,11 @@ function draw() {
   const total = [...outbox, ...rows].reduce((s, r) => s + r.amount, 0);
   $('#sum').textContent = `${rows.length + outbox.length} · ${money(total)} OMR`;
   $('#list').innerHTML = (outbox.length || rows.length)
-    ? outbox.map(p => `<div class="row pend"><div class="m"><b>${esc(catName(p.cat))} · ${money(p.amount)}${payName(p.paid_from) ? ' · ' + payName(p.paid_from) : ''}</b><span>${esc(p.note || '')} · waiting for internet</span></div></div>`).join('') +
-      rows.map(r => `<div class="row"><div class="m"><b>${esc(r.cat)} · ${money(r.amount)}${payName(r.paid_from) ? ' · ' + payName(r.paid_from) : ''}</b>
-        <span>${r.date && r.date !== today() ? esc(r.date) + ' · ' : ''}${esc(String(r.at || '').slice(11, 16))} ${esc(r.note || '')}${r.note ? ' · ' : ''}${esc(r.by_user || '')}</span>
-        ${r.receipt ? `<br><a href="api/api.php?a=receipt&id=${r.id}" target="_blank" rel="noopener">View invoice</a>` : ''}</div>
+    ? outbox.map(p => `<div class="row pend"><div class="m"><b>${esc(catName(p.cat))} · ${money(p.amount)} · ${payName(p.paid_from)}</b><span>${esc(p.note || '')} · waiting for internet</span></div></div>`).join('') +
+      rows.map(r => `<div class="row"><div class="m"><b>${esc(r.cat)} · ${money(r.amount)} · ${payName(r.paid_from)}</b>
+        <span>${esc(String(r.at || '').slice(11, 16))} ${esc(r.note || '')}${r.note ? ' · ' : ''}${esc(r.by_user || '')}</span></div>
         <button class="lnk" type="button" data-rm="${r.id}" data-label="${esc(r.cat)} · ${money(r.amount)}">Remove</button></div>`).join('')
-    : '<div class="row"><span>Nothing entered today</span></div>';
+    : '<div class="row"><span>Nothing entered by hand today</span></div>';
 }
 $('#list').onclick = async e => {
   const b = e.target.closest('[data-rm]'); if (!b) return;
@@ -266,7 +291,9 @@ $('#list').onclick = async e => {
   try { await api('pos_expense_void', { id: +b.dataset.rm }); } catch (ex) { toast(errText(ex), true); }
   load();
 };
-load(); sync();
+setInterval(() => { if (outbox.length) sync(); if (waitingInv.length) flushInvoices(); }, 20000);
+addEventListener('online', () => { sync(); flushInvoices(); });
+drawInv(); loadInv(); load(); sync(); flushInvoices();
 })();
 </script>
 </body>

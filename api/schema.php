@@ -202,6 +202,30 @@ function create_schema(): void {
             }
             q("INSERT INTO settings (k, v) VALUES ('costing_added', '1')");
         }
+        // Mango Milkshake (2.700), hidden until launch: the owner switches it on in Settings → menu
+        if (!q("SELECT 1 FROM settings WHERE k = 'mango_milkshake'")->fetch()) {
+            $ing = function (string $k, string $ar, string $en, float $price, float $qty): int {
+                $r = q('SELECT id, pack_price FROM ingredients WHERE k = ?', [$k])->fetch();
+                if (!$r) {
+                    $sort = (int)(q('SELECT COALESCE(MAX(sort), 0) m FROM ingredients')->fetch()['m'] ?? 0) + 1;
+                    q('INSERT INTO ingredients (k, name_ar, name_en, unit, pack_price, pack_qty, unit_cost, sort) VALUES (?,?,?,?,?,?,?,?)', [$k, $ar, $en, 'g', $price, $qty, $price / $qty, $sort]);
+                    return (int)db()->lastInsertId();
+                }
+                if ((float)$r['pack_price'] <= 0) q('UPDATE ingredients SET pack_price = ?, pack_qty = ?, unit_cost = ? WHERE id = ?', [$price, $qty, $price / $qty, (int)$r['id']]);
+                return (int)$r['id'];
+            };
+            $mango = $ing('mango', 'مانجو مجمد', 'Frozen mango', 5.2, 1000);
+            $milk = $ing('milk', 'حليب اللوز', 'Almond milk', 1.8, 1000);
+            $ice = $ing('icecream', 'آيسكريم لندن (لتر ≈ 580 غ)', 'London ice cream', 2.6, 580);
+            if (!q("SELECT 1 FROM products WHERE name_en = 'Mango Milkshake'")->fetch()) {
+                q("INSERT INTO products (name_ar, name_en, img, price, sort, active) VALUES (?,?,?,?,?,0)", ['مانجو ميلك شيك', 'Mango Milkshake', '', 2.7, 4]);
+                $pid = (int)db()->lastInsertId();
+                $items = [$mango => 120, $milk => 120, $ice => 80];
+                foreach (['cup12', 'lid12', 'straw_pc'] as $k) if ($r = q('SELECT id FROM ingredients WHERE k = ?', [$k])->fetch()) $items[(int)$r['id']] = 1;
+                foreach ($items as $iid => $g) q('INSERT INTO recipe_items (product_id, ingredient_id, qty) VALUES (?,?,?)', [$pid, $iid, $g]);
+            }
+            q("INSERT INTO settings (k, v) VALUES ('mango_milkshake', '1')");
+        }
     } else {
         seed_karak();
         karak_flavours();

@@ -176,6 +176,7 @@ function ext_after_request(): void {
         $retry = $hook && (mt_rand(1, 15) === 1 || q('SELECT 1 FROM ext_events WHERE pushed_at IS NULL AND tries < ? AND (next_try IS NULL OR next_try <= ?) LIMIT 1', [EXT_MAX_TRIES, now()])->fetch());
         if (empty($GLOBALS['ext_new']) && !$closeDays && !$retry) return;
         $async = false;
+        if (session_status() === PHP_SESSION_ACTIVE) session_write_close();   // don't keep the person's next request waiting
         if (function_exists('litespeed_finish_request')) { litespeed_finish_request(); $async = true; }
         elseif (function_exists('fastcgi_finish_request')) { fastcgi_finish_request(); $async = true; }
         ignore_user_abort(true);

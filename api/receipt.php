@@ -204,8 +204,10 @@ function invoice_rebuild(int $id): void {
 /** Reads waiting invoices (after the response has gone out). */
 function invoice_jobs(int $max = 3): void {
     if (ai_key() === '') return;
+    // A reading cut off half-way (the hosting stopped it) goes back in the queue
+    q("UPDATE invoices SET status = 'pending' WHERE status = 'reading' AND processed_at < ?", [date('Y-m-d H:i:s', time() - 600)]);
     foreach (q("SELECT * FROM invoices WHERE status = 'pending' ORDER BY id LIMIT " . $max)->fetchAll() as $inv) {
-        if (q("UPDATE invoices SET status = 'reading' WHERE id = ? AND status = 'pending'", [(int)$inv['id']])->rowCount() !== 1) continue;
+        if (q("UPDATE invoices SET status = 'reading', processed_at = ? WHERE id = ? AND status = 'pending'", [now(), (int)$inv['id']])->rowCount() !== 1) continue;
         $r = ai_read_invoice((string)$inv['receipt']);
         if (!$r || isset($r['error']) || empty($r['readable'])) {
             $err = $r['error'] ?? 'unreadable';

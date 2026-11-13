@@ -12,11 +12,19 @@ register_shutdown_function('invoice_after_request');
 function invoice_after_request(): void {
     try {
         if (empty($GLOBALS['invoice_new']) && mt_rand(1, 20) !== 1) return;
-        if (!q("SELECT 1 FROM invoices WHERE status = 'pending' LIMIT 1")->fetch()) return;
+        if (ai_key() === '' || !q("SELECT 1 FROM invoices WHERE status = 'pending' LIMIT 1")->fetch()) return;
+        // Let go of the login session first: else the same person's next upload waits for this reading to finish
+        if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
         if (function_exists('litespeed_finish_request')) litespeed_finish_request();
         elseif (function_exists('fastcgi_finish_request')) fastcgi_finish_request();
-        ignore_user_abort(true); @set_time_limit(400);
-        invoice_jobs(3);
+        // One reader at a time (20 photos at once must not start 20 slow readers on the hosting)
+        if (!q("SELECT 1 FROM settings WHERE k = 'inv_lock'")->fetch()) q("INSERT INTO settings (k, v) VALUES ('inv_lock', '0')");
+        if (q("UPDATE settings SET v = ? WHERE k = 'inv_lock' AND CAST(v AS " . (is_mysql() ? 'UNSIGNED' : 'INTEGER') . ') < ?', [(string)(time() + 400), time()])->rowCount() !== 1) return;
+        ignore_user_abort(true); @set_time_limit(420);
+        try {
+            $until = time() + 330;
+            while (time() < $until && q("SELECT 1 FROM invoices WHERE status = 'pending' LIMIT 1")->fetch()) invoice_jobs(1);
+        } finally { q("UPDATE settings SET v = '0' WHERE k = 'inv_lock'"); }
     } catch (Throwable $e) { error_log('invoice jobs: ' . $e->getMessage()); }
 }
 

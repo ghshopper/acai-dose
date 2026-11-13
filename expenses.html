@@ -126,39 +126,71 @@ function shrink(file) {
     img.src = url;
   });
 }
-let waiting = store.get('invq', []);   // photos taken with no internet, sent when it is back
-let invs = [];
+// Photos wait in the phone's storage (IndexedDB, room for many) until each is sent; sent one by one with retries
+const DB = new Promise(res => {
+  try {
+    const r = indexedDB.open('invoice-queue', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('q', { keyPath: 'client_id' });
+    r.onsuccess = () => res(r.result); r.onerror = () => res(null);
+  } catch { res(null); }
+});
+const mem = new Map();   // fallback when IndexedDB is unavailable
+async function qAll() { const db = await DB; if (!db) return [...mem.values()]; return new Promise(res => { const t = db.transaction('q').objectStore('q').getAll(); t.onsuccess = () => res(t.result.sort((a, b) => a.at - b.at)); t.onerror = () => res([]); }); }
+async function qPut(v) { const db = await DB; if (!db) { mem.set(v.client_id, v); return; } return new Promise(res => { const t = db.transaction('q', 'readwrite'); t.objectStore('q').put(v); t.oncomplete = res; t.onerror = res; }); }
+async function qDel(id) { const db = await DB; if (!db) { mem.delete(id); return; } return new Promise(res => { const t = db.transaction('q', 'readwrite'); t.objectStore('q').delete(id); t.oncomplete = res; t.onerror = res; }); }
+// Photos kept by the earlier version of this page (localStorage) move into the queue
+for (const w of store.get('invq', [])) await qPut({ ...w, at: Date.now() });
+store.set('invq', []);
+
+let invs = [], waiting = [], sending = false, progress = null;
 async function send(body) {
-  try { return await api('invoice_upload', body); }
+  try { return await api('invoice_upload', { client_id: body.client_id, image: body.image }); }
   catch (ex) {
     if (ex.message === 'login_required') { location.reload(); return false; }
-    if (ex.message === 'network' || /^http_5/.test(ex.message)) return null;
-    toast(ex.message === 'bad_image' ? 'That photo could not be used, take it again' : msgEn(ex), true); return false;
+    if (ex.message === 'network' || /^http_(5|429)|too_many|server_error/.test(ex.message)) return null;   // try again later
+    toast(ex.message === 'bad_image' ? 'A photo could not be used, take it again' : msgEn(ex), true); return false;
   }
 }
 async function flush() {
-  while (waiting.length) {
-    const r = await send(waiting[0]);
-    if (r === null) break;
-    waiting.shift(); store.set('invq', waiting);
+  if (sending) return;
+  sending = true;
+  try {
+    waiting = await qAll();
+    let fails = 0;
+    while (waiting.length) {
+      const it = waiting[0];
+      progress = { done: (progress?.done || 0), total: (progress?.total || 0) || waiting.length };
+      draw();
+      const r = await send(it);
+      if (r === null) {
+        if (++fails >= 3) break;                         // no internet / server busy: keep them, try later
+        await new Promise(ok => setTimeout(ok, 4000 * fails));
+        continue;
+      }
+      fails = 0;
+      await qDel(it.client_id);
+      if (r && r.duplicate) toast('One photo was already sent', true);
+      waiting.shift();
+      if (progress) progress.done++;
+    }
+  } finally {
+    sending = false;
+    if (!waiting.length) { if (progress && progress.total > 1) toast(`All ${progress.total} sent ✓`); progress = null; }
+    draw(); load();
   }
-  draw(); load();
 }
 $$('.photo').forEach(i => i.onchange = async e => {
   const files = [...e.target.files]; e.target.value = '';
+  if (!files.length) return;
+  progress = { done: 0, total: (waiting.length || 0) + files.length };
+  let n = 0;
   for (const file of files) {
     let data;
-    try { data = await shrink(file); } catch { toast('That photo could not be used, take it again', true); continue; }
-    const body = { client_id: cid(), image: data };
-    const r = await send(body);
-    if (r === null) {
-      waiting.push(body);
-      if (!store.set('invq', waiting)) { waiting.pop(); toast('No internet and no space to keep this photo. Try again with internet.', true); continue; }
-      toast('No internet: photo kept here, it will be sent automatically', true);
-    } else if (r && r.duplicate) toast('This invoice was already sent', true);
-    else if (r) toast('Sent ✓');
+    try { data = await shrink(file); } catch { toast('A photo could not be used', true); progress.total--; continue; }
+    await qPut({ client_id: cid(), image: data, at: Date.now() + n++ });
+    waiting = await qAll(); draw();
   }
-  draw(); load();
+  flush();
 });
 async function load() {
   try { invs = await api('my_invoices'); } catch (ex) { if (ex.message === 'login_required') return location.reload(); }
@@ -166,14 +198,16 @@ async function load() {
 }
 function draw() {
   const day = s => String(s || '').slice(0, 16).replace('T', ' ');
-  $('#invs').innerHTML = (waiting.length || invs.length)
-    ? waiting.map(w => `<div class="inv"><img src="${w.image}" alt=""><div class="m"><b>Waiting for internet</b><span class="st wait">Not sent yet</span></div></div>`).join('') +
+  const bar = progress && progress.total ? `<div class="card" style="padding:14px 16px;margin-bottom:10px"><b>${sending ? `Sending ${Math.min(progress.done + 1, progress.total)} of ${progress.total}…` : `${waiting.length} waiting · will send when the internet is back`}</b>
+    <div style="height:10px;border-radius:5px;background:var(--c2);margin-top:8px"><div style="height:10px;border-radius:5px;background:var(--ok);width:${(progress.done / progress.total * 100).toFixed(0)}%"></div></div></div>` : '';
+  $('#invs').innerHTML = bar + ((waiting.length || invs.length)
+    ? waiting.map(w => `<div class="inv"><img src="${w.image}" alt=""><div class="m"><b>Waiting to send</b><span class="st wait">Not sent yet</span></div></div>`).join('') +
       invs.map(i => `<div class="inv"><img src="api/api.php?a=invoice_photo&id=${i.id}" alt="Invoice" loading="lazy"><div class="m"><b>Sent ✓</b><span>${esc(day(i.created_at))}</span></div></div>`).join('')
-    : '<div class="row"><span>Nothing sent yet</span></div>';
+    : '<div class="row"><span>Nothing sent yet</span></div>');
 }
-setInterval(() => { if (waiting.length) flush(); }, 20000);
+setInterval(() => { if (waiting.length && !sending) flush(); }, 20000);
 addEventListener('online', flush);
-draw(); load(); flush();
+waiting = await qAll(); draw(); load(); flush();
 })();
 </script>
 </body>

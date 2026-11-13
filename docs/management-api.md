@@ -79,7 +79,7 @@ Only needed if you want a cron job to push waiting webhooks; normally not used.
 ```json
 {"id":301,"date":"2026-11-08","category":"إيجار","amount":250,"one_off":false,"note":"","created_at":"…","paid_from":"bank","entered_at":"owner"}
 ```
-- `paid_from`: `cash` (paid from the shop till), `bank` (bank transfer from the company account) or `custody` (paid by the purchasing employee from money the owner transferred to them earlier).
+- `paid_from`: `cash` (paid from the shop till), `bank` (paid by the owner / bank transfer), `custody` (paid by the purchasing employee from money the owner transferred to them earlier) or `unset` (an invoice photo whose payment the owner has not chosen yet; an `expense.updated` follows when they do).
 - `has_invoice_photo`: true when staff attached a photo of the invoice.
 - `entered_at`: `pos` (staff at the till; note starts with `POS · <staff name>`) or `owner`.
 

@@ -110,6 +110,13 @@ function create_schema(): void {
         $name = strtok($def, ' ');
         if (!in_array($name, $have, true)) xq("ALTER TABLE expenses ADD COLUMN $def");
     }
+    // Invoices: the photo's fingerprint and the earlier invoice it repeats (so the same invoice is not counted twice)
+    $have = [];
+    foreach (q(is_mysql() ? 'SHOW COLUMNS FROM invoices' : 'PRAGMA table_info(invoices)')->fetchAll() as $c) $have[] = $c['Field'] ?? $c['name'];
+    foreach (["img_hash VARCHAR(64) NULL", "dup_of INT NULL"] as $def) {
+        $name = strtok($def, ' ');
+        if (!in_array($name, $have, true)) xq("ALTER TABLE invoices ADD COLUMN $def");
+    }
     // v4: loyalty card per customer (secret link + Apple Wallet)
     $have = [];
     foreach (q(is_mysql() ? 'SHOW COLUMNS FROM customers' : 'PRAGMA table_info(customers)')->fetchAll() as $c) $have[] = $c['Field'] ?? $c['name'];

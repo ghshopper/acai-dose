@@ -180,7 +180,7 @@ function invoice_rebuild(int $id): void {
         if ($old) ext_emit('expense', (int)$e['id'], 'deleted', $old);
     }
     $items = q('SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY id', [$id])->fetchAll();
-    if (!$items) return;
+    if (!$items || $inv['status'] === 'dup') return;   // a repeat of an earlier invoice is not counted
     $sum = array_sum(array_map(fn($i) => (float)$i['amount'], $items));
     $total = (float)($inv['total'] ?? 0) > 0 ? (float)$inv['total'] : $sum;
     $scale = $sum > 0 ? $total / $sum : 1;
@@ -220,8 +220,9 @@ function invoice_jobs(int $max = 3): void {
             foreach ($r['items'] as $it)
                 q('INSERT INTO invoice_items (invoice_id, name, name_ar, qty, unit, amount, grp) VALUES (?,?,?,?,?,?,?)',
                   [(int)$inv['id'], $it['name'], $it['name_ar'], $it['qty'], $it['unit'], money($it['amount']), $it['group']]);
-            q("UPDATE invoices SET status = 'done', vendor = ?, invoice_no = ?, invoice_date = ?, total = ?, vat = ?, error = NULL, processed_at = ? WHERE id = ?",
-              [$r['vendor'] ?: null, $r['invoice_no'] ?: null, $r['date'], $r['total'] !== null ? money($r['total']) : null, $r['vat'] !== null ? money($r['vat']) : null, now(), (int)$inv['id']]);
+            $dupOf = invoice_find_repeat((int)$inv['id'], $r);
+            q("UPDATE invoices SET status = ?, dup_of = ?, vendor = ?, invoice_no = ?, invoice_date = ?, total = ?, vat = ?, error = NULL, processed_at = ? WHERE id = ?",
+              [$dupOf ? 'dup' : 'done', $dupOf, $r['vendor'] ?: null, $r['invoice_no'] ?: null, $r['date'], $r['total'] !== null ? money($r['total']) : null, $r['vat'] !== null ? money($r['vat']) : null, now(), (int)$inv['id']]);
             invoice_rebuild((int)$inv['id']);
             $pdo->commit();
         } catch (Throwable $e) {
@@ -231,10 +232,22 @@ function invoice_jobs(int $max = 3): void {
     }
 }
 
+/** An earlier invoice this one repeats: same shop and invoice number, or same shop, date and total (another photo of the same paper). */
+function invoice_find_repeat(int $id, array $r): ?int {
+    $norm = fn($s) => preg_replace('/[^a-z0-9\x{0600}-\x{06FF}]/u', '', mb_strtolower((string)$s));
+    $v = $norm($r['vendor'] ?? ''); $no = $norm($r['invoice_no'] ?? '');
+    foreach (q("SELECT id, vendor, invoice_no, invoice_date, total FROM invoices WHERE id <> ? AND status IN ('done','dup') AND dup_of IS NULL", [$id])->fetchAll() as $o) {
+        $ov = $norm($o['vendor']); $sameShop = $v !== '' && $ov !== '' && (str_contains($ov, $v) || str_contains($v, $ov));
+        if ($no !== '' && $norm($o['invoice_no']) === $no && ($sameShop || $v === '')) return (int)$o['id'];
+        if ($sameShop && $r['date'] && $o['invoice_date'] === $r['date'] && $r['total'] !== null && abs((float)$o['total'] - (float)$r['total']) < 0.0005) return (int)$o['id'];
+    }
+    return null;
+}
+
 function invoice_out(array $i, bool $items = false): array {
     $o = ['id' => (int)$i['id'], 'status' => $i['status'], 'vendor' => (string)($i['vendor'] ?? ''), 'invoice_no' => (string)($i['invoice_no'] ?? ''),
           'date' => $i['invoice_date'], 'total' => $i['total'] !== null ? (float)$i['total'] : null, 'vat' => $i['vat'] !== null ? (float)$i['vat'] : null,
-          'paid_from' => $i['paid_from'], 'note' => (string)($i['note'] ?? ''), 'by_user' => (string)($i['by_user'] ?? ''), 'created_at' => $i['created_at'], 'error' => $i['error']];
+          'paid_from' => $i['paid_from'], 'dup_of' => isset($i['dup_of']) ? (int)$i['dup_of'] ?: null : null, 'note' => (string)($i['note'] ?? ''), 'by_user' => (string)($i['by_user'] ?? ''), 'created_at' => $i['created_at'], 'error' => $i['error']];
     if ($items) {
         $g = item_groups();
         $o['items'] = array_map(fn($r) => ['id' => (int)$r['id'], 'name' => $r['name'], 'name_ar' => $r['name_ar'], 'qty' => (float)$r['qty'], 'unit' => (string)$r['unit'],

@@ -136,7 +136,7 @@ function offline_time($at): ?string {
     return ($t && $t <= time() + 300 && $t >= time() - 7 * 86400) ? date('Y-m-d H:i:s', $t) : null;
 }
 /** How an expense was paid: cash, or bank transfer ('bank' — taken off the company account balance). */
-function paid_from($v, string $default): string { return in_array($v, ['cash', 'bank', 'custody'], true) ? $v : $default; }
+function paid_from($v, string $default): string { return in_array($v, ['cash', 'bank', 'custody', 'unset'], true) ? $v : $default; }   // unset = an invoice photo the owner hasn't said how it was paid
 /** The buyer's float: money the owner handed them minus invoices they paid from it. */
 function float_of(int $uid): array {
     $given = (float)(q('SELECT COALESCE(SUM(amount), 0) s FROM custody_moves WHERE user_id = ?', [$uid])->fetch()['s'] ?? 0);
@@ -589,8 +589,12 @@ case 'invoice_upload':  // staff / buyer: just the photo (and how it was paid); 
     if ($cid !== '' && ($dup = q('SELECT id FROM invoices WHERE client_id = ?', [$cid])->fetch())) out(['ok' => true, 'id' => (int)$dup['id']]);
     rate_limit('invoice', 80, 3600);
     $name = receipt_save((string)($in['image'] ?? ''));
-    q('INSERT INTO invoices (receipt, uploaded_by, paid_from, note, status, client_id, created_at) VALUES (?,?,?,?,?,?,?)',
-      [$name, (int)$u['id'], paid_from($in['paid_from'] ?? null, $u['role'] === 'buyer' ? 'custody' : 'cash'), clean($in['note'] ?? '', 120) ?: null, 'pending', $cid ?: null, now()]);
+    // The very same photo sent again: keep the first one
+    $hash = hash_file('sha256', receipt_path($name));
+    if ($dup = q('SELECT id FROM invoices WHERE img_hash = ?', [$hash])->fetch()) { @unlink(receipt_path($name)); out(['ok' => true, 'id' => (int)$dup['id'], 'duplicate' => true]); }
+    // How it was paid is the owner's choice in the dashboard (staff only send the photo)
+    q('INSERT INTO invoices (receipt, uploaded_by, paid_from, note, status, client_id, img_hash, created_at) VALUES (?,?,?,?,?,?,?,?)',
+      [$name, (int)$u['id'], paid_from($in['paid_from'] ?? null, 'unset'), clean($in['note'] ?? '', 120) ?: null, 'pending', $cid ?: null, $hash, now()]);
     $GLOBALS['invoice_new'] = true;
     out(['ok' => true, 'id' => (int)db()->lastInsertId(), 'ai_on' => ai_key() !== '']);
 
@@ -604,7 +608,7 @@ case 'invoices':  // owner: invoices in a period, with their lines and how they 
     need('owner');
     $f = valid_date($_GET['from'] ?? date('Y-m-d', strtotime('-30 days'))); $t = valid_date($_GET['to'] ?? date('Y-m-d'));
     $rows = q("SELECT i.*, u.username AS by_user FROM invoices i LEFT JOIN users u ON u.id = i.uploaded_by
-               WHERE COALESCE(i.invoice_date, DATE(i.created_at)) BETWEEN ? AND ? OR i.status IN ('pending','reading','review') ORDER BY i.id DESC LIMIT 300", [$f, $t])->fetchAll();
+               WHERE COALESCE(i.invoice_date, DATE(i.created_at)) BETWEEN ? AND ? OR i.status IN ('pending','reading','review','dup') OR i.paid_from = 'unset' ORDER BY i.id DESC LIMIT 300", [$f, $t])->fetchAll();
     out(['ai_on' => ai_key() !== '', 'groups' => array_map(fn($k, $v) => ['k' => $k, 'ar' => $v[0]], array_keys(item_groups()), item_groups()),
          'invoices' => array_map(fn($r) => invoice_out($r, true), $rows)]);
 
@@ -623,6 +627,24 @@ case 'invoice_save':  // owner: fix the header (total, date, shop, how it was pa
     q('UPDATE invoices SET vendor = ?, invoice_date = ?, total = ?, paid_from = ? WHERE id = ?',
       [clean($in['vendor'] ?? '', 60) ?: null, valid_date($in['date'] ?? date('Y-m-d')), $tot > 0 ? money($tot) : null, paid_from($in['paid_from'] ?? null, 'cash'), $id]);
     invoice_rebuild($id);
+    out(['ok' => true]);
+
+case 'invoice_pay':  // owner: how these invoices were paid (one or many at once): cash from the till, from me (transfer), or the buyer's float
+    $post(); need('owner');
+    $pf = paid_from($in['paid_from'] ?? null, ''); if ($pf === '' || $pf === 'unset') fail('bad_payment');
+    $ids = array_values(array_filter(array_map('intval', (array)($in['ids'] ?? [])))); if (!$ids || count($ids) > 200) fail('bad_request');
+    $ph = implode(',', array_fill(0, count($ids), '?'));
+    q("UPDATE invoices SET paid_from = ? WHERE id IN ($ph)", [$pf, ...$ids]);
+    foreach (q("SELECT id FROM expenses WHERE invoice_id IN ($ph)", $ids)->fetchAll() as $e) {
+        q('UPDATE expenses SET paid_from = ? WHERE id = ?', [$pf, (int)$e['id']]);
+        ext_emit('expense', (int)$e['id'], 'updated');
+    }
+    out(['ok' => true, 'count' => count($ids)]);
+
+case 'invoice_not_dup':  // owner: it only looked like a repeat: count it
+    $post(); need('owner');
+    q("UPDATE invoices SET status = 'done', dup_of = NULL WHERE id = ? AND status = 'dup'", [(int)($in['id'] ?? 0)]);
+    invoice_rebuild((int)($in['id'] ?? 0));
     out(['ok' => true]);
 
 case 'invoice_retry':  // owner: read it again (e.g. after adding the key)

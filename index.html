@@ -311,7 +311,7 @@ function render() {
     }
     const key = String(p.id), q = cart.get(key) ? cart.get(key).qty : 0;
     return `<div class="card item${isBowl ? ' bowl' : ''}${p.best ? ' top' : ''}">
-      ${isBowl && (!p.img || /^bowl/.test(p.img)) ? '' : `<img src="assets/${esc(p.img || 'cup-smoothie.png')}" alt="">`}
+      ${p.secret ? `<div aria-hidden="true" style="width:96px;height:120px;flex:none;border-radius:18px;background:#470D43;color:#FFC229;display:flex;align-items:center;justify-content:center;font-size:64px;font-weight:900;font-family:serif">?</div>` : isBowl && (!p.img || /^bowl/.test(p.img)) ? '' : `<img src="assets/${esc(p.img || 'cup-smoothie.png')}" alt="">`}
       <div class="info">${p.best ? `<div class="best">★ ${L.best}</div>` : ''}${main}${desc}<div class="price"><span class="mon">${money(p.price)}</span> ${L.omr}${p.was ? ` <span class="was mon">${money(p.was)}</span>` : ''}</div></div>
       ${qtyBtns(key, q, pname(p))}</div>`;
   }).join('');

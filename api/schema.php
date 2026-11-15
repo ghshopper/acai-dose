@@ -139,7 +139,7 @@ function create_schema(): void {
     $have = [];
     foreach (q(is_mysql() ? 'SHOW COLUMNS FROM products' : 'PRAGMA table_info(products)')->fetchAll() as $c) $have[] = $c['Field'] ?? $c['name'];
     foreach (["kind VARCHAR(10) NOT NULL DEFAULT 'cup'", 'desc_ar VARCHAR(300) NULL', 'desc_en VARCHAR(300) NULL',
-              'cat VARCHAR(20) NULL', 'size VARCHAR(10) NULL', 'soldout TINYINT NOT NULL DEFAULT 0'] as $def) {
+              'cat VARCHAR(20) NULL', 'size VARCHAR(10) NULL', 'soldout TINYINT NOT NULL DEFAULT 0', 'secret TINYINT NOT NULL DEFAULT 0'] as $def) {
         $name = strtok($def, ' ');
         if (!in_array($name, $have, true)) xq("ALTER TABLE products ADD COLUMN $def");
     }
@@ -225,6 +225,11 @@ function create_schema(): void {
                 foreach ($items as $iid => $g) q('INSERT INTO recipe_items (product_id, ingredient_id, qty) VALUES (?,?,?)', [$pid, $iid, $g]);
             }
             q("INSERT INTO settings (k, v) VALUES ('mango_milkshake', '1')");
+        }
+        // 15 Nov: Mango Milkshake on sale as a "secret product" (customers see no name or photo; staff see the real name)
+        if (!q("SELECT 1 FROM settings WHERE k = 'mango_live'")->fetch()) {
+            q("UPDATE products SET active = 1, secret = 1, img = '' WHERE name_en = 'Mango Milkshake'");
+            q("INSERT INTO settings (k, v) VALUES ('mango_live', '1')");
         }
     } else {
         seed_karak();

@@ -198,7 +198,7 @@ function price_items($items, bool $offer = true, bool $staff = false, bool $offl
     foreach ($items as $it) {
         $pid = (int)($it['product_id'] ?? 0); $qty = (int)($it['qty'] ?? 0);
         if ($qty < 1 || $qty > 50) fail('invalid_qty');
-        $p = q('SELECT id, name_ar, name_en, price, kind, size, soldout FROM products WHERE id = ? AND active = 1', [$pid])->fetch();
+        $p = q('SELECT id, name_ar, name_en, price, kind, size, soldout, secret FROM products WHERE id = ? AND active = 1', [$pid])->fetch();
         if (!$p) fail('invalid_product');
         if ((int)$p['soldout'] && !$offline) fail('sold_out');   // an offline sale already happened
         if ($p['kind'] === 'open') {
@@ -303,12 +303,17 @@ switch ($a) {
 
 // ---------------- public ----------------
 case 'menu':
+    // A secret product shows customers no name or photo until its launch; staff (till) see the real name
+    $staffView = (bool)user_if_any();
+    $mask = fn($p) => (int)($p['secret'] ?? 0) && !$staffView
+        ? ['name_ar' => 'منتج سري', 'name_en' => 'Secret drink', 'img' => '', 'desc_ar' => 'مشروب جديد… جرّبه وخمّن', 'desc_en' => 'Something new… try it and guess']
+        : [];
     // The best seller shows first on the order page with a badge (settings key best_seller, else the large Peanut Butter cup)
     $best = (int)setting('best_seller', '0') ?: (int)(q("SELECT id FROM products WHERE name_en = 'Açaí Smoothie with Peanut Butter'")->fetch()['id'] ?? 0);
-    out(array_map(fn($p) => ['id' => (int)$p['id'], 'best' => (int)$p['id'] === $best, 'name_ar' => $p['name_ar'], 'name_en' => $p['name_en'],
+    out(array_map(fn($p) => $mask($p) + ['id' => (int)$p['id'], 'best' => (int)$p['id'] === $best, 'name_ar' => $p['name_ar'], 'name_en' => $p['name_en'],
         'img' => $p['img'], 'price' => promo_price((float)$p['price']), 'was' => promo() ? (float)$p['price'] : null, 'kind' => $p['kind'] ?? 'cup',
         'desc_ar' => (string)($p['desc_ar'] ?? ''), 'desc_en' => (string)($p['desc_en'] ?? ''),
-        'cat' => $p['cat'] ?? null, 'size' => $p['size'] ?? null, 'soldout' => (bool)(int)($p['soldout'] ?? 0)],
+        'cat' => $p['cat'] ?? null, 'size' => $p['size'] ?? null, 'soldout' => (bool)(int)($p['soldout'] ?? 0), 'secret' => (bool)(int)($p['secret'] ?? 0) && !$staffView],
         // ?preview=1: the menu as it will look with the bowls switched on (no Mini), for the owner's check before launch
         !empty($_GET['preview'])
             ? q("SELECT * FROM products WHERE (active = 1 OR kind IN ('bowl','build')) AND name_en NOT LIKE 'Mini %' ORDER BY sort, id")->fetchAll()

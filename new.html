@@ -282,7 +282,7 @@ const lineName = l => {
   return pname(p) + (names.length ? ` (${names.join(lang === 'ar' ? '، ' : ', ')})` : '');
 };
 const totals = () => { let n = 0, t = 0; for (const l of cart.values()) { n += l.qty; t += l.qty * unit(l); } return { n, t }; };
-const img = (p, h) => p.img && !/^bowl/.test(p.img) ? `<img src="assets/${esc(p.img)}" alt="" loading="lazy"${h ? ` style="height:${h}px"` : ''}>` : (p.kind === 'cup' ? ICON.cup : ICON.bowl);
+const img = (p, h) => p.secret ? `<span aria-hidden="true" style="display:flex;align-items:center;justify-content:center;width:100%;height:${h || 120}px;color:#FFC229;font-size:${Math.round((h || 120) * .6)}px;font-weight:900;font-family:serif">?</span>` : p.img && !/^bowl/.test(p.img) ? `<img src="assets/${esc(p.img)}" alt="" loading="lazy"${h ? ` style="height:${h}px"` : ''}>` : (p.kind === 'cup' ? ICON.cup : ICON.bowl);
 const priceHtml = (p, pre = '') => `<span class="price">${pre}${money(p.price)}<small>${L.omr}</small></span>${p.was ? `<span class="was">${money(p.was)}</span>` : ''}`;
 const qtyOf = key => cart.get(key)?.qty || 0;
 function toast(t) { const d = document.createElement('div'); d.className = 'toast'; d.textContent = t; document.body.appendChild(d); setTimeout(() => d.remove(), 1800); }

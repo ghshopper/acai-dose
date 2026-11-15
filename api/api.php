@@ -303,10 +303,10 @@ switch ($a) {
 
 // ---------------- public ----------------
 case 'menu':
-    // A secret product shows customers no name or photo until its launch; staff (till) see the real name
+    // A secret product shows customers its name but no photo until launch, labelled as secret
     $staffView = (bool)user_if_any();
     $mask = fn($p) => (int)($p['secret'] ?? 0) && !$staffView
-        ? ['name_ar' => 'منتج سري', 'name_en' => 'Secret drink', 'img' => '', 'desc_ar' => 'مشروب جديد… جرّبه وخمّن', 'desc_en' => 'Something new… try it and guess']
+        ? ['img' => '', 'desc_ar' => 'منتج سري 🤫', 'desc_en' => 'Secret product 🤫']
         : [];
     // The best seller shows first on the order page with a badge (settings key best_seller, else the large Peanut Butter cup)
     $best = (int)setting('best_seller', '0') ?: (int)(q("SELECT id FROM products WHERE name_en = 'Açaí Smoothie with Peanut Butter'")->fetch()['id'] ?? 0);

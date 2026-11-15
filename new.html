@@ -310,7 +310,8 @@ function header(withBack) {
 
 function viewMenu() {
   const best = products.find(p => p.best);
-  const rest = products.filter(p => p !== best);
+  const secrets = products.filter(p => p.secret && p !== best);   // secret drinks sit wide under the best seller until launch
+  const rest = products.filter(p => p !== best && !p.secret);
   const hasMini = rest.some(isMini), hasBowl = rest.some(p => p.kind !== 'cup');
   const shown = rest.filter(p => filter === 'all' || (filter === 'mini' ? isMini(p) : filter === 'bowl' ? p.kind !== 'cup' : (p.kind === 'cup' && !isMini(p))));
   const featured = best && (filter === 'all' || (filter === 'big' && !isMini(best)));
@@ -333,6 +334,9 @@ function viewMenu() {
       </div>
     </div>
   </div>` : ''}
+  ${filter === 'all' || filter === 'big' ? secrets.map(p => { const k = String(p.id); return `<div class="grid" style="margin-top:14px"><div class="card wide"><div class="ph">${img(p, 92)}</div><div class="txt">
+    <div class="nm">${esc(pname(p))}</div>${pdesc(p) ? `<div class="sm">${esc(pdesc(p))}</div>` : ''}
+    <div class="bt" style="margin-top:8px">${priceHtml(p)}${stepper(k, qtyOf(k), p.id)}</div></div></div></div>`; }).join('') : ''}
   <div class="sec"><h2>${L.menu}</h2><span class="eyebrow">${L.all}</span></div>
   ${hasMini || hasBowl ? `<div class="chips">${[['all', L.fAll], ['big', L.fBig], hasMini && ['mini', L.fMini], hasBowl && ['bowl', L.fBowl]].filter(Boolean)
     .map(([k, t]) => `<button type="button" class="chip" data-f="${k}" aria-pressed="${filter === k}">${t}</button>`).join('')}</div>` : ''}

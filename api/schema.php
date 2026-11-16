@@ -267,4 +267,18 @@ function create_schema(): void {
         q("DELETE FROM settings WHERE k = 'jobs_day'");
         q("INSERT INTO settings (k, v) VALUES ('karak_fixed_costs', '1')");
     }
+    // 16 Nov: workers' flat rent (monthly), and past months' totals as one entry per month (fixed costs + supplies), Apr–Oct
+    if (BIZ === 'karak' && !q("SELECT 1 FROM settings WHERE k = 'karak_fixed_costs2'")->fetch()) {
+        if (!q("SELECT 1 FROM recurring_expenses WHERE note = 'إيجار سكن العمال'")->fetch())
+            q("INSERT INTO recurring_expenses (category, amount, day_of_month, note, paid_from, active, last_month, created_at) VALUES ('إيجار', 50, 1, 'إيجار سكن العمال', 'bank', 1, NULL, ?)", [now()]);
+        $past = ['2026-04' => [640, 535], '2026-05' => [640, 610], '2026-06' => [790, 822], '2026-07' => [790, 625],
+                 '2026-08' => [790, 820], '2026-09' => [790, 900], '2026-10' => [790, 880]];
+        foreach ($past as $m => [$fixed, $goods]) {
+            foreach ([['مصاريف ثابتة', $fixed, 'إجمالي المصاريف الثابتة للشهر', 'bank'], ['مواد خام', $goods, 'إجمالي مشتريات الأغراض للشهر', 'cash']] as [$c, $a, $n, $pf])
+                if (!q('SELECT 1 FROM expenses WHERE expense_date = ? AND note = ?', ["$m-01", $n])->fetch())
+                    q('INSERT INTO expenses (expense_date, category, amount, note, created_at, paid_from) VALUES (?,?,?,?,?,?)', ["$m-01", $c, $a, $n, now(), $pf]);
+        }
+        q("DELETE FROM settings WHERE k = 'jobs_day'");
+        q("INSERT INTO settings (k, v) VALUES ('karak_fixed_costs2', '1')");
+    }
 }

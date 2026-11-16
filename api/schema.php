@@ -257,4 +257,14 @@ function create_schema(): void {
     }
     // Karak Dose: make sure all four apps are there (Talabat, TM Done, Khedmah, Snoonu)
     if (BIZ === 'karak' && !q("SELECT 1 FROM settings WHERE k = 'karak_channels_v2'")->fetch()) q("INSERT INTO settings (k, v) VALUES ('karak_channels_v2', '1')");
+    // 16 Nov: Karak Dose monthly fixed costs, on the 1st, from November (paid by the owner's transfer; editable in Expenses)
+    if (BIZ === 'karak' && !q("SELECT 1 FROM settings WHERE k = 'karak_fixed_costs'")->fetch()) {
+        foreach ([['إيجار', 200, 'إيجار المحل'], ['رواتب', 200, 'راتب عامل ١'], ['رواتب', 130, 'راتب عامل ٢'], ['رواتب', 120, 'راتب عامل ٣'],
+                  ['رواتب', 50, 'راتب موظف المشتريات'], ['كهرباء وماء وغاز', 70, 'الكهرباء'], ['كهرباء وماء وغاز', 10, 'الماي']] as [$c, $a, $n]) {
+            if (!q('SELECT 1 FROM recurring_expenses WHERE note = ?', [$n])->fetch())
+                q('INSERT INTO recurring_expenses (category, amount, day_of_month, note, paid_from, active, last_month, created_at) VALUES (?,?,1,?,?,1,NULL,?)', [$c, $a, $n, 'bank', now()]);
+        }
+        q("DELETE FROM settings WHERE k = 'jobs_day'");
+        q("INSERT INTO settings (k, v) VALUES ('karak_fixed_costs', '1')");
+    }
 }

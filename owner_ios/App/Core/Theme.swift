@@ -21,8 +21,30 @@ extension Color {
             return t.userInterfaceStyle == .dark ? UIColor(red: 0.86, green: 0.68, blue: 0.86, alpha: 1) : UIColor(red: 0x47 / 255, green: 0x0D / 255, blue: 0x43 / 255, alpha: 1)
         })
     }
-    static let pageBG = Color(uiColor: .systemGroupedBackground)
-    static let cardBG = Color(uiColor: .secondarySystemGroupedBackground)
+    /// One colour for light mode and one for dark mode.
+    private static func dyn(_ light: Int, _ dark: Int) -> Color {
+        Color(uiColor: UIColor { t in
+            let v = t.userInterfaceStyle == .dark ? dark : light
+            return UIColor(red: CGFloat((v >> 16) & 0xFF) / 255, green: CGFloat((v >> 8) & 0xFF) / 255, blue: CGFloat(v & 0xFF) / 255, alpha: 1)
+        })
+    }
+    static let yellow = Color(red: 1, green: 0xC2 / 255, blue: 0x29 / 255)
+    /// Page: cream (light) or deep purple (dark); Karak Dose light grey or near black.
+    static var pageBG: Color { karak ? dyn(0xF2F2F2, 0x111111) : dyn(0xFAF3E0, 0x170515) }
+    static var cardBG: Color { karak ? dyn(0xFFFFFF, 0x1F1F1F) : dyn(0xFFFFFF, 0x28102A) }
+    /// A step up from a card (icon wells, chips inside cards).
+    static var wellBG: Color { karak ? dyn(0xEDEDED, 0x2B2B2B) : dyn(0xF1E9DA, 0x341636) }
+    /// The big card on top: purple with cream text (light), yellow with purple text (dark). Karak: charcoal / white.
+    static var heroBG: Color { karak ? dyn(0x393939, 0xF2F2F2) : dyn(0x470D43, 0xFFC229) }
+    static var heroBG2: Color { karak ? dyn(0x4A4A4A, 0xDDDDDD) : dyn(0x5E1A55, 0xF2B21C) }
+    static var heroFG: Color { karak ? dyn(0xFFFFFF, 0x222222) : dyn(0xFAF3E0, 0x470D43) }
+    /// Highlight on the hero colour (badges, the chosen tab): yellow on purple, purple on yellow.
+    static var pop: Color { karak ? dyn(0xFFFFFF, 0x393939) : dyn(0xFFC229, 0x470D43) }
+    static var popFG: Color { karak ? dyn(0x393939, 0xFFFFFF) : dyn(0x470D43, 0xFFC229) }
+    /// The floating tab bar.
+    static var barBG: Color { karak ? dyn(0x393939, 0x2A2A2A) : dyn(0x470D43, 0x2E1430) }
+    static var barOn: Color { karak ? dyn(0xFFFFFF, 0xFFFFFF) : dyn(0xFFC229, 0xFFC229) }
+    static var barOnFG: Color { karak ? dyn(0x393939, 0x222222) : dyn(0x470D43, 0x470D43) }
 }
 
 /// White rounded group like an iOS inset-grouped section.
@@ -32,7 +54,7 @@ struct CardStyle: ViewModifier {
         content
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.cardBG, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(Color.cardBG, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 }
 

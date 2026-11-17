@@ -51,13 +51,30 @@ final class Period {
         return out
     }
 
-    /// The same number of days just before, to compare with.
+    /// The same dates one month back, to compare with: today against the same day last month,
+    /// this month so far against the same days of last month, last month against the month before.
     var previous: (Date, Date, [Date]) {
-        let n = days.count
-        let pFrom = muscat.date(byAdding: .day, value: -n, to: from)!
-        let pTo = muscat.date(byAdding: .day, value: -1, to: from)!
-        let list = (0..<n).map { muscat.date(byAdding: .day, value: $0, to: pFrom)! }
+        let cal = muscat
+        func back(_ d: Date) -> Date { cal.date(byAdding: .month, value: -1, to: d)! }   // 31 Mar → 28/29 Feb
+        var pFrom = back(from), pTo = back(to)
+        if key == "last" {   // a whole month: the whole month before it
+            pFrom = back(from)
+            pTo = cal.date(byAdding: .day, value: -1, to: from)!
+        }
+        var list: [Date] = []
+        var d = pFrom
+        while d <= pTo { list.append(d); d = cal.date(byAdding: .day, value: 1, to: d)! }
         return (pFrom, pTo, list)
+    }
+
+    /// "18 أكتوبر" or "1–18 أكتوبر": the dates compared with.
+    var previousText: String {
+        let (a, b, _) = previous
+        let f = DateFormatter(); f.locale = Locale(identifier: "ar_OM"); f.timeZone = muscat.timeZone
+        f.dateFormat = "d MMMM"
+        if muscat.isDate(a, inSameDayAs: b) { return f.string(from: a) }
+        let dOnly = DateFormatter(); dOnly.locale = f.locale; dOnly.timeZone = f.timeZone; dOnly.dateFormat = "d"
+        return "\(dOnly.string(from: a))–\(f.string(from: b))"
     }
 
     var label: String {
@@ -67,10 +84,11 @@ final class Period {
 
     var vsText: String {
         switch key {
-        case "today": return "مقارنة بأمس"
-        case "yest": return "مقارنة باليوم اللي قبله"
-        case "month": return "مقارنة بنفس عدد الأيام قبلها"
-        default: return "مقارنة بالفترة اللي قبلها"
+        case "today": return "نفس اليوم الشهر الماضي"
+        case "yest": return "نفس اليوم الشهر الماضي"
+        case "month": return "نفس الأيام الشهر الماضي"
+        case "last": return "الشهر اللي قبله"
+        default: return "نفس الفترة الشهر الماضي"
         }
     }
 }
@@ -120,8 +138,9 @@ struct PeriodBar: View {
                 Text(t).font(.subheadline.weight(.semibold))
             }
             .padding(.horizontal, 14).padding(.vertical, 8)
-            .foregroundStyle(on ? Color.white : Color.primary)
-            .background(on ? Color.brand : Color.cardBG, in: Capsule())
+            .foregroundStyle(on ? Color.heroFG : Color.ink)
+            .frame(minHeight: 30)
+            .background(on ? Color.heroBG : Color.cardBG, in: Capsule())
         }
         .buttonStyle(.plain)
     }

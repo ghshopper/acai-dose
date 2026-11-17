@@ -83,23 +83,25 @@ struct RootView: View {
 struct MainTabs: View {
     let onLogout: () -> Void
     @State private var tab = 0
+    /// Tabs opened so far: each is built the first time it is opened, then kept (its scroll and data stay).
+    @State private var opened: Set<Int> = [0]
     @Environment(\.scenePhase) private var phase
     @Environment(Live.self) private var live
 
+    static let tabs: [(String, String)] = [("الملخص", "house.fill"), ("الطلبات", "doc.text.fill"), ("العملاء", "person.2.fill"), ("المصاريف", "creditcard.fill"), ("المزيد", "ellipsis")]
+
     var body: some View {
-        TabView(selection: $tab) {
-            NavigationStack { SummaryView() }
-                .tabItem { Label("الملخص", systemImage: "chart.pie.fill") }.tag(0)
-            NavigationStack { OrdersView() }
-                .tabItem { Label("الطلبات", systemImage: "doc.text.fill") }.tag(1)
-            NavigationStack { CustomersView() }
-                .tabItem { Label("العملاء", systemImage: "person.2.fill") }.tag(2)
-            NavigationStack { ExpensesView() }
-                .tabItem { Label("المصاريف", systemImage: "creditcard.fill") }.tag(3)
-            NavigationStack { MoreView(onLogout: onLogout) }
-                .tabItem { Label("المزيد", systemImage: "ellipsis.circle.fill") }.tag(4)
+        ZStack {
+            ForEach(Array(opened).sorted(), id: \.self) { i in
+                page(i)
+                    .safeAreaInset(edge: .bottom, spacing: 0) { Color.clear.frame(height: 78) }
+                    .opacity(tab == i ? 1 : 0)
+                    .allowsHitTesting(tab == i)
+                    .accessibilityHidden(tab != i)
+            }
         }
-        .onChange(of: tab) { _, _ in Haptics.tap() }
+        .overlay(alignment: .bottom) { bar }
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .task {
             // Keep the widget and Live Activity fresh while the app is open
             while !Task.isCancelled {
@@ -107,6 +109,50 @@ struct MainTabs: View {
                 try? await Task.sleep(for: .seconds(60))
             }
         }
+    }
+
+    @ViewBuilder private func page(_ i: Int) -> some View {
+        switch i {
+        case 0: NavigationStack { SummaryView() }
+        case 1: NavigationStack { OrdersView() }
+        case 2: NavigationStack { CustomersView() }
+        case 3: NavigationStack { ExpensesView() }
+        default: NavigationStack { MoreView(onLogout: onLogout) }
+        }
+    }
+
+    /// Floating capsule: the open tab shows its name on a yellow (or white) pill, the rest are icons.
+    private var bar: some View {
+        HStack(spacing: 0) {
+            ForEach(Self.tabs.indices, id: \.self) { i in
+                let on = tab == i
+                Button {
+                    guard tab != i else { return }
+                    Haptics.tap()
+                    opened.insert(i)
+                    withAnimation(.spring(duration: 0.3)) { tab = i }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: Self.tabs[i].1).font(.system(size: 17, weight: .semibold))
+                        if on { Text(Self.tabs[i].0).font(.subheadline.bold()).lineLimit(1).fixedSize() }
+                    }
+                    .foregroundStyle(on ? Color.barOnFG : Color.white.opacity(0.72))
+                    .padding(.horizontal, on ? 16 : 0)
+                    .frame(minWidth: 48, minHeight: 48)
+                    .background(on ? Color.barOn : Color.clear, in: Capsule())
+                    .frame(maxWidth: on ? nil : .infinity)
+                    .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Self.tabs[i].0)
+                .accessibilityAddTraits(on ? .isSelected : [])
+            }
+        }
+        .padding(8)
+        .background(Color.barBG, in: Capsule())
+        .shadow(color: .black.opacity(0.22), radius: 18, y: 8)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 6)
     }
 }
 

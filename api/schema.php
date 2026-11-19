@@ -231,6 +231,13 @@ function create_schema(): void {
             q("UPDATE products SET active = 1, secret = 1, img = '' WHERE name_en = 'Mango Milkshake'");
             q("INSERT INTO settings (k, v) VALUES ('mango_live', '1')");
         }
+        // 19 Nov: Mango Milkshake launched officially: real name and photo, placed right after the açaí cups
+        if (!q("SELECT 1 FROM settings WHERE k = 'mango_official'")->fetch()) {
+            $after = (int)q("SELECT COALESCE(MAX(sort), 0) FROM products WHERE kind = 'cup' AND name_en NOT LIKE 'Mini %' AND name_en <> 'Mango Milkshake' AND name_en LIKE '%Açaí%'")->fetchColumn();
+            q("UPDATE products SET sort = sort + 1 WHERE sort > ? AND name_en <> 'Mango Milkshake'", [$after]);
+            q("UPDATE products SET active = 1, secret = 0, img = 'cup-mango.png', sort = ?, desc_ar = 'مانجو وحليب لوز وآيسكريم', desc_en = 'Mango, almond milk and ice cream' WHERE name_en = 'Mango Milkshake'", [$after + 1]);
+            q("INSERT INTO settings (k, v) VALUES ('mango_official', '1')");
+        }
     } else {
         seed_karak();
         karak_flavours();

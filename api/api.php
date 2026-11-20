@@ -818,6 +818,19 @@ case 'report':   // owner: one shop's period in numbers, for the partners' repor
          'bank' => $acc['total_balance'], 'accounts' => array_map(fn($x) => ['name' => $x['name'], 'balance' => $x['balance']], $acc['accounts']), 'owed' => array_values(array_filter(array_map(fn($c) => ['ar' => $c['ar'], 'owed' => $c['owed']], $acc['channels']), fn($c) => abs($c['owed']) > 0.0005)),
          'owed_total' => $acc['owed_total']]);
 
+case 'months':   // owner: the last 12 months side by side (sales, app commission, expenses, net, orders), for the business page
+    need('owner');
+    $start = date('Y-m-01', strtotime(date('Y-m-01') . ' -11 months'));
+    $m = [];
+    for ($i = 0; $i < 12; $i++) { $k = date('Y-m', strtotime("$start +$i months")); $m[$k] = ['month' => $k, 'sales' => 0.0, 'commission' => 0.0, 'expenses' => 0.0, 'orders' => 0, 'days' => 0]; }
+    foreach (q("SELECT SUBSTR(day, 1, 7) k, SUM(total) s, SUM(COALESCE(commission, 0)) c, SUM(COALESCE(n_orders, 1)) n, COUNT(DISTINCT day) d FROM orders WHERE day >= ? AND status <> 'cancelled' GROUP BY SUBSTR(day, 1, 7)", [$start])->fetchAll() as $r)
+        if (isset($m[$r['k']])) { $m[$r['k']]['sales'] += (float)$r['s']; $m[$r['k']]['commission'] += (float)$r['c']; $m[$r['k']]['orders'] += (int)$r['n']; $m[$r['k']]['days'] = (int)$r['d']; }
+    foreach (q('SELECT SUBSTR(sale_date, 1, 7) k, SUM(gross) s, SUM(commission) c, SUM(COALESCE(orders_count, 0)) n FROM channel_sales WHERE sale_date >= ? GROUP BY SUBSTR(sale_date, 1, 7)', [$start])->fetchAll() as $r)
+        if (isset($m[$r['k']])) { $m[$r['k']]['sales'] += (float)$r['s']; $m[$r['k']]['commission'] += (float)$r['c']; $m[$r['k']]['orders'] += (int)$r['n']; }
+    foreach (q('SELECT SUBSTR(expense_date, 1, 7) k, SUM(amount) s FROM expenses WHERE expense_date >= ? GROUP BY SUBSTR(expense_date, 1, 7)', [$start])->fetchAll() as $r)
+        if (isset($m[$r['k']])) $m[$r['k']]['expenses'] += (float)$r['s'];
+    out(array_values(array_map(fn($x) => $x + ['net' => money($x['sales'] - $x['commission'] - $x['expenses'])] , array_map(fn($x) => array_merge($x, ['sales' => money($x['sales']), 'commission' => money($x['commission']), 'expenses' => money($x['expenses'])]), $m))));
+
 case 'payout_add':   // owner: an app transferred money
     $post(); need('owner');
     $c = (string)($in['channel'] ?? ''); if (!in_array($c, channels(), true)) fail('bad_channel');

@@ -141,6 +141,7 @@ struct PeriodBar: View {
             .foregroundStyle(on ? Color.heroFG : Color.ink)
             .frame(minHeight: 30)
             .background(on ? Color.heroBG : Color.cardBG, in: Capsule())
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
     }

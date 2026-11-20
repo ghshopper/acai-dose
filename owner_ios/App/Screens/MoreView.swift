@@ -20,6 +20,7 @@ struct MoreView: View {
             }
             Section {
                 NavigationLink { SettingsView() } label: { row("gearshape.fill", .gray, "الإعدادات", "الأسعار، الولاء، العمولات، حسابات العمال") }
+                NavigationLink { BusinessView() } label: { row("chart.pie.fill", .brand, "البزنس", "المبيعات والمصاريف والربح وآخر ١٢ شهر") }
                 NavigationLink { ReportView() } label: { row("doc.text.magnifyingglass", .brand, "تقرير الشركاء", "المحلين مع بعض، وترسله واتساب بضغطة") }
                 NavigationLink { AccountsView() } label: { row("banknote.fill", .accent2, "الحسابات والتحويلات", "كم باقي على التطبيقات، ورصيد حساب الشركة") }
                 NavigationLink { CostView() } label: { row("shippingbox.fill", .good, "التكلفة والمخزون", "تكلفة كل كوب، الجرد، المشتريات") }

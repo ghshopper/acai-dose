@@ -20,8 +20,8 @@ struct SummaryView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                header
-                PeriodBar().padding(.horizontal, -16)
+                header.padding(.horizontal, 16)
+                PeriodBar()
                 Group {
                     if let s {
                         hero(s)
@@ -36,8 +36,8 @@ struct SummaryView: View {
                         ProgressView().frame(maxWidth: .infinity).padding(60)
                     }
                 }
+                .padding(.horizontal, 16)
             }
-            .padding(.horizontal, 16)
             .padding(.bottom, 24)
         }
         .background(Color.pageBG.ignoresSafeArea())
@@ -67,6 +67,13 @@ struct SummaryView: View {
             }
             Spacer()
             if loading { ProgressView().frame(width: 48, height: 48) }
+            NavigationLink { BusinessView() } label: {
+                Image(systemName: "chart.pie.fill").font(.title3)
+                    .foregroundStyle(Color.ink)
+                    .frame(width: 48, height: 48)
+                    .background(Color.cardBG, in: Circle())
+            }
+            .accessibilityLabel("البزنس")
         }
         .padding(.top, 8)
     }

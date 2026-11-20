@@ -5,27 +5,56 @@ import Charts
 /// the last 12 months side by side, and where the money sits now.
 struct BusinessView: View {
     @Environment(Period.self) private var period
-    @State private var r: J?
-    @State private var months: [J] = []
-    @State private var err: String?
+    @State private var reports: [Biz: J] = [:]
+    @State private var monthsBy: [Biz: [J]] = [:]
+    @State private var errs: [Biz: String] = [:]
+    @State private var pick = "all"
     @State private var loading = false
+
+    static let shopColor: [Biz: Color] = [.acai: Color(red: 0x8E / 255, green: 0x3B / 255, blue: 0x86 / 255), .karak: Color(red: 0.6, green: 0.6, blue: 0.6)]
+
+    /// The report the detail sections show: one shop, or both added together.
+    private var sel: J? {
+        if pick == "all" { return reports.isEmpty ? nil : combined }
+        return Biz(rawValue: pick).flatMap { reports[$0] }
+    }
+    private var months: [J] {
+        if pick == "all" { return combinedMonths }
+        return Biz(rawValue: pick).flatMap { monthsBy[$0] } ?? []
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 PeriodBar()
                 Group {
-                    if let r {
-                        hero(r)
-                        perRial(r)
-                        income(r)
-                        spending(r)
-                        if months.count > 1 { trend }
-                        cash(r)
-                    } else if let err {
-                        EmptyNote(text: err, icon: "wifi.exclamationmark")
-                    } else {
+                    if reports.isEmpty && !errs.isEmpty {
+                        EmptyNote(text: errs.values.first ?? "", icon: "wifi.exclamationmark")
+                    } else if reports.isEmpty {
                         ProgressView().frame(maxWidth: .infinity).padding(60)
+                    } else {
+                        hero(combined, title: reports.count > 1 ? "المحلين مع بعض" : (reports.keys.first?.name ?? ""))
+                        shops
+                        if reports.count > 1 { table }
+                        ForEach(Biz.allCases) { b in
+                            if reports[b] == nil, let e = errs[b] {
+                                Text(e == errText("login_required") ? "سجّل دخول \(b.name) مرة وحدة من زر المحل، وبعدها يطلع هني" : "\(b.name): \(e)")
+                                    .font(.footnote).foregroundStyle(.secondary)
+                            }
+                        }
+                        Picker("", selection: $pick) {
+                            Text("المحلين").tag("all")
+                            ForEach(Biz.allCases) { b in Text(b.name).tag(b.rawValue) }
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.top, 6)
+                        if let r = sel {
+                            perRial(r)
+                            income(r)
+                            spending(r)
+                            if months.filter({ $0["sales"].double > 0 }).count > 1 { trend }
+                            cash(r)
+                        }
                     }
                 }
                 .padding(.horizontal, 16)
@@ -38,7 +67,136 @@ struct BusinessView: View {
         .toolbar(.visible, for: .navigationBar)
         .toolbar { ToolbarItem(placement: .topBarTrailing) { if loading { ProgressView() } } }
         .refreshable { await load() }
-        .task(id: "\(period.version)-\(BizStore.shared.current.rawValue)") { await load() }
+        .task(id: period.version) { await load() }
+    }
+
+    // MARK: both shops
+
+    /// Both reports added together, in the same shape as one report.
+    private var combined: J {
+        let rs = Biz.allCases.compactMap { reports[$0] }
+        let multi = rs.count > 1
+        func sum(_ k: String) -> Double { rs.reduce(0) { $0 + $1[k].double } }
+        func merge(_ k: String) -> [String: Any] {
+            var d: [String: Double] = [:]
+            for r in rs { for (c, v) in r[k].dict { d[c, default: 0] += v.double } }
+            return d
+        }
+        var pay: [String: Any] = [:]
+        for f in ["cash", "card", "apps", "open"] { pay[f] = rs.reduce(0) { $0 + $1["pay"][f].double } }
+        var apps: [String: (String, Double)] = [:]
+        for r in rs { for a in r["apps"].array { let k = a["k"].string; apps[k] = (a["ar"].string, (apps[k]?.1 ?? 0) + a["gross"].double) } }
+        var accounts: [[String: Any]] = [], owed: [[String: Any]] = []
+        for b in Biz.allCases {
+            guard let r = reports[b] else { continue }
+            for x in r["accounts"].array { accounts.append(["name": multi ? "\(b.name) · \(x["name"].string)" : x["name"].string, "balance": x["balance"].double]) }
+            for o in r["owed"].array { owed.append(["ar": multi ? "\(o["ar"].string) (\(b.name))" : o["ar"].string, "owed": o["owed"].double]) }
+        }
+        return J([
+            "sales": sum("sales"), "orders": sum("orders"), "commission": sum("commission"),
+            "running": merge("running"), "running_total": sum("running_total"),
+            "one_off": merge("one_off"), "one_off_total": sum("one_off_total"),
+            "net": sum("net"), "net_running": sum("net_running"), "owner_in": sum("owner_in"), "withdrawn": sum("withdrawn"),
+            "pay": pay, "apps": apps.map { ["k": $0.key, "ar": $0.value.0, "gross": $0.value.1] },
+            "accounts": accounts, "owed": owed,
+        ] as [String: Any])
+    }
+
+    private var combinedMonths: [J] {
+        var out: [String: [String: Double]] = [:]
+        var order: [String] = []
+        for b in Biz.allCases {
+            for m in monthsBy[b] ?? [] {
+                let k = m["month"].string
+                if out[k] == nil { out[k] = [:]; order.append(k) }
+                for f in ["sales", "commission", "expenses", "net", "orders"] { out[k]![f, default: 0] += m[f].double }
+            }
+        }
+        return order.sorted().map { k in
+            var d: [String: Any] = [:]
+            for (f, v) in out[k] ?? [:] { d[f] = v }
+            d["month"] = k
+            return J(d)
+        }
+    }
+
+    /// The two shops side by side; tap one to see its details below.
+    private var shops: some View {
+        HStack(spacing: 10) {
+            ForEach(Biz.allCases) { b in
+                if let r = reports[b] {
+                    let sl = r["sales"].double, net = r["net"].double
+                    Button { withAnimation { pick = pick == b.rawValue ? "all" : b.rawValue } } label: {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 6) {
+                                Circle().fill(Self.shopColor[b] ?? .gray).frame(width: 10, height: 10)
+                                Text(b.name).font(.subheadline.weight(.bold))
+                            }
+                            Text(money(net)).font(.title2.weight(.heavy)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
+                                .foregroundStyle(net < 0 ? Color.bad : Color.ink)
+                            Text("صافي · هامش \(sl > 0 ? Int((net / sl * 100).rounded()) : 0)%").font(.caption).foregroundStyle(.secondary)
+                            Divider()
+                            kv("المبيعات", money(sl))
+                            kv("المصاريف", money(r["commission"].double + r["running_total"].double + r["one_off_total"].double))
+                            kv("الطلبات", "\(r["orders"].int)")
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(14)
+                        .background(Color.cardBG, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(pick == b.rawValue ? (Self.shopColor[b] ?? .gray) : .clear, lineWidth: 2))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private func kv(_ a: String, _ v: String) -> some View {
+        HStack {
+            Text(a).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            Spacer()
+            Text(v).font(.footnote.bold()).monospacedDigit()
+        }
+    }
+
+    /// Every number for both shops in one table.
+    private var table: some View {
+        let a = reports[.acai], k = reports[.karak]
+        func cell(_ r: J?, _ f: (J) -> Double, money m: Bool = true) -> String {
+            guard let r else { return "—" }
+            let v = f(r); return m ? money(v) : String(Int(v.rounded()))
+        }
+        let rows: [(String, (J) -> Double, Bool)] = [
+            ("المبيعات", { $0["sales"].double }, true),
+            ("كاش", { $0["pay"]["cash"].double }, true),
+            ("فيزا", { $0["pay"]["card"].double }, true),
+            ("التطبيقات", { $0["pay"]["apps"].double }, true),
+            ("عمولات", { $0["commission"].double }, true),
+            ("المصاريف", { $0["running_total"].double + $0["one_off_total"].double }, true),
+            ("الصافي", { $0["net"].double }, true),
+            ("الطلبات", { $0["orders"].double }, false),
+        ]
+        return VStack(alignment: .leading, spacing: 10) {
+            header("المحلين جنب بعض", nil)
+            HStack {
+                Text("").frame(width: 72, alignment: .leading)
+                Text("أساي").font(.caption.bold()).foregroundStyle(Self.shopColor[.acai]!).frame(maxWidth: .infinity, alignment: .trailing)
+                Text("كرك").font(.caption.bold()).foregroundStyle(Self.shopColor[.karak]!).frame(maxWidth: .infinity, alignment: .trailing)
+                Text("المجموع").font(.caption.bold()).frame(maxWidth: .infinity, alignment: .trailing)
+            }
+            ForEach(rows.indices, id: \.self) { i in
+                let row = rows[i]
+                let bold = row.0 == "الصافي" || row.0 == "المبيعات"
+                HStack {
+                    Text(row.0).font(bold ? .footnote.bold() : .footnote).frame(width: 72, alignment: .leading)
+                    Text(cell(a, row.1, money: row.2)).font(.footnote).monospacedDigit().frame(maxWidth: .infinity, alignment: .trailing)
+                    Text(cell(k, row.1, money: row.2)).font(.footnote).monospacedDigit().frame(maxWidth: .infinity, alignment: .trailing)
+                    Text(cell(combined, row.1, money: row.2)).font(.footnote.bold()).monospacedDigit().frame(maxWidth: .infinity, alignment: .trailing)
+                }
+                if i < rows.count - 1 { Divider() }
+            }
+        }
+        .card(16)
     }
 
     // MARK: numbers
@@ -49,12 +207,12 @@ struct BusinessView: View {
     // MARK: pieces
 
     /// Net profit, margin, and the three big numbers.
-    private func hero(_ r: J) -> some View {
+    private func hero(_ r: J, title: String) -> some View {
         let s = sales(r), net = r["net"].double
         let margin = s > 0 ? net / s * 100 : 0
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("صافي الربح · \(period.label)").font(.subheadline.weight(.semibold)).opacity(0.8)
+                Text("\(title) · \(period.label)").font(.subheadline.weight(.semibold)).opacity(0.8)
                 Spacer()
                 Text("هامش \(Int(margin.rounded()))%").font(.caption.bold()).monospacedDigit()
                     .padding(.horizontal, 10).padding(.vertical, 5)
@@ -65,6 +223,7 @@ struct BusinessView: View {
                     .lineLimit(1).minimumScaleFactor(0.6)
                 Text("ر.ع").font(.headline).opacity(0.8)
             }
+            Text("صافي الربح").font(.caption.weight(.semibold)).opacity(0.75)
             HStack(spacing: 8) {
                 mini("المبيعات", money(s))
                 mini("المصاريف", money(costs(r)))
@@ -291,13 +450,25 @@ struct BusinessView: View {
     private func load() async {
         loading = true
         defer { loading = false }
-        do {
-            async let a = API.shared.get("report", ["from": period.fromStr, "to": period.toStr])
-            async let b = API.shared.get("months")
-            let (x, y) = try await (a, b)
-            r = x; months = y.array; err = nil
-        } catch {
-            err = errText(error)
+        var rs: [Biz: J] = [:], ms: [Biz: [J]] = [:], es: [Biz: String] = [:]
+        let from = period.fromStr, to = period.toStr
+        await withTaskGroup(of: (Biz, J?, [J], String?).self) { g in
+            for b in Biz.allCases {
+                g.addTask {
+                    do {
+                        async let x = API.shared.get("report", ["from": from, "to": to], biz: b)
+                        async let y = API.shared.get("months", [:], biz: b)
+                        let (r, m) = try await (x, y)
+                        return (b, r, m.array, nil)
+                    } catch { return (b, nil, [], errText(error)) }
+                }
+            }
+            for await (b, r, m, e) in g {
+                if let r { rs[b] = r; ms[b] = m }
+                if let e { es[b] = e }
+            }
         }
+        reports = rs; monthsBy = ms; errs = es
     }
 }
+

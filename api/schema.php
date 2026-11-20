@@ -238,6 +238,12 @@ function create_schema(): void {
             q("UPDATE products SET active = 1, secret = 0, img = 'cup-mango.png', sort = ?, desc_ar = 'مانجو وحليب لوز وآيسكريم', desc_en = 'Mango, almond milk and ice cream' WHERE name_en = 'Mango Milkshake'", [$after + 1]);
             q("INSERT INTO settings (k, v) VALUES ('mango_official', '1')");
         }
+        // 20 Nov: National Day, 20% off today only (till and order page; delivery-app sales keep their prices)
+        if (!q("SELECT 1 FROM settings WHERE k = 'promo_nd26'")->fetch()) {
+            q("DELETE FROM settings WHERE k = 'promo'");
+            q("INSERT INTO settings (k, v) VALUES ('promo', ?)", [json_encode(['pct' => 20, 'from' => '2026-11-20', 'to' => '2026-11-20', 'ar' => 'خصم اليوم الوطني ٢٠٪', 'en' => 'National Day · 20% off'], JSON_UNESCAPED_UNICODE)]);
+            q("INSERT INTO settings (k, v) VALUES ('promo_nd26', '1')");
+        }
     } else {
         seed_karak();
         karak_flavours();

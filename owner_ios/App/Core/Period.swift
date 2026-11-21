@@ -93,25 +93,35 @@ final class Period {
     }
 }
 
-/// Capsules for the period, plus a custom range.
+/// The period picker: one bar of equal segments (no sideways scrolling, so every tap lands), plus a custom range.
 struct PeriodBar: View {
     @Environment(Period.self) private var period
     @State private var picking = false
     @State private var a = Date.now
     @State private var b = Date.now
+    @Namespace private var ns
+
+    static let short: [String: String] = ["today": "اليوم", "yest": "أمس", "week": "٧ أيام", "month": "هالشهر", "last": "الشهر الماضي"]
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+        VStack(spacing: 6) {
+            HStack(spacing: 2) {
                 ForEach(Period.options.map { $0.0 }, id: \.self) { k in
-                    capsule(Period.options.first { $0.0 == k }?.1 ?? k, on: period.key == k) { period.set(k) }
+                    seg(on: period.key == k, id: k) { Text(Self.short[k] ?? k) } action: { period.set(k) }
                 }
-                capsule(period.key == "custom" ? period.label : "تاريخ", on: period.key == "custom", icon: "calendar") {
+                seg(on: period.key == "custom", id: "custom") { Image(systemName: "calendar") } action: {
                     a = period.from; b = period.to; picking = true
                 }
+                .frame(maxWidth: 52)
+                .accessibilityLabel("تاريخ مخصص")
             }
-            .padding(.horizontal, 16)
+            .padding(4)
+            .background(Color.cardBG, in: Capsule())
+            if period.key == "custom" {
+                Text(period.label).font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+            }
         }
+        .padding(.horizontal, 16)
         .sheet(isPresented: $picking) {
             NavigationStack {
                 Form {
@@ -129,20 +139,23 @@ struct PeriodBar: View {
         }
     }
 
-    private func capsule(_ t: String, on: Bool, icon: String? = nil, _ action: @escaping () -> Void) -> some View {
+    private func seg<L: View>(on: Bool, id: String, @ViewBuilder label: () -> L, action: @escaping () -> Void) -> some View {
         Button {
-            Haptics.tap(); withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { action() }
+            Haptics.tap()
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { action() }
         } label: {
-            HStack(spacing: 5) {
-                if let icon { Image(systemName: icon).font(.footnote) }
-                Text(t).font(.subheadline.weight(.semibold))
-            }
-            .padding(.horizontal, 16).padding(.vertical, 10)
-            .foregroundStyle(on ? Color.heroFG : Color.ink)
-            .frame(minHeight: 44)
-            .background(on ? Color.heroBG : Color.cardBG, in: Capsule())
-            .contentShape(Capsule())
+            label()
+                .font(.subheadline.weight(.bold))
+                .lineLimit(1).minimumScaleFactor(0.7)
+                .foregroundStyle(on ? Color.heroFG : Color.ink)
+                .frame(maxWidth: .infinity, minHeight: 42)
+                .padding(.horizontal, 4)
+                .background {
+                    if on { Capsule().fill(Color.heroBG).matchedGeometryEffect(id: "seg", in: ns) }
+                }
+                .contentShape(Capsule())
         }
-        .buttonStyle(Pressable())
+        .buttonStyle(Pressable(scale: 0.93))
+        .accessibilityAddTraits(on ? .isSelected : [])
     }
 }

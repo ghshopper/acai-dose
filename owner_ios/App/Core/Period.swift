@@ -131,18 +131,18 @@ struct PeriodBar: View {
 
     private func capsule(_ t: String, on: Bool, icon: String? = nil, _ action: @escaping () -> Void) -> some View {
         Button {
-            Haptics.tap(); action()
+            Haptics.tap(); withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { action() }
         } label: {
             HStack(spacing: 5) {
                 if let icon { Image(systemName: icon).font(.footnote) }
                 Text(t).font(.subheadline.weight(.semibold))
             }
-            .padding(.horizontal, 14).padding(.vertical, 8)
+            .padding(.horizontal, 16).padding(.vertical, 10)
             .foregroundStyle(on ? Color.heroFG : Color.ink)
-            .frame(minHeight: 30)
+            .frame(minHeight: 44)
             .background(on ? Color.heroBG : Color.cardBG, in: Capsule())
             .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(Pressable())
     }
 }

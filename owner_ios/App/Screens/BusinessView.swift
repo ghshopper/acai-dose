@@ -145,7 +145,7 @@ struct BusinessView: View {
                         .background(Color.cardBG, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(pick == b.rawValue ? (Self.shopColor[b] ?? .gray) : .clear, lineWidth: 2))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(Pressable())
                 }
             }
         }

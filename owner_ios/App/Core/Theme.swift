@@ -226,3 +226,15 @@ func waLink(_ phone: String, text: String? = nil) -> String {
     if let text, let q = text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) { return "https://wa.me/\(n)?text=\(q)" }
     return "https://wa.me/\(n)"
 }
+
+
+/// Buttons that visibly react: shrink a little and dim while pressed.
+struct Pressable: ButtonStyle {
+    var scale: CGFloat = 0.95
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? scale : 1)
+            .opacity(configuration.isPressed ? 0.8 : 1)
+            .animation(.spring(response: 0.22, dampingFraction: 0.7), value: configuration.isPressed)
+    }
+}

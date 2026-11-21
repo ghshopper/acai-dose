@@ -85,6 +85,7 @@ struct MainTabs: View {
     @State private var tab = 0
     /// Tabs opened so far: each is built the first time it is opened, then kept (its scroll and data stay).
     @State private var opened: Set<Int> = [0]
+    @Namespace private var tabNS
     @Environment(\.scenePhase) private var phase
     @Environment(Live.self) private var live
 
@@ -121,7 +122,7 @@ struct MainTabs: View {
         }
     }
 
-    /// Floating capsule: the open tab shows its name on a yellow (or white) pill, the rest are icons.
+    /// Floating capsule of icons; the open tab sits on a yellow (or white) pill.
     private var bar: some View {
         HStack(spacing: 0) {
             ForEach(Self.tabs.indices, id: \.self) { i in
@@ -130,28 +131,28 @@ struct MainTabs: View {
                     guard tab != i else { return }
                     Haptics.tap()
                     opened.insert(i)
-                    withAnimation(.spring(duration: 0.3)) { tab = i }
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { tab = i }
                 } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: Self.tabs[i].1).font(.system(size: 17, weight: .semibold))
-                        if on { Text(Self.tabs[i].0).font(.subheadline.bold()).lineLimit(1).fixedSize() }
-                    }
-                    .foregroundStyle(on ? Color.barOnFG : Color.white.opacity(0.72))
-                    .padding(.horizontal, on ? 16 : 0)
-                    .frame(minWidth: 48, minHeight: 48)
-                    .background(on ? Color.barOn : Color.clear, in: Capsule())
-                    .frame(maxWidth: on ? nil : .infinity)
-                    .contentShape(Capsule())
+                    Image(systemName: Self.tabs[i].1)
+                        .font(.system(size: 19, weight: .semibold))
+                        .foregroundStyle(on ? Color.barOnFG : Color.white.opacity(0.7))
+                        .frame(width: 58, height: 46)
+                        .background {
+                            if on { Capsule().fill(Color.barOn).matchedGeometryEffect(id: "tab", in: tabNS) }
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(Pressable(scale: 0.88))
                 .accessibilityLabel(Self.tabs[i].0)
                 .accessibilityAddTraits(on ? .isSelected : [])
             }
         }
-        .padding(8)
+        .padding(6)
         .background(Color.barBG, in: Capsule())
-        .shadow(color: .black.opacity(0.22), radius: 18, y: 8)
-        .padding(.horizontal, 16)
+        .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 1))
+        .shadow(color: .black.opacity(0.25), radius: 18, y: 8)
+        .padding(.horizontal, 20)
         .padding(.bottom, 6)
     }
 }

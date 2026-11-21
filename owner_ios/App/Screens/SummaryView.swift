@@ -106,7 +106,7 @@ struct SummaryView: View {
             HStack {
                 Text("صافي الربح · \(period.label)").font(.subheadline.weight(.semibold)).opacity(0.8)
                 Spacer()
-                if let prev { pill(now: s.net, before: prev.net) }
+                if let prev, period.key != "today" { pill(now: s.net, before: prev.net) }
             }
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(money(s.net)).font(.system(size: 42, weight: .heavy, design: .rounded)).monospacedDigit()
@@ -220,7 +220,7 @@ struct SummaryView: View {
             .frame(maxWidth: .infinity).padding(.vertical, 14)
             .background(Color.cardBG, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(Pressable())
     }
 
     /// Cash, card and the delivery apps: amounts, share of sales, and against last month.

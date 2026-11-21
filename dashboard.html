@@ -363,46 +363,13 @@ function drawApps({ apps }) {
       <button class="btn" type="submit">أضف</button>
       <div class="err" id="aerr" role="alert"></div>
     </form>
-    <h3 class="lal">السجل</h3>
-    ${apps.length ? `<div class="tbl-wrap"><table>
-      <thead><tr><th>التاريخ</th><th>التطبيق</th><th>المبيعات</th><th>العمولة</th><th>الصافي</th><th>الطلبات</th><th>ملاحظة</th><th></th></tr></thead>
-      <tbody>${apps.map(r => `<tr><td class="num">${r.sale_date}</td><td>${CH[r.channel]}</td><td class="num">${money(r.gross)}</td><td class="num">${money(r.commission)} <span class="pill">${+r.commission_pct}%</span></td><td class="num">${money(r.gross - r.commission)}</td><td class="num">${r.orders_count == null ? '-' : r.orders_count}</td><td>${esc(r.note || '')}</td><td><button class="del" data-del="sale:${r.id}" type="button">حذف</button></td></tr>`).join('')}</tbody>
-    </table></div>` : '<div class="card empty">ما فيه مبيعات تطبيقات مسجلة في هالفترة</div>'}`;
-  const setPct = () => { $('#ap').value = (commissions[$('#ac').value] == null ? 0 : commissions[$('#ac').value]); };
-  $('#ac').onchange = setPct; setPct();
-  $('#af').onsubmit = async e => {
-    e.preventDefault();
-    const gross = +$('#ag').value; if (!(gross >= 0) || $('#ag').value === '') { $('#aerr').textContent = 'اكتب المبلغ'; return; }
-    const row = { sale_date: $('#ad').value, channel: $('#ac').value, gross, commission_pct: +$('#ap').value || 0,
-      orders_count: $('#an').value === '' ? null : +$('#an').value, note: $('#ax').value.trim() || null };
-    try { await api('add_sale', row); } catch (ex) { $('#aerr').textContent = msg(ex); return; }
-    refresh();
-  };
-}
-
-// ---------- expenses ----------
-function drawExp({ exps }) {
-  const total = exps.reduce((s, r) => s + +r.amount, 0);
-  const cats = [...new Set([...CATS, ...exps.map(r => r.category)])];
-  $('[data-panel="exp"]').innerHTML = `
-    <form class="card formrow" id="xf">
-      <div class="field"><label for="xd">التاريخ</label><input type="date" id="xd" value="${ymd(new Date())}" required></div>
-      <div class="field"><label for="xc">النوع</label><select id="xc">${cats.map(c => `<option>${esc(c)}</option>`).join('')}</select></div>
-      <div class="field"><label for="xa">المبلغ (ر.ع)</label><input type="number" id="xa" step="0.001" min="0" inputmode="decimal" required></div>
-      <div class="field"><label for="xp">الدفع</label><select id="xp">${Object.entries(PAID).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
-      <div class="field"><label for="xn">ملاحظة</label><input id="xn" maxlength="120"></div>
-      <button class="btn" type="submit" id="xsave">أضف</button>
-      <button class="btn ghost" type="button" id="xcancel" style="display:none">إلغاء التعديل</button>
-      <div class="err" id="xerr" role="alert"></div>
-    </form>
-    <h3 class="lal">مصاريف ثابتة كل شهر</h3>
-    <div class="card" id="recBox" style="display:grid;gap:12px;padding:18px"><p style="margin:0">جاري التحميل…</p></div>
-    <h3 class="lal">السجل</h3>
-    ${exps.length ? `<div class="tbl-wrap"><table>
-      <thead><tr><th>التاريخ</th><th>النوع</th><th>المبلغ</th><th>ملاحظة</th><th></th><th></th></tr></thead>
-      <tbody>${exps.map(r => `<tr><td class="num">${r.expense_date}</td><td>${esc(r.category)}</td><td class="num">${money(r.amount)}</td><td>${esc(r.note || '')}${r.paid_from === 'cash' ? ' <span class="pill">كاش</span>' : r.paid_from === 'custody' ? ' <span class="pill">من العهدة</span>' : r.paid_from === 'unset' ? ' <span class="pill" style="background:#FFF4E0;color:#7A4A00">دفع ما تحدد</span>' : ''}${r.receipt ? ` <a href="api/api.php?a=receipt&id=${r.id}" target="_blank" rel="noopener" style="font-weight:800">الفاتورة</a>` : ''}</td><td><button class="btn small ghost" type="button" data-xedit="${r.id}">تعديل</button></td><td><button class="del" data-del="expense:${r.id}" type="button">حذف</button></td></tr>`).join('')}</tbody>
-      <tfoot><tr><td colspan="2">المجموع</td><td class="num">${money(total)}</td><td colspan="3"></td></tr></tfoot>
-    </table></div>` : '<div class="card empty">ما فيه مصاريف مسجلة في هالفترة</div>'}`;
+    ${exps.length ? `<div class="card" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:18px;margin-top:14px">
+      <div><div style="font-weight:700;opacity:.7">المجموع</div><div class="num" style="font-size:26px;font-weight:800">${money(total)}</div></div>
+      <div><div style="font-weight:700;opacity:.7">الثابتة</div><div class="num" style="font-size:22px;font-weight:800">${money(fixedT)}</div><div style="opacity:.6;font-size:13px">${total ? Math.round(fixedT / total * 100) : 0}%</div></div>
+      <div><div style="font-weight:700;opacity:.7">الثانية</div><div class="num" style="font-size:22px;font-weight:800">${money(total - fixedT)}</div><div style="opacity:.6;font-size:13px">${total ? Math.round((total - fixedT) / total * 100) : 0}%</div></div>
+    </div>
+    ${fixed.length ? `<h3 class="lal">المصاريف الثابتة</h3>${expTable(fixed)}` : ''}
+    ${other.length ? `<h3 class="lal">المصاريف الثانية</h3>${expTable(other)}` : ''}` : '<h3 class="lal">السجل</h3><div class="card empty">ما فيه مصاريف مسجلة في هالفترة</div>'}`;
   drawRecurring(cats);
   let editing = null;   // the expense being changed, or null when adding
   const stopEdit = () => { editing = null; $('#xsave').textContent = 'أضف'; $('#xcancel').style.display = 'none'; $('#xf').reset(); $('#xd').value = ymd(new Date()); };
